@@ -43,6 +43,20 @@ async function seedDevice(suffix: string) {
       deviceToken: `ingest-live-tok-${suffix}`,
     },
   });
+  for (const toolName of ["cursor", "codex", "claude", "opencode"] as const) {
+    await prisma.toolAccount.create({
+      data: {
+        orgId: org.id,
+        userId: user.id,
+        deviceId: device.id,
+        toolName,
+        accountKey: toolName,
+        usageEnabled: true,
+        loggingEnabled: true,
+        authPresent: true,
+      },
+    });
+  }
   return { org, user, device };
 }
 

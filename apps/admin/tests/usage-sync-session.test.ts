@@ -13,6 +13,23 @@ import {
 
 const runDb = Boolean(process.env.DATABASE_URL);
 
+async function enableGatedUsage(orgId: string, userId: string, deviceId: string) {
+  for (const toolName of ["cursor", "codex"] as const) {
+    await prisma.toolAccount.create({
+      data: {
+        orgId,
+        userId,
+        deviceId,
+        toolName,
+        accountKey: toolName,
+        usageEnabled: true,
+        loggingEnabled: true,
+        authPresent: true,
+      },
+    });
+  }
+}
+
 test("usage sync session start/chunk/commit is idempotent", { skip: !runDb }, async () => {
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const org = await prisma.organization.create({
@@ -37,6 +54,7 @@ test("usage sync session start/chunk/commit is idempotent", { skip: !runDb }, as
       deviceToken: `tok-${suffix}`,
     },
   });
+  await enableGatedUsage(org.id, user.id, device.id);
 
   try {
     const start = await startUsageSync({
@@ -130,6 +148,7 @@ test("legacy Cursor cost fingerprints produce zero delta on an unchanged second 
       deviceToken: `legacy-fp-tok-${suffix}`,
     },
   });
+  await enableGatedUsage(org.id, user.id, device.id);
   const partitionKey = "2026-07-21|cursor|composer|cursor_usage_events|";
   const legacyHash = "in:0,out:0,cr:0,cw:0,r:0,req:0,cost:100,sug:0,acc:0,add:0,del:0,com:0,ai:,v:0,mk:usage";
   const roundedHash = legacyHash.replace("cost:100", "cost:101");
@@ -231,6 +250,7 @@ test("usage sync chunks defer rematerialize; commit settles projections", { skip
       deviceToken: `settle-tok-${suffix}`,
     },
   });
+  await enableGatedUsage(org.id, user.id, device.id);
 
   try {
     const start = await startUsageSync({
@@ -335,6 +355,7 @@ test("usage sync commit deferHeavyWork schedules reconcile+settle", { skip: !run
       deviceToken: `defer-c-tok-${suffix}`,
     },
   });
+  await enableGatedUsage(org.id, user.id, device.id);
 
   try {
     const start = await startUsageSync({
@@ -421,6 +442,7 @@ test("usage sync commit skips settle when remainingPartitions > 0", { skip: !run
       deviceToken: `remain-c-tok-${suffix}`,
     },
   });
+  await enableGatedUsage(org.id, user.id, device.id);
 
   try {
     const start = await startUsageSync({
@@ -500,6 +522,7 @@ test("usage sync start deferHeavyWork defers empty-delta settle", { skip: !runDb
       deviceToken: `defer-s-tok-${suffix}`,
     },
   });
+  await enableGatedUsage(org.id, user.id, device.id);
 
   try {
     const start = await startUsageSync(
@@ -547,6 +570,7 @@ test("usage sync start applies tools sidecar once then short-circuits on hash", 
       deviceToken: `tools-tok-${suffix}`,
     },
   });
+  await enableGatedUsage(org.id, user.id, device.id);
 
   const tools = {
     contentHash: "",
@@ -634,6 +658,7 @@ test("usage sync start keeps usage delta when tools apply would fail", { skip: !
       deviceToken: `tools-fail-tok-${suffix}`,
     },
   });
+  await enableGatedUsage(org.id, user.id, device.id);
 
   try {
     // Invalid org/user mismatch is hard to force through startUsageSync params
@@ -687,6 +712,20 @@ test("usage sync start applies accounts+quotas and creates billing templates", {
       architecture: "arm64",
       agentVersion: "test",
       deviceToken: `aq-tok-${suffix}`,
+    },
+  });
+  await prisma.toolAccount.create({
+    data: {
+      orgId: org.id,
+      userId: user.id,
+      deviceId: device.id,
+      toolName: "cursor",
+      accountKey: "dev@example.com",
+      email: "dev@example.com",
+      usageEnabled: true,
+      loggingEnabled: true,
+      authPresent: true,
+      loginMethod: "local_app",
     },
   });
 
@@ -858,6 +897,7 @@ test("usage sync start keeps usage delta when accounts apply fails", { skip: !ru
       deviceToken: `aq-fail-tok-${suffix}`,
     },
   });
+  await enableGatedUsage(org.id, user.id, device.id);
 
   try {
     const start = await startUsageSync({
@@ -911,6 +951,7 @@ test("reconcileDeviceDayPartitions removes many orphan partitions in one pass", 
       deviceToken: `reconcile-tok-${suffix}`,
     },
   });
+  await enableGatedUsage(org.id, user.id, device.id);
 
   const day = "2026-07-21";
   const dayDate = new Date(`${day}T00:00:00.000Z`);

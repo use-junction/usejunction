@@ -9,6 +9,7 @@ import { invalidateAnalyticsCache } from "@/lib/analytics/query";
 import { syncTeamSeatQuantityBestEffort } from "@/lib/saas-billing/quantity";
 import { sanitizeExtractionPayload } from "@usejunction/usage-schema";
 import { extractionFingerprint, JUNCTION_EXTRACTION_SCHEMA_VERSION } from "@usejunction/usage-schema";
+import { vendorUsageAllowed } from "@/lib/privacy/account-collection";
 
 function json(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value ?? {})) as Prisma.InputJsonValue;
@@ -228,6 +229,9 @@ export async function syncConnection(connectionId: string) {
     }
 
     for (const row of data.usage) {
+      if (!(await vendorUsageAllowed({ orgId: connection.orgId, toolName: row.toolName ?? "", email: row.email }))) {
+        continue;
+      }
       await recordSourceEnvelope({ connection, runId: run.id, row });
       const developerId = await developerForUsage(connection, row);
       const dedupeKey = `${connection.id}:${row.externalKey}`;

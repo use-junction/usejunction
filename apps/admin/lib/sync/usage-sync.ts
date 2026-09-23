@@ -6,6 +6,8 @@ import { createHash } from "crypto";
 import { prisma } from "@usejunction/db";
 import { normalizeUusWireRecord, uusContentFingerprint, uusPartitionKey } from "@usejunction/usage-schema";
 import { ingestLocalUsageBatch, type LocalUsageInputRow } from "@/lib/ingest/local-usage-batch";
+import { filterGatedUsageToolNames } from "@/lib/privacy/account-collection";
+import { keepUsageRow } from "@/lib/privacy/account-collection-policy";
 import { invalidateAnalyticsCache } from "@/lib/analytics/query/invalidation";
 import { markOrgUsageDaysDirty, ORG_DAY_SNAPSHOT_VERSION } from "@/lib/analytics/snapshots";
 import { enqueueMaterializationJob, materializeOrgNow } from "@/lib/analytics/snapshots/jobs";
@@ -374,13 +376,18 @@ export async function startUsageSync(params: {
         : quotasInventoryContentHash(items);
 
     try {
+      const allowedQuotaTools = await filterGatedUsageToolNames(
+        params.deviceId,
+        items.map((item) => String(item.toolName ?? "")),
+      );
+      const allowedItems = items.filter((item) => keepUsageRow(String(item.toolName ?? ""), allowedQuotaTools));
       const device = await prisma.device.findFirst({
         where: { id: params.deviceId, orgId: params.orgId },
         select: { quotasContentHash: true },
       });
       if (device?.quotasContentHash && device.quotasContentHash === contentHash) {
         quotasApplied = "unchanged";
-        await recordQuotaObservations({ deviceId: params.deviceId, items });
+        await recordQuotaObservations({ deviceId: params.deviceId, items: allowedItems });
         const now = new Date();
         await prisma.device.update({
           where: { id: params.deviceId },
@@ -391,7 +398,7 @@ export async function startUsageSync(params: {
           orgId: params.orgId,
           userId: params.userId,
           deviceId: params.deviceId,
-          items,
+          items: allowedItems,
           contentHash,
         });
         quotasApplied = "updated";
@@ -576,12 +583,17 @@ export async function ingestUsageSyncChunk(params: {
   }
 
   const observedAt = params.observedAt ?? new Date();
+  const allowedGatedTools = await filterGatedUsageToolNames(
+    params.deviceId,
+    params.rows.map((row) => String(row.toolName ?? "")),
+  );
+  const rows = params.rows.filter((row) => keepUsageRow(String(row.toolName ?? ""), allowedGatedTools));
   const upsertStart = performance.now();
   const { upserted, changedDates } = await ingestLocalUsageBatch({
     orgId: params.orgId,
     userId: params.userId,
     deviceId: params.deviceId,
-    rows: params.rows,
+    rows,
     observedAt,
     monotonicObservedAt: true,
   });
@@ -589,7 +601,7 @@ export async function ingestUsageSyncChunk(params: {
 
   // Update fingerprints for uploaded rows (one bulk ON CONFLICT per batch).
   const fps: Array<{ partitionKey: string; contentHash: string; date: Date }> = [];
-  for (const raw of params.rows) {
+  for (const raw of rows) {
     const normalized = normalizeUusWireRecord(raw as Record<string, unknown>);
     if (!normalized) continue;
     const partitionKey = uusPartitionKey({

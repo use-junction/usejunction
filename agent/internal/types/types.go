@@ -12,6 +12,7 @@ type ToolStatus struct {
 // ToolAccount describes an authenticated identity for a tool.
 type ToolAccount struct {
 	ToolName    string `json:"toolName"`
+	AccountKey  string `json:"accountKey,omitempty"`
 	Email       string `json:"email,omitempty"`
 	Plan        string `json:"plan,omitempty"`
 	LoginMethod string `json:"loginMethod"`
@@ -56,30 +57,30 @@ const (
 
 // DailyUsage is token/cost data aggregated by date + model.
 type DailyUsage struct {
-	Date                string              `json:"date"`
-	ToolName            string              `json:"toolName"`
-	Model               string              `json:"model"`
-	InputTokens         int                 `json:"inputTokens"`
-	OutputTokens        int                 `json:"outputTokens"`
-	CacheReadTokens     int                 `json:"cacheReadTokens"`
-	CacheWriteTokens    int                 `json:"cacheWriteTokens,omitempty"`
-	ReasoningTokens     int                 `json:"reasoningTokens,omitempty"`
-	EstimatedCost       float64             `json:"estimatedCost"`
-	SuggestedLines      int                 `json:"suggestedLines,omitempty"`
-	AcceptedLines       int                 `json:"acceptedLines,omitempty"`
-	AddedLines          int                 `json:"addedLines,omitempty"`
-	DeletedLines        int                 `json:"deletedLines,omitempty"`
-	Commits             int                 `json:"commits,omitempty"`
-	AiPercent           *float64            `json:"aiPercent,omitempty"`
-	Requests            int                 `json:"requests,omitempty"`
-	Source              string              `json:"source,omitempty"`
-	Verified            bool                `json:"verified,omitempty"`
-	MetricKind          MetricKind          `json:"metricKind,omitempty"`
-	CostKind            CostKind            `json:"costKind,omitempty"`
-	TokenSemantics      TokenSemantics      `json:"tokenSemantics,omitempty"`
-	CalculationVersion  string              `json:"calculationVersion,omitempty"`
-	Repository          *RepositoryIdentity `json:"repository,omitempty"`
-	Metadata            map[string]any      `json:"metadata,omitempty"`
+	Date               string              `json:"date"`
+	ToolName           string              `json:"toolName"`
+	Model              string              `json:"model"`
+	InputTokens        int                 `json:"inputTokens"`
+	OutputTokens       int                 `json:"outputTokens"`
+	CacheReadTokens    int                 `json:"cacheReadTokens"`
+	CacheWriteTokens   int                 `json:"cacheWriteTokens,omitempty"`
+	ReasoningTokens    int                 `json:"reasoningTokens,omitempty"`
+	EstimatedCost      float64             `json:"estimatedCost"`
+	SuggestedLines     int                 `json:"suggestedLines,omitempty"`
+	AcceptedLines      int                 `json:"acceptedLines,omitempty"`
+	AddedLines         int                 `json:"addedLines,omitempty"`
+	DeletedLines       int                 `json:"deletedLines,omitempty"`
+	Commits            int                 `json:"commits,omitempty"`
+	AiPercent          *float64            `json:"aiPercent,omitempty"`
+	Requests           int                 `json:"requests,omitempty"`
+	Source             string              `json:"source,omitempty"`
+	Verified           bool                `json:"verified,omitempty"`
+	MetricKind         MetricKind          `json:"metricKind,omitempty"`
+	CostKind           CostKind            `json:"costKind,omitempty"`
+	TokenSemantics     TokenSemantics      `json:"tokenSemantics,omitempty"`
+	CalculationVersion string              `json:"calculationVersion,omitempty"`
+	Repository         *RepositoryIdentity `json:"repository,omitempty"`
+	Metadata           map[string]any      `json:"metadata,omitempty"`
 }
 
 // RepositoryIdentity is the canonical remote identity of a repository. Local

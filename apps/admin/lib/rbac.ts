@@ -10,6 +10,7 @@ export {
   CAPABILITIES,
   ORGANIZATION_ROLES,
   canManageSettings,
+  canManagePrivacy,
   canSeeOrgOverview,
   hasCapability,
   isAssignableRole,

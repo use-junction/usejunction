@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
             contentHash: accounts.contentHash,
             items: (accounts.items ?? []).map((item) => ({
               toolName: String(item.toolName ?? ""),
+              accountKey: typeof item.accountKey === "string" ? item.accountKey : null,
               email: typeof item.email === "string" ? item.email : null,
               plan: typeof item.plan === "string" ? item.plan : null,
               loginMethod: typeof item.loginMethod === "string" ? item.loginMethod : "unknown",

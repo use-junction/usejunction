@@ -362,8 +362,13 @@ func CodexAccountFromAuth(home string) (*types.ToolAccount, error) {
 			plan = codexPlanFromClaims(claims)
 		}
 	}
+	accountKey := strings.TrimSpace(auth.AccountID)
+	if accountKey == "" {
+		accountKey = strings.ToLower(strings.TrimSpace(email))
+	}
 	return &types.ToolAccount{
 		ToolName:    "codex",
+		AccountKey:  accountKey,
 		Email:       email,
 		Plan:        plan,
 		LoginMethod: "oauth",

@@ -31,6 +31,7 @@ model Organization {
   requestMetadata           RequestMetadata[]
   enrollmentTokens          EnrollmentToken[]
   toolAccounts              ToolAccount[]
+  accountCollectionEvents   AccountCollectionEvent[]
   quotaSnapshots            QuotaSnapshot[]
   quotaObservations         QuotaObservation[]
   planInterests             PlanInterest[]
@@ -142,6 +143,7 @@ model Device {
   localModels             LocalModel[]
   requestMetadata         RequestMetadata[]
   toolAccounts            ToolAccount[]
+  accountCollectionEvents AccountCollectionEvent[]
   quotaSnapshots          QuotaSnapshot[]
   quotaObservations       QuotaObservation[]
   usageDaily              UsageDaily[]
@@ -425,23 +427,52 @@ model EnrollmentToken {
 }
 
 model ToolAccount {
-  id          String   @id @default(cuid())
-  orgId       String   @map("org_id")
-  userId      String   @map("user_id")
-  deviceId    String   @map("device_id")
-  toolName    String   @map("tool_name")
-  email       String?
-  plan        String?
-  loginMethod String   @default("unknown") @map("login_method")
-  authPresent Boolean  @default(false) @map("auth_present")
-  updatedAt   DateTime @default(now()) @map("updated_at")
+  id                 String   @id @default(cuid())
+  orgId              String   @map("org_id")
+  userId             String   @map("user_id")
+  deviceId           String   @map("device_id")
+  toolName           String   @map("tool_name")
+  accountKey         String   @default("") @map("account_key")
+  email              String?
+  plan               String?
+  loginMethod        String   @default("unknown") @map("login_method")
+  authPresent        Boolean  @default(false) @map("auth_present")
+  usageEnabled       Boolean  @default(false) @map("usage_enabled")
+  loggingEnabled     Boolean  @default(false) @map("logging_enabled")
+  usageAdminLocked   Boolean  @default(false) @map("usage_admin_locked")
+  loggingAdminLocked Boolean  @default(false) @map("logging_admin_locked")
+  updatedAt          DateTime @default(now()) @map("updated_at")
+
+  organization     Organization              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user             Developer                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device           Device                    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  collectionEvents AccountCollectionEvent[]
+
+  @@unique([deviceId, toolName, accountKey])
+  @@index([orgId, toolName, email])
+  @@map("tool_accounts")
+}
+
+model AccountCollectionEvent {
+  id            String   @id @default(cuid())
+  orgId         String   @map("org_id")
+  deviceId      String   @map("device_id")
+  toolAccountId String?  @map("tool_account_id")
+  toolName      String   @map("tool_name")
+  accountKey    String   @map("account_key")
+  stream        String
+  enabled       Boolean
+  actor         String
+  actorId       String?  @map("actor_id")
+  createdAt     DateTime @default(now()) @map("created_at")
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  user         Developer    @relation(fields: [userId], references: [id], onDelete: Cascade)
   device       Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  toolAccount  ToolAccount? @relation(fields: [toolAccountId], references: [id], onDelete: SetNull)
 
-  @@unique([deviceId, toolName])
-  @@map("tool_accounts")
+  @@index([orgId, createdAt])
+  @@index([deviceId, toolName, accountKey, createdAt])
+  @@map("account_collection_events")
 }
 
 model QuotaSnapshot {

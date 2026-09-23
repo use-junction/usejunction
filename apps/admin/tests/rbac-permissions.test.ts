@@ -4,6 +4,7 @@ import {
   CAPABILITIES,
   canManageSettings,
   canSeeOrgOverview,
+  canManagePrivacy,
   canChooseOnboardingPath,
   requiresDeviceOnboarding,
   hasCapability,
@@ -36,6 +37,14 @@ describe("RBAC capabilities", () => {
     expect(requiresDeviceOnboarding("manager")).toBe(false);
   });
 
+  it("maps privacy_manage to owner and admin only", () => {
+    expect(rolesFor("privacy_manage")).toEqual(["owner", "admin"]);
+    expect(canManagePrivacy("owner")).toBe(true);
+    expect(canManagePrivacy("admin")).toBe(true);
+    expect(canManagePrivacy("manager")).toBe(false);
+    expect(canManagePrivacy("user")).toBe(false);
+  });
+
   it("maps self_view to all roles", () => {
     expect(rolesFor("self_view")).toEqual(["owner", "admin", "manager", "user"]);
     expect(hasCapability("user", "self_view")).toBe(true);
@@ -44,7 +53,12 @@ describe("RBAC capabilities", () => {
   });
 
   it("keeps capability tables exhaustive", () => {
-    expect(Object.keys(CAPABILITIES).sort()).toEqual(["org_overview", "self_view", "settings_billing"]);
+    expect(Object.keys(CAPABILITIES).sort()).toEqual([
+      "org_overview",
+      "privacy_manage",
+      "self_view",
+      "settings_billing",
+    ]);
   });
 
   it("validates assignable invite/member roles", () => {

@@ -76,6 +76,7 @@ func (s *Server) ListenAndServe() error {
 	mux.HandleFunc("/v1/sync/status", s.withCORS(s.handleSyncStatus))
 	mux.HandleFunc("/v1/sync", s.withCORS(s.handleSync))
 	mux.HandleFunc("/v1/metrics", s.withCORS(s.handleMetrics))
+	mux.HandleFunc("/v1/accounts", s.withCORS(s.handleAccounts))
 	srv := &http.Server{
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
@@ -88,7 +89,7 @@ func (s *Server) withCORS(next http.HandlerFunc) http.HandlerFunc {
 		origin := r.Header.Get("Origin")
 		if s.originAllowed(origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
 			w.Header().Set("Access-Control-Max-Age", "600")
 			w.Header().Set("Vary", "Origin")

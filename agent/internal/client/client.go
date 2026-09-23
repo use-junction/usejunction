@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/usejunction/agent/internal/accountpolicy"
 	"github.com/usejunction/agent/internal/config"
 	"github.com/usejunction/agent/internal/controlurl"
 )
@@ -239,6 +240,7 @@ type LocalModelReport struct {
 
 type AccountReport struct {
 	ToolName    string `json:"toolName"`
+	AccountKey  string `json:"accountKey,omitempty"`
 	Email       string `json:"email,omitempty"`
 	Plan        string `json:"plan,omitempty"`
 	LoginMethod string `json:"loginMethod"`
@@ -705,6 +707,71 @@ func (c *APIClient) SignalsPolicy() (*SignalsPolicy, error) {
 		return nil, err
 	}
 	return &out.Policy, nil
+}
+
+type AccountPolicyPatch struct {
+	Scope      string `json:"scope,omitempty"`
+	ToolName   string `json:"toolName"`
+	AccountKey string `json:"accountKey"`
+	Stream     string `json:"stream,omitempty"`
+	Enabled    bool   `json:"enabled"`
+}
+
+func (c *APIClient) AccountPolicy() (*accountpolicy.Policy, error) {
+	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/api/devices/account-policy", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("GET /api/devices/account-policy returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	var out accountpolicy.Policy
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *APIClient) PatchAccountPolicy(patch AccountPolicyPatch) (*accountpolicy.Account, error) {
+	if err := controlurl.Validate(c.baseURL); err != nil {
+		return nil, err
+	}
+	data, err := json.Marshal(patch)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodPatch, c.baseURL+"/api/devices/account-policy", bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, ErrUnauthorized
+	}
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("PATCH /api/devices/account-policy returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	var out struct {
+		Account accountpolicy.Account `json:"account"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, err
+	}
+	return &out.Account, nil
 }
 
 func (c *APIClient) ReportSignalsSessions(sessions []SignalsSession) error {

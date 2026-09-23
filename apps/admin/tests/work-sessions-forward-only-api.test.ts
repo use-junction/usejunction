@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { beforeEach, test, vi } from "vitest";
+import { beforeEach, afterEach, test, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getEffectiveSignalsPolicy: vi.fn(),
   enforceSignalsRetention: vi.fn(),
   recordDeviceActivityEvent: vi.fn(),
+  deviceActiveAccountAllowed: vi.fn(async () => true),
 }));
 
 vi.mock("@usejunction/db", () => ({
@@ -23,6 +24,10 @@ vi.mock("@usejunction/db", () => ({
 
 vi.mock("@/lib/ingest/device-context", () => ({
   requireActiveDeviceForIngest: () => mocks.deviceFindUnique(),
+}));
+
+vi.mock("@/lib/privacy/account-collection", () => ({
+  deviceActiveAccountAllowed: mocks.deviceActiveAccountAllowed,
 }));
 
 vi.mock("@/lib/signals/service", () => ({
@@ -54,6 +59,7 @@ function session(localId: string, observedAt: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("NEXT_PUBLIC_SIGNALS_PRODUCT_ENABLED", "true");
   mocks.deviceFindUnique.mockResolvedValue({
     id: "device_1",
     orgId: "org_1",
@@ -70,6 +76,24 @@ beforeEach(() => {
   mocks.deviceUpdate.mockResolvedValue({});
   mocks.enforceSignalsRetention.mockResolvedValue(undefined);
   mocks.recordDeviceActivityEvent.mockResolvedValue(undefined);
+  mocks.deviceActiveAccountAllowed.mockResolvedValue(true);
+});
+
+test("work ingest skips Cursor and Codex sessions when logging is off", async () => {
+  mocks.deviceActiveAccountAllowed.mockResolvedValueOnce(false);
+  const { POST } = await import("../app/api/ingest/work-sessions/route");
+  const response = await POST(request([session("later", "2026-07-19T10:00:01.000Z")]));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    upserted: 0,
+    skipped: 1,
+    beforeCollectionStartSkipped: 0,
+  });
+  assert.equal(mocks.workSessionUpsert.mock.calls.length, 0);
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 test("work ingest stores only exact or post-cutoff observations from a mixed batch", async () => {

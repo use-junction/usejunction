@@ -4,12 +4,13 @@ export const ORGANIZATION_ROLES = ["owner", "admin", "manager", "user"] as const
 
 export const ASSIGNABLE_ROLES = ["admin", "manager", "user"] as const;
 
-export type Capability = "settings_billing" | "org_overview" | "self_view";
+export type Capability = "settings_billing" | "org_overview" | "self_view" | "privacy_manage";
 
 export const CAPABILITIES = {
   settings_billing: ["owner", "admin"],
   org_overview: ["owner", "admin", "manager"],
   self_view: ["owner", "admin", "manager", "user"],
+  privacy_manage: ["owner", "admin"],
 } as const satisfies Record<Capability, readonly OrganizationRole[]>;
 
 export function rolesFor(cap: Capability): readonly OrganizationRole[] {
@@ -23,6 +24,10 @@ export function hasCapability(role: OrganizationRole | null | undefined, cap: Ca
 
 export function canManageSettings(role: OrganizationRole | null | undefined): boolean {
   return hasCapability(role, "settings_billing");
+}
+
+export function canManagePrivacy(role: OrganizationRole | null | undefined): boolean {
+  return hasCapability(role, "privacy_manage");
 }
 
 export function canSeeOrgOverview(role: OrganizationRole | null | undefined): boolean {

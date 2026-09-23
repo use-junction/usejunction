@@ -18,6 +18,7 @@ import {
 } from "@/lib/signals/collection-window";
 import { enforceSignalsRetention, getEffectiveSignalsPolicy } from "@/lib/signals/service";
 import { logServerError } from "@/lib/errors/public";
+import { deviceActiveAccountAllowed } from "@/lib/privacy/account-collection";
 
 export const maxDuration = 60;
 
@@ -444,6 +445,14 @@ export async function POST(req: NextRequest) {
       if (!isObservedAtEligible(session.observedAt, collectionStartedAt)) {
         skipped += 1;
         beforeCollectionStartSkipped += 1;
+        continue;
+      }
+      if (!(await deviceActiveAccountAllowed({
+        deviceId: device.id,
+        toolName: session.toolName,
+        stream: "logging",
+      }))) {
+        skipped += 1;
         continue;
       }
 

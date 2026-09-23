@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/usejunction/agent/internal/accountpolicy"
 	"github.com/usejunction/agent/internal/client"
 	"github.com/usejunction/agent/internal/config"
 	"github.com/usejunction/agent/internal/probe"
@@ -16,7 +17,6 @@ import (
 	"github.com/usejunction/agent/internal/scan"
 	"github.com/usejunction/agent/internal/syncengine"
 	"github.com/usejunction/agent/internal/types"
-	"github.com/usejunction/agent/internal/workextract"
 )
 
 const (
@@ -46,6 +46,9 @@ func mergeToolAccounts(base, richer *types.ToolAccount) *types.ToolAccount {
 		return base
 	}
 	out := *base
+	if strings.TrimSpace(out.AccountKey) == "" {
+		out.AccountKey = richer.AccountKey
+	}
 	if strings.TrimSpace(out.Email) == "" {
 		out.Email = richer.Email
 	}
@@ -126,6 +129,11 @@ func collectAndReportWithTools(
 		}
 	}
 
+	accountPolicy, policyErr := api.AccountPolicy()
+	if policyErr != nil && verbose {
+		fmt.Printf("[collect] account policy: %v\n", policyErr)
+	}
+
 	var toolReports []client.ToolReport
 	var accountReports []client.AccountReport
 	var modelReports []client.LocalModelReport
@@ -156,7 +164,7 @@ func collectAndReportWithTools(
 				return
 			}
 			progress("scan-tool-start", id)
-			result, timedOut := collectProviderWithTimeout(ctx, prov, forceFull)
+			result, timedOut := collectProviderWithTimeout(ctx, prov, forceFull, accountPolicy)
 			outcomes[idx] = providerOutcome{id: id, result: result, timedOut: timedOut}
 			if timedOut {
 				progress("scan-tool-skip", id)
@@ -276,11 +284,6 @@ func collectAndReportWithTools(
 		}
 	}
 
-	progress("work-extract", "Checking work extraction policy")
-	if workErr := maybeReportWorkSessions(api, progress); workErr != nil && verbose {
-		fmt.Printf("[report] work extraction: %v\n", workErr)
-	}
-
 	if !usageIncomplete && forceFull && sealedDay != "" && sealedDay > lastFullDay && cfgErr == nil && cfg != nil {
 		cfg.LastFullUsageRescanDay = sealedDay
 		if saveErr := config.Save(cfg); saveErr != nil {
@@ -335,103 +338,12 @@ func shouldSkipInitialDaemonCollect(cfg *config.Config) bool {
 	return time.Since(completedAt) < 10*time.Minute
 }
 
-func maybeReportWorkSessions(api *client.APIClient, progress collectProgress) error {
-	policy, err := api.SignalsPolicy()
-	if err != nil {
-		return err
-	}
-	if !policy.WorkExtractionEnabled {
-		return nil
-	}
-
-	cfg, err := config.Load()
-	if err != nil {
-		return fmt.Errorf("load work extraction state: %w", err)
-	}
-	opts, stateChanged, err := forwardOnlyWorkOptions(policy.WorkExtractionStartedAt, cfg)
-	if err != nil {
-		return err
-	}
-	if stateChanged {
-		if err := config.Save(cfg); err != nil {
-			return fmt.Errorf("save work extraction epoch: %w", err)
-		}
-	}
-
-	progress("work-extract", "Extracting work observed since Signals was enabled")
-	sessions := workextract.Collect(opts)
-	if len(sessions) == 0 {
-		return nil
-	}
-
-	const batchSize = 200
-	for start := 0; start < len(sessions); start += batchSize {
-		end := start + batchSize
-		if end > len(sessions) {
-			end = len(sessions)
-		}
-		batch := sessions[start:end]
-		progress("work-extract", fmt.Sprintf("Uploading work sessions %d–%d of %d", start+1, end, len(sessions)))
-		if err := api.ReportWorkSessions(batch); err != nil {
-			return err
-		}
-	}
-
-	newest := opts.NotBefore
-	for _, session := range sessions {
-		observed, parseErr := time.Parse(time.RFC3339Nano, session.ObservedAt)
-		if parseErr == nil && observed.After(newest) {
-			newest = observed
-		}
-	}
-	cfg.WorkExtractionLastAt = newest.UTC().Format(time.RFC3339Nano)
-	cfg.SignalsWorkExtraction = true
-	if err := config.Save(cfg); err != nil {
-		return fmt.Errorf("save work extraction watermark: %w", err)
-	}
-	return nil
-}
-
-func forwardOnlyWorkOptions(policyStartedAt string, cfg *config.Config) (workextract.Options, bool, error) {
-	cutoff, err := time.Parse(time.RFC3339Nano, policyStartedAt)
-	if err != nil || cutoff.IsZero() {
-		return workextract.Options{}, false, fmt.Errorf("work extraction policy missing valid collection start")
-	}
-	cutoff = cutoff.UTC()
-	cutoffText := cutoff.Format(time.RFC3339Nano)
-	opts := workextract.Options{NotBefore: cutoff}
-	changed := false
-
-	if cfg.WorkExtractionStartedAt != cutoffText {
-		// A new enablement epoch always resets the incremental watermark to the
-		// server boundary; it never authorizes a historical scan.
-		cfg.WorkExtractionStartedAt = cutoffText
-		cfg.WorkExtractionLastAt = ""
-		changed = true
-	} else if strings.TrimSpace(cfg.WorkExtractionLastAt) != "" {
-		since, parseErr := time.Parse(time.RFC3339Nano, cfg.WorkExtractionLastAt)
-		if parseErr != nil {
-			// Corrupt local state is repaired to the safe policy epoch. NotBefore
-			// remains mandatory, so no pre-enable session can be returned.
-			cfg.WorkExtractionLastAt = ""
-			changed = true
-		} else {
-			opts.Since = since.UTC()
-		}
-	}
-	if !cfg.SignalsWorkExtraction {
-		cfg.SignalsWorkExtraction = true
-		changed = true
-	}
-	return opts, changed, nil
-}
-
-func collectProviderWithTimeout(ctx context.Context, p providers.Provider, refresh bool) (providerCollectResult, bool) {
+func collectProviderWithTimeout(ctx context.Context, p providers.Provider, refresh bool, policy *accountpolicy.Policy) (providerCollectResult, bool) {
 	providerCtx, cancel := context.WithTimeout(ctx, providerCollectTimeout)
 	defer cancel()
 	ch := make(chan providerCollectResult, 1)
 	go func() {
-		ch <- collectProvider(providerCtx, p, refresh)
+		ch <- collectProvider(providerCtx, p, refresh, policy)
 	}()
 	select {
 	case result := <-ch:
@@ -441,7 +353,7 @@ func collectProviderWithTimeout(ctx context.Context, p providers.Provider, refre
 	}
 }
 
-func collectProvider(ctx context.Context, p providers.Provider, refresh bool) providerCollectResult {
+func collectProvider(ctx context.Context, p providers.Provider, refresh bool, policy *accountpolicy.Policy) providerCollectResult {
 	var result providerCollectResult
 	status, _ := p.Detect(ctx)
 	if status == nil || !status.Detected {
@@ -456,47 +368,47 @@ func collectProvider(ctx context.Context, p providers.Provider, refresh bool) pr
 		Version:    status.Version,
 	})
 
-	// Scan usage before quota HTTP so upload can start sooner after all providers finish.
-	if daily, scanErr := p.ScanLocalUsage(ctx, refresh); scanErr == nil {
-		for _, row := range daily {
-			result.usageReports = append(result.usageReports, usageToAggregate(row))
+	acc, _ := p.AccountIdentity(ctx)
+	allowUsage := accountpolicy.UsageAllowed(policy, p.ID(), accountKeyOf(acc), emailOf(acc))
+
+	if allowUsage {
+		if daily, scanErr := p.ScanLocalUsage(ctx, refresh); scanErr == nil {
+			for _, row := range daily {
+				result.usageReports = append(result.usageReports, usageToAggregate(row))
+			}
 		}
 	}
 
-	acc, _ := p.AccountIdentity(ctx)
 	var quotaSnaps []types.QuotaSnapshot
-	switch p.ID() {
-	case "cursor":
-		// Single probe — CursorProvider.ProbeQuota would call this again.
-		if snaps, probeAcc, err := probe.ProbeCursorQuota(ctx); err == nil {
-			quotaSnaps = snaps
+	if allowUsage {
+		switch p.ID() {
+		case "cursor":
+			if snaps, probeAcc, err := probe.ProbeCursorQuota(ctx); err == nil {
+				quotaSnaps = snaps
+				acc = mergeToolAccounts(acc, probeAcc)
+			}
+		case "codex":
+			if snaps, probeAcc, err := probe.ProbeCodexQuota(ctx, codexHomeForProbe()); err == nil {
+				quotaSnaps = snaps
+				acc = mergeToolAccounts(acc, probeAcc)
+			}
+		case "claude":
+			snaps, probeAcc, err := probe.ProbeClaudeQuota(ctx, claudeConfigDirForProbe())
 			acc = mergeToolAccounts(acc, probeAcc)
+			if err == nil {
+				quotaSnaps = snaps
+			}
+		default:
+			quotaSnaps, _ = p.ProbeQuota(ctx)
 		}
-	case "codex":
-		// Single probe — formerly accountFromProbe + ProbeQuota each called
-		// ProbeCodexQuota and burned most of the collect timeout before scan.
-		if snaps, probeAcc, err := probe.ProbeCodexQuota(ctx, codexHomeForProbe()); err == nil {
-			quotaSnaps = snaps
-			acc = mergeToolAccounts(acc, probeAcc)
-		}
-	case "claude":
-		// Merge plan/auth from quota probe even when HTTP fails. Local
-		// subscriptionType is kept for seat sync; only quota windows require a
-		// live token (same pattern as Codex auth.json plan_type).
-		snaps, probeAcc, err := probe.ProbeClaudeQuota(ctx, claudeConfigDirForProbe())
-		acc = mergeToolAccounts(acc, probeAcc)
-		if err == nil {
-			quotaSnaps = snaps
-		}
-	default:
-		quotaSnaps, _ = p.ProbeQuota(ctx)
+	} else if acc != nil {
+		fmt.Printf("[collect] %s: skipping usage until this account is turned on\n", p.ID())
 	}
+
 	plan := ""
 	if acc != nil {
 		plan = strings.TrimSpace(acc.Plan)
 	}
-	// Attach when auth is present or a vendor plan was probed — syncDetected
-	// creates seats from a non-empty plan, or auth + catalog default plan.
 	if acc != nil && (acc.AuthPresent || plan != "") {
 		toolName := strings.TrimSpace(acc.ToolName)
 		if toolName == "" {
@@ -504,6 +416,7 @@ func collectProvider(ctx context.Context, p providers.Provider, refresh bool) pr
 		}
 		result.accountReports = append(result.accountReports, client.AccountReport{
 			ToolName:    toolName,
+			AccountKey:  acc.AccountKey,
 			Email:       acc.Email,
 			Plan:        plan,
 			LoginMethod: acc.LoginMethod,
@@ -558,4 +471,18 @@ func shouldForceFullUsageRescan(refresh bool, sealedDay, lastFullDay string) boo
 	sealedDay = strings.TrimSpace(sealedDay)
 	lastFullDay = strings.TrimSpace(lastFullDay)
 	return sealedDay != "" && sealedDay > lastFullDay
+}
+
+func accountKeyOf(acc *types.ToolAccount) string {
+	if acc == nil {
+		return ""
+	}
+	return acc.AccountKey
+}
+
+func emailOf(acc *types.ToolAccount) string {
+	if acc == nil {
+		return ""
+	}
+	return acc.Email
 }

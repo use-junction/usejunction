@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
       const row = acct as Record<string, unknown>;
       return {
         toolName: String(row.toolName ?? ""),
+        accountKey: typeof row.accountKey === "string" ? row.accountKey : null,
         email: typeof row.email === "string" ? row.email : null,
         plan: typeof row.plan === "string" ? row.plan : null,
         loginMethod: typeof row.loginMethod === "string" ? row.loginMethod : "unknown",

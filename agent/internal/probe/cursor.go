@@ -209,6 +209,14 @@ func resolveCursorPlan(ctx context.Context, cookie string, summary *cursorUsageS
 	return local
 }
 
+func cursorAccountKey(token string) string {
+	claims := jwtPayload(token)
+	if sub := strings.TrimSpace(claimString(claims, "sub")); sub != "" {
+		return sub
+	}
+	return strings.ToLower(strings.TrimSpace(cursorLocalEmail(token)))
+}
+
 func CursorAccountFromLocal() (*types.ToolAccount, error) {
 	token, err := cursorAccessToken()
 	if err != nil {
@@ -218,6 +226,7 @@ func CursorAccountFromLocal() (*types.ToolAccount, error) {
 	plan := cursorLocalMembershipType()
 	return &types.ToolAccount{
 		ToolName:    "cursor",
+		AccountKey:  cursorAccountKey(token),
 		Email:       email,
 		Plan:        plan,
 		LoginMethod: "local_app",
@@ -234,7 +243,7 @@ func CursorAccountIdentity(ctx context.Context) (*types.ToolAccount, error) {
 	cookie, err := cursorSessionCookie(token)
 	if err != nil {
 		return &types.ToolAccount{
-			ToolName: "cursor", Email: cursorLocalEmail(token),
+			ToolName: "cursor", AccountKey: cursorAccountKey(token), Email: cursorLocalEmail(token),
 			Plan: cursorLocalMembershipType(), LoginMethod: "local_app", AuthPresent: true,
 		}, nil
 	}
@@ -268,6 +277,7 @@ func CursorAccountIdentity(ctx context.Context) (*types.ToolAccount, error) {
 
 	return &types.ToolAccount{
 		ToolName:    "cursor",
+		AccountKey:  cursorAccountKey(token),
 		Email:       email,
 		Plan:        plan,
 		LoginMethod: "local_app",
@@ -310,7 +320,7 @@ func ProbeCursorQuota(ctx context.Context) ([]types.QuotaSnapshot, *types.ToolAc
 
 	account, _ := CursorAccountIdentity(ctx)
 	if account == nil {
-		account = &types.ToolAccount{ToolName: "cursor", LoginMethod: "local_app", AuthPresent: true}
+		account = &types.ToolAccount{ToolName: "cursor", AccountKey: cursorAccountKey(token), LoginMethod: "local_app", AuthPresent: true}
 	}
 	if account.Plan == "" {
 		account.Plan = resolveCursorPlan(ctx, cookie, &summary)
@@ -658,8 +668,8 @@ func ScanCursorUsageEvents(ctx context.Context, forceFull bool) ([]types.DailyUs
 			if buckets[key] == nil {
 				buckets[key] = &types.DailyUsage{
 					Date: date, ToolName: "cursor", Model: model,
-					Source: cursorEventsSource,
-					MetricKind: types.MetricKindUsage,
+					Source:         cursorEventsSource,
+					MetricKind:     types.MetricKindUsage,
 					TokenSemantics: types.TokenSemanticsVendor, CalculationVersion: cursorEventsCalcVersion,
 				}
 			}

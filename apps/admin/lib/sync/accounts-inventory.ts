@@ -10,9 +10,15 @@ import {
 } from "@/lib/activity/record-device-activity-event";
 import { syncDetectedPlansForDevice } from "@/lib/tools/sync-detected";
 import { logServerError } from "@/lib/errors/public";
+import {
+  defaultCollectionFlags,
+  normalizeAccountKey,
+  pickExistingAccount,
+} from "@/lib/privacy/account-collection-policy";
 
 export type AccountInventoryItem = {
   toolName: string;
+  accountKey?: string | null;
   email?: string | null;
   plan?: string | null;
   loginMethod?: string | null;
@@ -21,13 +27,26 @@ export type AccountInventoryItem = {
 
 export type SidecarAppliedStatus = "unchanged" | "updated" | "failed" | "skipped";
 
+export type AccountInventoryReported = {
+  toolName: string;
+  accountKey: string;
+  plan: string | null;
+  email: string | null;
+  authPresent: boolean;
+  usageEnabled: boolean;
+  loggingEnabled: boolean;
+  usageAdminLocked: boolean;
+  loggingAdminLocked: boolean;
+};
+
 export function accountsInventoryCanonicalLine(item: AccountInventoryItem): string {
   const toolName = String(item.toolName ?? "").trim();
+  const accountKey = String(item.accountKey ?? "").trim();
   const email = String(item.email ?? "").trim();
   const plan = String(item.plan ?? "").trim();
   const loginMethod = String(item.loginMethod ?? "").trim();
   const authPresent = item.authPresent ? "1" : "0";
-  return `${toolName}|${email}|${plan}|${loginMethod}|${authPresent}`;
+  return `${toolName}|${accountKey}|${email}|${plan}|${loginMethod}|${authPresent}`;
 }
 
 /** Plan merge: non-empty incoming always wins; sticky last-known only while authPresent. */
@@ -59,28 +78,26 @@ export async function applyDeviceAccountInventory(params: {
   runPlanSync?: boolean;
 }): Promise<{
   upserted: number;
-  reported: Array<{ toolName: string; plan: string | null; email: string | null; authPresent: boolean }>;
+  reported: AccountInventoryReported[];
 }> {
   const started = Date.now();
   let upserted = 0;
-  const reported: Array<{
-    toolName: string;
-    plan: string | null;
-    email: string | null;
-    authPresent: boolean;
-  }> = [];
+  const reported: AccountInventoryReported[] = [];
+  const incomingKeysByTool = new Map<string, string[]>();
 
   for (const acct of params.items) {
     const toolName = String(acct.toolName ?? "").trim();
     if (!toolName) continue;
 
-    const existing = await prisma.toolAccount.findUnique({
-      where: { deviceId_toolName: { deviceId: params.deviceId, toolName } },
-      select: { email: true, plan: true },
+    const incomingEmail = typeof acct.email === "string" ? acct.email.trim() : "";
+    const accountKey = normalizeAccountKey(acct.accountKey, incomingEmail);
+    const existingRows = await prisma.toolAccount.findMany({
+      where: { deviceId: params.deviceId, toolName },
+      select: { id: true, accountKey: true, email: true, plan: true },
     });
+    const existing = pickExistingAccount(existingRows, { accountKey, email: incomingEmail });
 
     const incomingPlan = typeof acct.plan === "string" ? acct.plan.trim() : "";
-    const incomingEmail = typeof acct.email === "string" ? acct.email.trim() : "";
     const authPresent = Boolean(acct.authPresent);
     const plan = resolveStickyAccountPlan({
       incomingPlan,
@@ -88,29 +105,80 @@ export async function applyDeviceAccountInventory(params: {
       authPresent,
     });
     const email = incomingEmail || existing?.email || null;
+    const flags = defaultCollectionFlags(toolName);
 
-    await prisma.toolAccount.upsert({
-      where: { deviceId_toolName: { deviceId: params.deviceId, toolName } },
-      update: {
-        email,
-        plan,
-        loginMethod: acct.loginMethod?.trim() || "unknown",
-        authPresent,
-        updatedAt: new Date(),
+    if (existing) {
+      await prisma.toolAccount.update({
+        where: { id: existing.id },
+        data: {
+          accountKey,
+          email,
+          plan,
+          loginMethod: acct.loginMethod?.trim() || "unknown",
+          authPresent,
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      await prisma.toolAccount.create({
+        data: {
+          orgId: params.orgId,
+          userId: params.userId,
+          deviceId: params.deviceId,
+          toolName,
+          accountKey,
+          email,
+          plan,
+          loginMethod: acct.loginMethod?.trim() || "unknown",
+          authPresent,
+          usageEnabled: flags.usageEnabled,
+          loggingEnabled: flags.loggingEnabled,
+        },
+      });
+    }
+
+    const stored = await prisma.toolAccount.findUnique({
+      where: {
+        deviceId_toolName_accountKey: {
+          deviceId: params.deviceId,
+          toolName,
+          accountKey,
+        },
       },
-      create: {
-        orgId: params.orgId,
-        userId: params.userId,
-        deviceId: params.deviceId,
-        toolName,
-        email,
-        plan,
-        loginMethod: acct.loginMethod?.trim() || "unknown",
-        authPresent,
+      select: {
+        usageEnabled: true,
+        loggingEnabled: true,
+        usageAdminLocked: true,
+        loggingAdminLocked: true,
       },
     });
-    reported.push({ toolName, plan, email, authPresent });
+
+    reported.push({
+      toolName,
+      accountKey,
+      plan,
+      email,
+      authPresent,
+      usageEnabled: stored?.usageEnabled ?? flags.usageEnabled,
+      loggingEnabled: stored?.loggingEnabled ?? flags.loggingEnabled,
+      usageAdminLocked: stored?.usageAdminLocked ?? false,
+      loggingAdminLocked: stored?.loggingAdminLocked ?? false,
+    });
+    const keys = incomingKeysByTool.get(toolName) ?? [];
+    keys.push(accountKey);
+    incomingKeysByTool.set(toolName, keys);
     upserted += 1;
+  }
+
+  for (const [toolName, keys] of incomingKeysByTool) {
+    await prisma.toolAccount.updateMany({
+      where: {
+        deviceId: params.deviceId,
+        toolName,
+        accountKey: { notIn: keys },
+      },
+      data: { authPresent: false, updatedAt: new Date() },
+    });
   }
 
   const now = new Date();
