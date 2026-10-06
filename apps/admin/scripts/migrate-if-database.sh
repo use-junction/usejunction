@@ -14,13 +14,24 @@ fi
 migrate_url="${DIRECT_URL:-$DATABASE_URL}"
 migrate_url="${migrate_url/:6543/:5432}"
 
-# A previous production deploy left this migration failed after the FK already
-# existed. Mark it applied so migrate deploy can continue; ignore if it is
-# already applied or not in a failed state.
-echo "Resolving enrollment_token_repair_device if it was left failed"
-DATABASE_URL="$migrate_url" pnpm --filter @usejunction/db exec prisma migrate resolve --applied 202608090001_enrollment_token_repair_device \
-  && echo "Marked 202608090001_enrollment_token_repair_device as applied" \
-  || echo "No failed enrollment_token_repair_device migration to resolve"
+# Production was db-pushed after a failed migrate. Mark leftover migrations
+# applied when their objects already exist so deploy can finish.
+already_on_prod=(
+  202608090001_enrollment_token_repair_device
+  202609241200_work_spend
+  202609241300_work_spend_query_indexes
+  202609241400_github_projects
+  202609251200_multi_github_connections
+  202610031200_wi_item_timeline
+  202610031300_project_attribution_mode
+  202610061200_usage_collection_default_on
+)
+for migration in "${already_on_prod[@]}"; do
+  echo "Resolving $migration if it was left failed or already pushed"
+  DATABASE_URL="$migrate_url" pnpm --filter @usejunction/db exec prisma migrate resolve --applied "$migration" \
+    && echo "Marked $migration as applied" \
+    || echo "No resolve needed for $migration"
+done
 
 echo "Running prisma migrate deploy"
 DATABASE_URL="$migrate_url" pnpm --filter @usejunction/db exec prisma migrate deploy
