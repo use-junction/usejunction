@@ -1,0 +1,13 @@
+node_modules
+.next
+.next-dev
+.next-e2e
+test-results
+playwright-report
+.turbo
+NOTES.md
+.git
+apps/admin/.next-e2e
+apps/admin/.next-dev
+apps/admin/test-results
+apps/admin/playwright-report
