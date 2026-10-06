@@ -16,20 +16,16 @@ GitHub Actions runs three jobs in [`.github/workflows/admin-tests.yml`](../.gith
 
 ### Prerequisites
 
-1. **PostgreSQL 16** (integration + E2E need a real database):
+1. **PostgreSQL 16** (integration + E2E need a real database) on `localhost:5432`:
 
 ```sh
-docker run --name usejunction-pg \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=usejunction \
-  -p 5432:5432 \
-  -d postgres:16
+createdb usejunction
 ```
 
 2. **Root `.env`** (monorepo root, not `apps/admin/.env`) with at least:
 
 ```sh
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/usejunction
+DATABASE_URL=postgresql://localhost:5432/usejunction
 NEXTAUTH_SECRET=ci-test-secret
 AUTH_TRUST_HOST=true
 ```
@@ -156,14 +152,14 @@ pnpm test:e2e
 
 The seed uses `owner@example.com` / `e2e-password` by default. Override `E2E_OWNER_EMAIL`, `E2E_OWNER_PASSWORD`, `E2E_DEVELOPER_EMAIL`, or `E2E_ORG_SLUG` when needed. Authentication state, reports, traces, screenshots, and videos are ignored by Git.
 
-The existing shell full-stack test remains separate because it validates gateway/API infrastructure. Playwright validates the authenticated workspace pages, route variants, filters, tabs, seeded calculation output, and browser errors.
+Playwright validates the authenticated workspace pages, route variants, filters, tabs, seeded calculation output, and browser errors.
 
 ## Calculation verification (golden / reconciliation)
 
 Separate from unit and browser tests: page query outputs are reconciled against an independent recompute from raw `usage_daily` rows. This is a **correctness verification suite**, not a performance benchmark.
 
 ```sh
-# Deterministic e2e fixture (Docker DB / root .env)
+# Deterministic e2e fixture (root .env)
 pnpm --filter @usejunction/admin e2e:seed
 pnpm --filter @usejunction/admin verify:calcs
 

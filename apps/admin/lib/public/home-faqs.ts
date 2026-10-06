@@ -31,12 +31,12 @@ export const HOME_FAQS: ContentFaq[] = [
   {
     question: "What data does UseJunction collect?",
     answer:
-      "Privacy first, observability second. The agent can report tool, model, tokens, latency, estimated cost, device, and status—plus optional Signals work context when enabled. There is no keystroke surveillance, browser capture, or network interception. Work summaries and person-level detail can be turned off.",
+      "Privacy first, observability second. The agent reports tool, model, tokens, estimated cost, device, and status. There is no keystroke surveillance, browser capture, or network interception. Usage collection can be turned off per login.",
   },
   {
     question: "Can we self-host it?",
     answer:
-      "Yes. UseJunction is available under the UseJunction Community License and designed for infrastructure your team controls. Deploy the admin app with the repository’s Docker or local setup; your data stays with you.",
+      "Yes. UseJunction is available under the UseJunction Community License and designed for infrastructure your team controls. Deploy the admin app the same way as local development — Postgres and Next.js; your data stays with you.",
   },
   {
     question: "Which tools are supported?",

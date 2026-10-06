@@ -3,6 +3,8 @@ import { normalizeEmail } from "@/lib/developer-identity";
 import { resolveProviderApiKeyMapping } from "@/lib/integrations/api-key-mapping";
 import { getAdapter } from "@/lib/integrations/adapters";
 import { githubInstallationToken } from "@/lib/integrations/github-app";
+import { syncGitHubCode } from "@/lib/features/github-code-sync";
+import { syncGitHubProjectsIfDue } from "@/lib/integrations/github-projects";
 import type { IntegrationConfig, ProviderApiKey, ProviderMember, ProviderUsage } from "@/lib/integrations/types";
 import { decryptSecret } from "@/lib/security";
 import { invalidateAnalyticsCache } from "@/lib/analytics/query";
@@ -20,18 +22,25 @@ function configOf(connection: ProviderConnection): IntegrationConfig {
 }
 
 async function upsertMember(connection: ProviderConnection, member: ProviderMember) {
+  const existing = await prisma.externalIdentity.findUnique({
+    where: { orgId_provider_externalUserId: { orgId: connection.orgId, provider: connection.provider, externalUserId: member.externalUserId } },
+    select: { matchedBy: true, developerId: true },
+  });
+  const preserveManual = existing?.matchedBy === "manual";
   const email = member.email ? normalizeEmail(member.email) : null;
-  let developer = email
-    ? await prisma.developer.findUnique({ where: { orgId_email: { orgId: connection.orgId, email } } })
-    : null;
+  let developer = preserveManual
+    ? null
+    : email
+      ? await prisma.developer.findUnique({ where: { orgId_email: { orgId: connection.orgId, email } } })
+      : null;
   return prisma.externalIdentity.upsert({
     where: { orgId_provider_externalUserId: { orgId: connection.orgId, provider: connection.provider, externalUserId: member.externalUserId } },
     update: {
-      developerId: developer?.id ?? undefined,
+      developerId: preserveManual ? existing?.developerId : developer?.id ?? undefined,
       connectionId: connection.id,
       email,
       displayName: member.name ?? null,
-      matchedBy: developer ? "email" : null,
+      matchedBy: preserveManual ? "manual" : developer ? "email" : null,
       observedAt: new Date(),
       metadata: json(member.metadata),
     },
@@ -199,7 +208,10 @@ async function credentialForConnection(connection: ProviderConnection) {
   return decryptSecret(connection.credentialCiphertext);
 }
 
-export async function syncConnection(connectionId: string) {
+export async function syncConnection(
+  connectionId: string,
+  options: { forceAuthorWake?: boolean; forceProjects?: boolean } = {},
+) {
   const connection = await prisma.providerConnection.findUnique({ where: { id: connectionId } });
   if (!connection || connection.status === "disconnected") throw new Error("connection not available");
   const run = await prisma.providerSyncRun.create({ data: { orgId: connection.orgId, connectionId: connection.id } });
@@ -256,7 +268,6 @@ export async function syncConnection(connectionId: string) {
         },
       });
     }
-    const counts = { members: identities.size, seats: data.seats.length, apiKeys: data.apiKeys?.length ?? 0, usage: data.usage.length };
     const capabilityRows = new Map<string, { endpoint: string | null; dataThrough: Date | null }>();
     for (const row of data.usage) {
       const capability = row.sourceCapability ?? "usage";
@@ -272,10 +283,35 @@ export async function syncConnection(connectionId: string) {
     }
     if (data.members.length > 0) await recordCapability({ connection, capability: "members", endpoint: "provider-members", dataThrough: new Date() });
     if (data.seats.length > 0) await recordCapability({ connection, capability: "seats", endpoint: "provider-seats", dataThrough: new Date() });
+    let codeCounts: Record<string, unknown> = {};
+    if (connection.provider === "github") {
+      try {
+        const code = await syncGitHubCode(connection, {
+          initial: !connection.lastSyncedAt,
+          forceAuthorWake: options.forceAuthorWake,
+        });
+        codeCounts = { githubRepos: code.repositories, githubPullRequests: code.pullRequests, githubCommits: code.commits, githubSkipped: code.skipped, githubReason: code.reason ?? null, githubFailedRepos: code.failedRepositories ?? 0 };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        codeCounts = { githubError: message.slice(0, 500) };
+        await recordCapability({ connection, capability: "pull_requests", status: "error", error: message.slice(0, 4000) });
+      }
+      try {
+        const projects = await syncGitHubProjectsIfDue(connection.orgId, options.forceProjects, connection.id);
+        if (projects) codeCounts = { ...codeCounts, githubProjects: projects };
+      } catch (error) {
+        codeCounts = { ...codeCounts, githubProjectsError: error instanceof Error ? error.message.slice(0, 500) : "Project sync failed" };
+      }
+    }
     const now = new Date();
+    const latest = connection.provider === "github"
+      ? await prisma.providerConnection.findUnique({ where: { id: connection.id }, select: { permissions: true, externalOrgId: true } })
+      : null;
+    const counts = { members: identities.size, seats: data.seats.length, apiKeys: data.apiKeys?.length ?? 0, usage: data.usage.length, ...codeCounts };
     await prisma.$transaction([
       prisma.providerConnection.update({ where: { id: connection.id }, data: {
-        status: "active", externalOrgId: data.externalOrgId ?? connection.externalOrgId, permissions: json(data.permissions ?? []),
+        status: "active", externalOrgId: latest?.externalOrgId ?? data.externalOrgId ?? connection.externalOrgId,
+        permissions: latest?.permissions ? json(latest.permissions) : json(data.permissions ?? []),
         lastSyncedAt: now, lastCostSyncedAt: data.costSyncSucceeded ? now : undefined,
         costDataThrough: data.costSyncSucceeded ? (data.costDataThrough ?? now) : undefined,
         nextSyncAt: new Date(now.getTime() + 15 * 60_000), leaseUntil: null, lastError: null,

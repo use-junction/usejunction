@@ -73,6 +73,7 @@ test("actual ingest: multi-tool batch with repo lands in both tables", { skip: !
         {
           date: "2026-07-21",
           toolName: "codex",
+          accountKey: "codex",
           model: "gpt-5.6-sol",
           source: "local_scan",
           inputTokens: 7_225_706,
@@ -84,6 +85,7 @@ test("actual ingest: multi-tool batch with repo lands in both tables", { skip: !
         {
           date: "2026-07-21",
           toolName: "claude",
+          accountKey: "claude",
           model: "opus",
           source: "local_scan",
           inputTokens: 12_000,
@@ -94,6 +96,7 @@ test("actual ingest: multi-tool batch with repo lands in both tables", { skip: !
         {
           date: "2026-07-20",
           toolName: "cursor",
+          accountKey: "cursor",
           model: "gpt-4.1",
           source: "local_scan",
           inputTokens: 1_000,
@@ -104,6 +107,7 @@ test("actual ingest: multi-tool batch with repo lands in both tables", { skip: !
         {
           date: "2026-07-21",
           toolName: "opencode",
+          accountKey: "opencode",
           model: "opencode-go/kimi-k2.7-code",
           source: "opencode_usage",
           inputTokens: 5_000,
@@ -115,6 +119,7 @@ test("actual ingest: multi-tool batch with repo lands in both tables", { skip: !
         {
           date: "2026-07-21",
           toolName: "opencode",
+          accountKey: "opencode",
           model: "opencode",
           source: "opencode_local",
           metricKind: "productivity",
@@ -157,6 +162,7 @@ test("actual ingest: multi-tool batch with repo lands in both tables", { skip: !
         {
           date: "2026-07-21",
           toolName: "codex",
+          accountKey: "codex",
           model: "gpt-5.6-sol",
           source: "local_scan",
           inputTokens: 7_300_000,
@@ -190,6 +196,7 @@ test("actual ingest: invalidation + rematerialize + overlay shows spend", { skip
         {
           date: "2026-07-21",
           toolName: "codex",
+          accountKey: "codex",
           model: "gpt-5",
           source: "local_scan",
           inputTokens: 50_000,
@@ -243,6 +250,7 @@ test("actual ingest: sync session start/chunk/commit end-to-end", { skip: !runDb
   const rowCodex = {
     date: "2026-07-21",
     toolName: "codex",
+    accountKey: "codex",
     model: "gpt-5",
     source: "local_scan",
     inputTokens: 1000,
@@ -253,6 +261,7 @@ test("actual ingest: sync session start/chunk/commit end-to-end", { skip: !runDb
   const rowClaude = {
     date: "2026-07-20",
     toolName: "claude",
+    accountKey: "claude",
     model: "opus",
     source: "local_scan",
     inputTokens: 500,
@@ -265,6 +274,7 @@ test("actual ingest: sync session start/chunk/commit end-to-end", { skip: !runDb
   const keyCodex = uusPartitionKey({
     date: uusCodex.date,
     tool: uusCodex.tool,
+    accountKey: uusCodex.accountKey,
     model: uusCodex.model ?? "",
     source: uusCodex.source,
     repository: uusCodex.repository,
@@ -272,6 +282,7 @@ test("actual ingest: sync session start/chunk/commit end-to-end", { skip: !runDb
   const keyClaude = uusPartitionKey({
     date: uusClaude.date,
     tool: uusClaude.tool,
+    accountKey: uusClaude.accountKey,
     model: uusClaude.model ?? "",
     source: uusClaude.source,
     repository: uusClaude.repository,
@@ -396,6 +407,7 @@ test("actual ingest: HTTP route path with device auth shape", { skip: !runDb }, 
         {
           date: "2026-07-22",
           toolName: "codex",
+          accountKey: "codex",
           model: "gpt-5",
           source: "local_scan",
           inputTokens: 100,
@@ -456,6 +468,7 @@ test("actual ingest: large delta partial commit still enqueues materialize + liv
     const row = {
       date,
       toolName: "codex",
+      accountKey: "codex",
       model,
       source: "local_scan",
       inputTokens: 1000 + i,
@@ -467,6 +480,7 @@ test("actual ingest: large delta partial commit still enqueues materialize + liv
     const partitionKey = uusPartitionKey({
       date: uus.date,
       tool: uus.tool,
+      accountKey: uus.accountKey,
       model: uus.model ?? "",
       source: uus.source,
       repository: uus.repository,
@@ -536,6 +550,7 @@ test("actual ingest: large delta partial commit still enqueues materialize + liv
       const key = uusPartitionKey({
         date: uus.date,
         tool: uus.tool,
+        accountKey: uus.accountKey,
         model: uus.model ?? "",
         source: uus.source,
         repository: uus.repository,

@@ -22,6 +22,7 @@ type ToolAccount struct {
 // QuotaSnapshot is a point-in-time quota reading.
 type QuotaSnapshot struct {
 	ToolName         string   `json:"toolName"`
+	AccountKey       string   `json:"accountKey,omitempty"`
 	WindowType       string   `json:"windowType"`
 	UsedPercent      *float64 `json:"usedPercent,omitempty"`
 	ResetAt          *string  `json:"resetAt,omitempty"`
@@ -59,6 +60,7 @@ const (
 type DailyUsage struct {
 	Date               string              `json:"date"`
 	ToolName           string              `json:"toolName"`
+	AccountKey         string              `json:"accountKey,omitempty"`
 	Model              string              `json:"model"`
 	InputTokens        int                 `json:"inputTokens"`
 	OutputTokens       int                 `json:"outputTokens"`

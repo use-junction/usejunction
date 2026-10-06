@@ -3,7 +3,7 @@
  * Run with DATABASE_URL set (apps/admin/.env → localhost:5432).
  */
 import assert from "node:assert/strict";
-import { test } from "vitest";
+import { test, vi } from "vitest";
 import { prisma } from "@usejunction/db";
 import { ingestLocalUsageBatch } from "@/lib/ingest/local-usage-batch";
 import { readSignalsFilterOptions } from "@/lib/signals/readers/filter-options";
@@ -111,6 +111,7 @@ test("opencode usage ingest stores actual spend and productivity rows", { skip: 
 });
 
 test("opencode work sessions surface in activity filters and work feed", { skip: !runDb }, async () => {
+  vi.stubEnv("NEXT_PUBLIC_SIGNALS_PRODUCT_ENABLED", "true");
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const { org, developer, device } = await seedOrg(suffix);
 
@@ -145,6 +146,7 @@ test("opencode work sessions surface in activity filters and work feed", { skip:
     assert.ok(activity.data.sessions.some((session) => session.toolName === "opencode"));
     assert.ok(activity.data.sessions.some((session) => session.title === "Ship onboarding polish"));
   } finally {
+    vi.unstubAllEnvs();
     await prisma.organization.delete({ where: { id: org.id } });
   }
 });

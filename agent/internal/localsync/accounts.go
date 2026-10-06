@@ -87,8 +87,10 @@ func (s *Server) writeAccountsPage(w http.ResponseWriter) {
   p { color: var(--muted); margin: 0 0 1.5rem; }
   article { border: 1px solid var(--line); padding: 1rem 1.1rem; margin-bottom: .75rem; }
   h2 { font-size: 1rem; margin: 0 0 .2rem; }
-  .meta { font-size: .85rem; color: var(--muted); margin-bottom: .8rem; }
-  label { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .35rem 0; }
+  .head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: .75rem; }
+  .meta { font-size: .85rem; color: var(--muted); }
+  .account { border-top: 1px solid var(--line); padding: .75rem 0 0; margin-top: .75rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
   .lock { font-size: .8rem; color: #8a1f1f; }
   .empty { border: 1px dashed var(--line); padding: 1.25rem; color: var(--muted); }
 </style>
@@ -96,7 +98,7 @@ func (s *Server) writeAccountsPage(w http.ResponseWriter) {
 <body>
 <main>
   <h1>Collection on this Mac</h1>
-  <p>Click a provider to turn it off. Collection stays off until you opt in the account that is signed in.</p>
+  <p>Every login on this Mac is its own switch. Turn on usage for the accounts you want collected — one, several, or all of them.</p>
   <div id="list" class="empty">Loading accounts…</div>
 </main>
 <script>
@@ -117,17 +119,39 @@ async function load() {
     rows.push(account);
     providers.set(account.toolName, rows);
   }
+  function esc(value) {
+    return String(value || "").replace(/[&<>"']/g, (ch) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[ch]));
+  }
   root.className = "";
   root.innerHTML = [...providers.entries()].map(([toolName, rows]) => {
     const name = rows[0].displayName || toolName;
-    const on = rows.some((account) => account.usageAllowed || account.loggingAllowed);
-    const selected = rows.find((account) => account.authPresent) || rows[0];
-    const who = selected.email || selected.accountKey || "Account";
-    return '<article data-tool="' + toolName + '" data-key="' + selected.accountKey + '">' +
-      "<h2>" + name + "</h2>" +
-      '<div class="meta">' + who + (selected.plan ? " · " + selected.plan : "") + (selected.authPresent ? " · signed in" : "") + "</div>" +
-      '<button type="button" data-action="disable"' + (on ? "" : " disabled") + ">Disable provider</button> " +
-      '<button type="button" data-action="optin">' + ((selected.usageEnabled || selected.loggingEnabled) ? "Turn off this account" : "Opt in this account") + "</button>" +
+    const collecting = rows.filter((account) => account.usageAllowed).length;
+    const sorted = [...rows].sort((a, b) => Number(b.authPresent) - Number(a.authPresent));
+    const accountsHtml = sorted.map((account) => {
+      const who = account.email || account.accountKey || "Account";
+      const lockedUsage = account.usageAdminLocked;
+      return '<div class="account" data-tool="' + esc(toolName) + '" data-key="' + encodeURIComponent(account.accountKey) + '">' +
+        '<div class="meta">' + esc(who) +
+          (account.plan ? " · " + esc(account.plan) : "") +
+          (account.authPresent ? " · signed in" : " · seen on this Mac") +
+          (account.usageAllowed ? " · usage collecting" : " · usage off") +
+        "</div>" +
+        '<div class="actions">' +
+          '<button type="button" data-action="usage"' + (lockedUsage ? " disabled" : "") + ">" +
+            (account.usageEnabled ? "Turn usage off" : "Collect usage") +
+          "</button>" +
+        "</div>" +
+        (lockedUsage ? '<p class="lock">An admin lock is on for this account.</p>' : "") +
+      "</div>";
+    }).join("");
+    return '<article data-tool="' + esc(toolName) + '">' +
+      '<div class="head"><h2>' + esc(name) + "</h2>" +
+      (collecting ? '<button type="button" data-action="disable">Turn off all accounts</button>' : "") +
+      "</div>" +
+      '<div class="meta">' + collecting + " of " + rows.length + " collecting</div>" +
+      accountsHtml +
       "</article>";
   }).join("");
   root.querySelectorAll("button").forEach((button) => {
@@ -135,22 +159,23 @@ async function load() {
   });
 }
 async function save(button) {
-  const article = button.closest("article");
+  const row = button.closest(".account") || button.closest("article");
   button.disabled = true;
-  const optIn = button.dataset.action === "optin";
+  const action = button.dataset.action;
+  const body = action === "disable" ? {
+    scope: "provider",
+    toolName: row.dataset.tool,
+    enabled: false
+  } : {
+    toolName: row.dataset.tool,
+    accountKey: decodeURIComponent(row.dataset.key || ""),
+    stream: action,
+    enabled: button.textContent.indexOf("Collect") === 0
+  };
   await fetch("/v1/accounts?token=" + encodeURIComponent(token), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(optIn ? {
-      scope: "account",
-      toolName: article.dataset.tool,
-      accountKey: article.dataset.key,
-      enabled: button.textContent.indexOf("Opt in") === 0
-    } : {
-      scope: "provider",
-      toolName: article.dataset.tool,
-      enabled: false
-    })
+    body: JSON.stringify(body)
   });
   await load();
 }

@@ -156,7 +156,7 @@ func TestProcessCodexWorkFileAttributesSurfaceAndTools(t *testing.T) {
 	}
 
 	buckets := map[string]*types.DailyUsage{}
-	processCodexFile(path, buckets)
+	processCodexFile(path, buckets, map[string]string{}, "acct-test")
 
 	var usage *types.DailyUsage
 	toolCounts := map[string]int{}
@@ -207,12 +207,12 @@ func TestScanCodexForcesRequestOnTokenOnlyUsageRow(t *testing.T) {
 		buf.WriteByte('\n')
 	}
 	write(map[string]any{
-		"type": "session_meta", "timestamp": "2026-07-17T10:00:00Z",
+		"type": "session_meta", "timestamp": "2026-09-01T10:00:00Z",
 		"payload": map[string]any{"originator": "codex_cli"},
 	})
 	// Single cumulative total — one request after parse; then we zero Requests
 	write(map[string]any{
-		"type": "event_msg", "timestamp": "2026-07-17T10:00:01Z",
+		"type": "event_msg", "timestamp": "2026-09-01T10:00:01Z",
 		"payload": map[string]any{
 			"type": "token_count", "model": "gpt-5.2-codex",
 			"info": map[string]any{"total_token_usage": map[string]any{

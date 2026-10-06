@@ -195,9 +195,10 @@ func verifyDarwinDaemonExecutable(home string) error {
 	deadline := time.Now().Add(5 * time.Second)
 	id := config.CurrentServiceIdentity()
 	configDir := config.ConfigDir()
-	appBinary := id.DaemonBinaryPath(configDir)
-	previousMarker := id.PreviousAppBundlePath(configDir)
+	appBinary := id.DaemonBinaryPath()
+	previousMarker := id.PreviousAppBundlePath()
 	legacyPrevious := filepath.Join(configDir, id.AppName+".app.previous")
+	legacyHiddenPrevious := filepath.Join(configDir, id.AppName+".previous.app")
 
 	for time.Now().Before(deadline) {
 		out, err := exec.Command("ps", "-ax", "-o", "command=").Output()
@@ -212,11 +213,11 @@ func verifyDarwinDaemonExecutable(home string) error {
 			if !strings.Contains(line, "usejunction") || !strings.Contains(line, "daemon") {
 				continue
 			}
-			if strings.Contains(line, previousMarker) || strings.Contains(line, legacyPrevious) || strings.Contains(line, id.AppName+".previous.app") || strings.Contains(line, id.AppName+".app.previous") {
+			if strings.Contains(line, previousMarker) || strings.Contains(line, legacyPrevious) || strings.Contains(line, legacyHiddenPrevious) || strings.Contains(line, id.AppName+".previous.app") || strings.Contains(line, id.AppName+".app.previous") {
 				stalePrevious = true
 				continue
 			}
-			if strings.Contains(line, appBinary) || strings.Contains(line, id.AppName+".app/Contents/MacOS/usejunction") {
+			if strings.Contains(line, appBinary) || strings.Contains(line, id.LegacyAppBundlePath(configDir)) || strings.Contains(line, id.AppName+".app/Contents/MacOS/usejunction") {
 				runningApp = true
 			}
 		}

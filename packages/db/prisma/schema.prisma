@@ -21,6 +21,8 @@ model Organization {
   lemonSqueezyQuantity       Int?      @map("lemon_squeezy_quantity")
   billingEmail               String?   @map("billing_email")
   currentPeriodEnd           DateTime? @map("current_period_end")
+  dataRegion                 String    @default("us") @map("data_region")
+  usageRetentionDays         Int       @default(1095) @map("usage_retention_days")
   createdAt                  DateTime  @default(now()) @map("created_at")
 
   developers                Developer[]
@@ -39,6 +41,11 @@ model Organization {
   invites                   OrganizationInvite[]
   teamInviteLinks           TeamInviteLink[]
   providerConnections       ProviderConnection[]
+  githubRepositoryAccesses   GitHubRepositoryAccess[]
+  githubProjects             GitHubProject[]
+  githubProjectItems         GitHubProjectItem[]
+  projectToolConnections     ProjectToolConnection[]
+  projectIssues              ProjectIssue[]
   providerSyncRuns          ProviderSyncRun[]
   providerCapabilities      ProviderConnectionCapability[]
   providerSourceRecords     ProviderSourceRecord[]
@@ -47,6 +54,9 @@ model Organization {
   externalIdentities        ExternalIdentity[]
   seatAssignments           SeatAssignment[]
   repositories              Repository[]
+  gitPullRequests           GitPullRequest[]
+  gitCommits                GitCommit[]
+  featureCostAllocations    FeatureCostAllocation[]
   usageDaily                UsageDaily[]
   orgUsageDaySnapshots      OrgUsageDaySnapshot[]
   analyticsDirtyDays        AnalyticsDirtyDay[]
@@ -72,6 +82,7 @@ model Organization {
   dailyReportDeliveries     DailyReportDelivery[]
   dailyReportUsageSnapshots DailyReportUsageSnapshot[]
   deviceRecoveryNotices     DeviceRecoveryNotice[]
+  privacyRequests           PrivacyRequest[]
 
   @@map("organizations")
 }
@@ -97,6 +108,9 @@ model Developer {
   externalIdentities    ExternalIdentity[]
   providerApiKeys       ProviderApiKey[]
   seatAssignments       SeatAssignment[]
+  gitPullRequests       GitPullRequest[]       @relation("GitPullRequestAuthor")
+  gitCommits            GitCommit[]            @relation("GitCommitAuthor")
+  featureCostAllocations FeatureCostAllocation[]
   toolClaims            DeveloperToolClaim[]
   planAssignments       DeveloperPlanAssignment[]
   usageDaily            UsageDaily[]
@@ -105,6 +119,7 @@ model Developer {
   localWorkSessions     LocalWorkSession[]
   deviceActivityEvents  DeviceActivityEvent[]
   syncRequests          SyncRequest[]
+  privacyRequests       PrivacyRequest[]
 
   @@unique([orgId, email])
   @@unique([orgId, authUserId])
@@ -134,8 +149,10 @@ model Device {
   toolsContentHash    String?   @map("tools_content_hash")
   accountsContentHash String?   @map("accounts_content_hash")
   quotasContentHash   String?   @map("quotas_content_hash")
-  decommissionedAt    DateTime? @map("decommissioned_at")
-  createdAt           DateTime  @default(now()) @map("created_at")
+  decommissionedAt            DateTime? @map("decommissioned_at")
+  collectionNoticeAckAt       DateTime? @map("collection_notice_ack_at")
+  collectionNoticeVersion     String?   @map("collection_notice_version")
+  createdAt                   DateTime  @default(now()) @map("created_at")
 
   organization            Organization              @relation(fields: [orgId], references: [id], onDelete: Cascade)
   user                    Developer                 @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -437,7 +454,7 @@ model ToolAccount {
   plan               String?
   loginMethod        String   @default("unknown") @map("login_method")
   authPresent        Boolean  @default(false) @map("auth_present")
-  usageEnabled       Boolean  @default(false) @map("usage_enabled")
+  usageEnabled       Boolean  @default(true) @map("usage_enabled")
   loggingEnabled     Boolean  @default(false) @map("logging_enabled")
   usageAdminLocked   Boolean  @default(false) @map("usage_admin_locked")
   loggingAdminLocked Boolean  @default(false) @map("logging_admin_locked")
@@ -480,6 +497,7 @@ model QuotaSnapshot {
   orgId            String    @map("org_id")
   deviceId         String?   @map("device_id")
   toolName         String    @map("tool_name")
+  accountKey       String    @default("") @map("account_key")
   windowType       String    @map("window_type")
   usedPercent      Float?    @map("used_percent")
   resetAt          DateTime? @map("reset_at")
@@ -491,6 +509,7 @@ model QuotaSnapshot {
   device       Device?      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
   @@index([deviceId, toolName, windowType])
+  @@index([deviceId, toolName, accountKey, windowType])
   @@map("quota_snapshots")
 }
 
@@ -499,6 +518,7 @@ model QuotaObservation {
   orgId        String   @map("org_id")
   deviceId     String   @map("device_id")
   toolName     String   @map("tool_name")
+  accountKey   String   @default("") @map("account_key")
   windowType   String   @map("window_type")
   resetAt      DateTime @map("reset_at")
   usedPercent  Float    @map("used_percent")
@@ -508,7 +528,7 @@ model QuotaObservation {
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   device       Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
-  @@unique([deviceId, toolName, windowType, resetAt, sampleBucket])
+  @@unique([deviceId, toolName, accountKey, windowType, resetAt, sampleBucket])
   @@index([orgId, toolName, windowType, resetAt, observedAt])
   @@index([deviceId, observedAt])
   @@map("quota_observations")
@@ -524,8 +544,11 @@ model User {
   /// IANA timezone (e.g. Asia/Colombo). Used for 19:00 local daily reports.
   timeZone       String?   @map("time_zone")
   timeZoneSource String?   @map("time_zone_source")
-  timeZoneManual Boolean   @default(false) @map("time_zone_manual")
-  createdAt      DateTime  @default(now()) @map("created_at")
+  timeZoneManual    Boolean   @default(false) @map("time_zone_manual")
+  termsAcceptedAt   DateTime? @map("terms_accepted_at")
+  termsVersion      String?   @map("terms_version")
+  privacyVersion    String?   @map("privacy_version")
+  createdAt         DateTime  @default(now()) @map("created_at")
 
   accounts                Account[]
   sessions                Session[]
@@ -587,6 +610,8 @@ model OrganizationMembership {
   role                      String    @default("user")
   onboardingCompletedAt     DateTime? @map("onboarding_completed_at")
   setupChecklistDismissedAt DateTime? @map("setup_checklist_dismissed_at")
+  collectionNoticeAckAt     DateTime? @map("collection_notice_ack_at")
+  collectionNoticeVersion   String?   @map("collection_notice_version")
   createdAt                 DateTime  @default(now()) @map("created_at")
 
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -723,8 +748,12 @@ model ProviderConnection {
   usageDaily         UsageDaily[]
   apiCreditPool      ApiCreditPool?
   apiKeys            ProviderApiKey[]
+  gitPullRequests    GitPullRequest[]
+  githubRepositoryAccesses GitHubRepositoryAccess[]
+  githubProjects     GitHubProject[]
 
-  @@unique([orgId, provider, product])
+  @@index([orgId, provider, product])
+  @@index([orgId, provider, externalOrgId])
   @@index([status, nextSyncAt, leaseUntil])
   @@map("provider_connections")
 }
@@ -875,7 +904,7 @@ model ExternalIdentity {
 
   organization Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
   developer    Developer?          @relation(fields: [developerId], references: [id], onDelete: SetNull)
-  connection   ProviderConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  connection   ProviderConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
 
   @@unique([orgId, provider, externalUserId])
   @@index([orgId, email])
@@ -917,9 +946,231 @@ model Repository {
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   usageDaily   UsageDaily[]
+  gitPullRequests GitPullRequest[]
+  gitCommits   GitCommit[]
+  featureCostAllocations FeatureCostAllocation[]
+  githubRepositoryAccesses GitHubRepositoryAccess[]
+  githubProjectItems GitHubProjectItem[]
 
   @@unique([orgId, host, owner, name])
   @@map("repositories")
+}
+
+/// A repository currently granted to a GitHub App installation. Historical
+/// repository rows remain independent of access when a grant is removed.
+model GitHubRepositoryAccess {
+  id            String    @id @default(cuid())
+  orgId         String    @map("org_id")
+  connectionId  String    @map("connection_id")
+  repositoryId  String    @map("repository_id")
+  syncStatus    String    @default("pending") @map("sync_status")
+  grantedAt     DateTime  @default(now()) @map("granted_at")
+  lastAttemptAt DateTime? @map("last_attempt_at")
+  lastSuccessAt DateTime? @map("last_success_at")
+  lastError     String?   @map("last_error") @db.Text
+
+  organization Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  connection   ProviderConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  repository   Repository         @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, repositoryId])
+  @@index([orgId, repositoryId])
+  @@map("github_repository_accesses")
+}
+
+/// Organization Project explicitly selected for a GitHub App installation.
+model GitHubProject {
+  id            String    @id @default(cuid())
+  orgId         String    @map("org_id")
+  connectionId  String    @map("connection_id")
+  externalId    String    @map("external_id")
+  number        Int
+  title         String
+  url           String
+  syncStatus    String    @default("pending") @map("sync_status")
+  lastAttemptAt DateTime? @map("last_attempt_at")
+  lastSuccessAt DateTime? @map("last_success_at")
+  lastError       String?   @map("last_error") @db.Text
+  attributionMode String    @default("wi_order") @map("attribution_mode")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  organization Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  connection   ProviderConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  items        GitHubProjectItem[]
+
+  @@unique([connectionId, externalId])
+  @@index([orgId, connectionId])
+  @@map("github_projects")
+}
+
+model GitHubProjectItem {
+  id                     String    @id @default(cuid())
+  orgId                  String    @map("org_id")
+  projectId              String    @map("project_id")
+  externalItemId         String    @map("external_item_id")
+  contentId              String    @map("content_id")
+  contentType            String    @map("content_type")
+  repositoryId           String    @map("repository_id")
+  repositoryFullName     String    @map("repository_full_name")
+  number                 Int
+  title                  String
+  status                 String?
+  statusSource           String?   @map("status_source")
+  url                    String
+  contentCreatedAt       DateTime? @map("content_created_at")
+  contentClosedAt        DateTime? @map("content_closed_at")
+  lastSeenAt             DateTime  @map("last_seen_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  project      GitHubProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  repository   Repository    @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, externalItemId])
+  @@index([orgId, repositoryId, contentType, number])
+  @@index([orgId, repositoryId, contentId])
+  @@map("github_project_items")
+}
+
+model ProjectToolConnection {
+  id                     String    @id @default(cuid())
+  orgId                  String    @map("org_id")
+  provider               String
+  externalWorkspaceId    String    @map("external_workspace_id")
+  externalWorkspaceName  String    @map("external_workspace_name")
+  accessTokenCiphertext  String    @map("access_token_ciphertext") @db.Text
+  refreshTokenCiphertext String    @map("refresh_token_ciphertext") @db.Text
+  accessTokenExpiresAt   DateTime? @map("access_token_expires_at")
+  status                 String    @default("connected")
+  lastSyncedAt           DateTime? @map("last_synced_at")
+  lastError              String?   @map("last_error") @db.Text
+  createdByUserId        String?   @map("created_by_user_id")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  issues       ProjectIssue[]
+
+  @@unique([orgId, provider])
+  @@map("project_tool_connections")
+}
+
+model ProjectIssue {
+  id             String    @id @default(cuid())
+  orgId          String    @map("org_id")
+  connectionId   String    @map("connection_id")
+  externalId     String    @map("external_id")
+  identifier     String
+  title          String
+  status         String
+  url            String?
+  issueUpdatedAt DateTime? @map("issue_updated_at")
+  lastSeenAt     DateTime  @default(now()) @map("last_seen_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  organization Organization        @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  connection   ProjectToolConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, externalId])
+  @@index([orgId, identifier])
+  @@map("project_issues")
+}
+
+model GitPullRequest {
+  id                String    @id @default(cuid())
+  orgId             String    @map("org_id")
+  connectionId      String    @map("connection_id")
+  repositoryId      String    @map("repository_id")
+  number            Int
+  title             String
+  state             String
+  headRefName       String?   @map("head_ref_name")
+  baseRefName       String?   @map("base_ref_name")
+  authorLogin       String?   @map("author_login")
+  authorDeveloperId String?   @map("author_developer_id")
+  url               String?
+  githubCreatedAt   DateTime  @map("github_created_at")
+  mergedAt          DateTime? @map("merged_at")
+  closedAt          DateTime? @map("closed_at")
+  additions         Int       @default(0)
+  deletions         Int       @default(0)
+  changedFiles      Int       @default(0) @map("changed_files")
+  ticketKeys        Json      @default("[]") @map("ticket_keys")
+  closingIssues     Json      @default("[]") @map("closing_issues")
+  metadata          Json?
+  syncedAt          DateTime  @default(now()) @map("synced_at")
+
+  organization Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  connection   ProviderConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  repository   Repository         @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  author       Developer?         @relation("GitPullRequestAuthor", fields: [authorDeveloperId], references: [id], onDelete: SetNull)
+  commits      GitCommit[]
+  allocations  FeatureCostAllocation[]
+
+  @@unique([repositoryId, number])
+  @@index([orgId, authorDeveloperId, mergedAt])
+  @@index([orgId, repositoryId])
+  @@map("git_pull_requests")
+}
+
+model GitCommit {
+  id                String    @id @default(cuid())
+  orgId             String    @map("org_id")
+  repositoryId      String    @map("repository_id")
+  sha               String
+  authoredAt        DateTime  @map("authored_at")
+  committedAt       DateTime  @map("committed_at")
+  authorEmail       String?   @map("author_email")
+  authorLogin       String?   @map("author_login")
+  authorDeveloperId String?   @map("author_developer_id")
+  messageHeadline   String    @default("") @map("message_headline")
+  additions         Int       @default(0)
+  deletions         Int       @default(0)
+  pullRequestId     String?   @map("pull_request_id")
+  isDirectPush      Boolean   @default(false) @map("is_direct_push")
+  isBot             Boolean   @default(false) @map("is_bot")
+  ticketKeys        Json      @default("[]") @map("ticket_keys")
+
+  organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  repository   Repository    @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  author       Developer?    @relation("GitCommitAuthor", fields: [authorDeveloperId], references: [id], onDelete: SetNull)
+  pullRequest  GitPullRequest? @relation(fields: [pullRequestId], references: [id], onDelete: SetNull)
+
+  @@unique([repositoryId, sha])
+  @@index([orgId, authorDeveloperId, authoredAt])
+  @@index([repositoryId, authoredAt])
+  @@index([pullRequestId, authoredAt])
+  @@map("git_commits")
+}
+
+model FeatureCostAllocation {
+  id                 String   @id @default(cuid())
+  orgId              String   @map("org_id")
+  date               DateTime @db.Date
+  developerId        String   @map("developer_id")
+  repositoryId       String?  @map("repository_id")
+  pullRequestId      String?  @map("pull_request_id")
+  commitSha          String?  @map("commit_sha")
+  ticketKey          String?  @map("ticket_key")
+  ticketKeySource    String?  @map("ticket_key_source")
+  costKind           String   @map("cost_kind")
+  costMicros         BigInt   @default(0) @map("cost_micros")
+  weight             Float    @default(0)
+  method             String
+  calculationVersion String   @map("calculation_version")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  developer    Developer     @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  repository   Repository?   @relation(fields: [repositoryId], references: [id], onDelete: SetNull)
+  pullRequest  GitPullRequest? @relation(fields: [pullRequestId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, date])
+  @@index([orgId, repositoryId, date])
+  @@index([orgId, ticketKey])
+  @@index([orgId, pullRequestId])
+  @@index([orgId, developerId, date])
+  @@map("feature_cost_allocations")
 }
 
 model UsageDaily {
@@ -933,6 +1184,7 @@ model UsageDaily {
   provider           String
   product            String   @default("")
   toolName           String   @default("") @map("tool_name")
+  accountKey         String   @default("") @map("account_key")
   model              String   @default("")
   source             String
   sourceRef          String?  @map("source_ref")
@@ -983,6 +1235,7 @@ model OrgUsageDaySnapshot {
   toolName                String    @default("") @map("tool_name")
   developerId             String    @default("") @map("developer_id")
   modelName               String    @default("") @map("model_name")
+  accountKey              String    @default("") @map("account_key")
   metricVersion           String    @map("metric_version")
   requests                Int       @default(0)
   sessions                Int       @default(0)
@@ -1006,7 +1259,7 @@ model OrgUsageDaySnapshot {
 
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
-  @@unique([orgId, date, toolName, developerId, modelName, metricVersion])
+  @@unique([orgId, date, toolName, developerId, modelName, accountKey, metricVersion])
   @@index([orgId, date, metricVersion])
   @@index([orgId, developerId, date, metricVersion])
   @@map("org_usage_day_snapshots")
@@ -1266,6 +1519,7 @@ model LocalWorkSession {
   developerId    String    @map("developer_id")
   deviceId       String    @map("device_id")
   localId        String    @map("local_id")
+  accountKey     String    @default("") @map("account_key")
   toolName       String    @map("tool_name")
   model          String?
   mode           String?
@@ -1287,7 +1541,7 @@ model LocalWorkSession {
   developer    Developer    @relation(fields: [developerId], references: [id], onDelete: Cascade)
   device       Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
-  @@unique([deviceId, localId])
+  @@unique([deviceId, localId, accountKey])
   @@index([orgId, observedAt])
   @@index([orgId, developerId, observedAt])
   @@index([orgId, toolName, observedAt])
@@ -1394,6 +1648,31 @@ model AuditLog {
 
   @@index([orgId, createdAt])
   @@map("audit_logs")
+}
+
+model PrivacyRequest {
+  id                 String    @id @default(cuid())
+  orgId              String    @map("org_id")
+  subjectDeveloperId String?   @map("subject_developer_id")
+  subjectUserId      String?   @map("subject_user_id")
+  type               String
+  status             String    @default("pending")
+  requestedByUserId  String    @map("requested_by_user_id")
+  scheduledFor       DateTime? @map("scheduled_for")
+  completedAt        DateTime? @map("completed_at")
+  cancelledAt        DateTime? @map("cancelled_at")
+  artifactPath       String?   @map("artifact_path")
+  metadata           Json?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  developer    Developer?   @relation(fields: [subjectDeveloperId], references: [id], onDelete: SetNull)
+
+  @@index([orgId, status])
+  @@index([orgId, subjectDeveloperId])
+  @@index([status, scheduledFor])
+  @@map("privacy_requests")
 }
 
 /// Global control-plane key/value settings (cron seals, feature flags).

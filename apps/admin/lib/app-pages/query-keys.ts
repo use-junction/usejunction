@@ -78,4 +78,18 @@ export const notificationPreferencesKey = ["app", "notification-preferences"] as
 
 export const meDevicesKey = ["app", "me", "devices"] as const;
 
+export const myDataKey = ["app", "me", "data"] as const;
+
 export const settingsKey = ["app", "settings"] as const;
+
+export function featuresKey(queryString = "") {
+  return ["app", "features", queryString] as const;
+}
+
+export function workSpendKey(queryString = "") {
+  return ["app", "work-spend", queryString] as const;
+}
+
+export function workSpendProjectKey(projectId: string, days: number) {
+  return ["app", "work-spend-project", projectId, days] as const;
+}

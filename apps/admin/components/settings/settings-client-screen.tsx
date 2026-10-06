@@ -6,7 +6,7 @@ import { BillingSettingsCard } from "@/components/settings/billing-settings-card
 import { EmailReportsSettingsCard, type EmailReportsPrefs } from "@/components/settings/email-reports-settings-card";
 import { SignalsSettingsCard } from "@/components/settings/signals-settings-card";
 import { MachineConnectionSettingsCard } from "@/components/settings/machine-connection-settings-card";
-import { AccountCollectionCard, AccountCollectionLockCard } from "@/components/me/account-collection-card";
+import { AnalyticsConsentCard } from "@/components/settings/analytics-consent-card";
 import { WorkspaceSettingsCard } from "@/components/settings/workspace-settings-card";
 import type { getOrgActivitySettings } from "@/lib/activity/service";
 import type { getOrgSignalsPolicy } from "@/lib/signals/service";
@@ -14,6 +14,7 @@ import type { getOrgBillingStatus } from "@/lib/saas-billing/status";
 import { useAppPageQuery } from "@/lib/api/client";
 import { notificationPreferencesKey, settingsKey } from "@/lib/app-pages/query-keys";
 import { AppPageError, AppPageSkeleton, isBlockingAppQueryError, useAppQueryErrorToast } from "@/components/app-data-state";
+import { signalsProductEnabled } from "@/lib/region";
 
 type SettingsPayload = {
   orgId: string;
@@ -55,16 +56,11 @@ export default function SettingsClientScreen() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <PageHeader
-        title="Settings."
-        description="Email reports, workspace identity, billing, and what your team can open."
-        className="mb-8"
-      />
+      <PageHeader title="How is this set up?" className="mb-8" />
 
       <div className="space-y-6">
         <MachineConnectionSettingsCard />
-        <AccountCollectionCard />
-        {canManageOrg ? <AccountCollectionLockCard /> : null}
+        <AnalyticsConsentCard />
 
         {canManageOrg && orgQuery.data ? (
           <>
@@ -75,7 +71,7 @@ export default function SettingsClientScreen() {
             />
             <BillingSettingsCard billing={orgQuery.data.billing} members={orgQuery.data.billingMembers} />
             {prefsQuery.data ? <EmailReportsSettingsCard initial={prefsQuery.data} /> : null}
-            <SignalsSettingsCard initialPolicy={orgQuery.data.signalsPolicy} />
+            {signalsProductEnabled() ? <SignalsSettingsCard initialPolicy={orgQuery.data.signalsPolicy} /> : null}
             <ActivitySettingsCard initialSettings={orgQuery.data.settings} />
           </>
         ) : prefsQuery.data ? (

@@ -10,30 +10,45 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: production-crons-device-health
-  cancel-in-progress: false
-
 jobs:
   device-health:
-    name: Device health
+    name: Device health (${{ matrix.region }})
     runs-on: ubuntu-latest
     environment: agent-production
     timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        region: [us, eu]
+    concurrency:
+      group: production-crons-device-health-${{ matrix.region }}
+      cancel-in-progress: false
     steps:
       - name: Require environment secrets
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          CONTROL_PLANE_URL: ${{ secrets.CONTROL_PLANE_URL }}
+          CONTROL_PLANE_URL: ${{ matrix.region == 'eu' && secrets.CONTROL_PLANE_URL_EU || secrets.CONTROL_PLANE_URL }}
+          REGION: ${{ matrix.region }}
         run: |
-          if [ -z "$CRON_SECRET" ] || [ -z "$CONTROL_PLANE_URL" ]; then
-            echo "::error::Set agent-production environment secrets CRON_SECRET and CONTROL_PLANE_URL"
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Set agent-production environment secret CRON_SECRET"
             exit 1
           fi
+          if [ -z "$CONTROL_PLANE_URL" ]; then
+            if [ "$REGION" = "eu" ]; then
+              echo "::notice::CONTROL_PLANE_URL_EU is not set; skipping EU cron"
+              echo "skip=true" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "::error::Set agent-production environment secret CONTROL_PLANE_URL"
+            exit 1
+          fi
+          echo "skip=false" >> "$GITHUB_ENV"
+          echo "CONTROL_PLANE_URL=$CONTROL_PLANE_URL" >> "$GITHUB_ENV"
       - name: POST /api/cron/device-health
+        if: env.skip != 'true'
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          CONTROL_PLANE_URL: ${{ secrets.CONTROL_PLANE_URL }}
         run: |
           set -euo pipefail
           base="${CONTROL_PLANE_URL%/}"

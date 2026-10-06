@@ -59,7 +59,7 @@ export const guideSeePlanUsage: ContentPage = {
     {
       question: "Does this watch developers’ work?",
       answer:
-        "Privacy first, observability second. There is no keystroke surveillance, browser capture, or network interception. Work summaries and person-level detail can be turned off per person or team.",
+        "Privacy first, observability second. There is no keystroke surveillance, browser capture, or network interception. Usage collection can be turned off per login.",
     },
     {
       question: "How do I spot wasted seats?",

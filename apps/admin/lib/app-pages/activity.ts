@@ -5,7 +5,7 @@ import { getOrgActivitySettings } from "@/lib/activity/service";
 import { cycleViewPeriodLabel, cycleViewWindows, parseCycleView, reportWindowForCycleView } from "@/lib/dashboard/cycle-view";
 import { parseRollingPeriodFromSearch } from "@/lib/dashboard/period-prefs";
 import { getDeviceActivityFeed } from "@/lib/queries/activity/device-activity";
-import { getDashboardUsage } from "@/lib/queries/dashboard/usage";
+import { getTeamAdoption } from "@/lib/queries/activity/adoption";
 import { getMeOverview } from "@/lib/queries/me/overview";
 import { resolveLinkedDeveloperId } from "@/lib/queries/me/resolve-developer";
 import { getPersonalSignalsLedger } from "@/lib/signals/read";
@@ -106,8 +106,8 @@ export async function loadActivityPage(principal: AppPrincipal, search: Activity
     });
   }
 
-  const [usage, deviceFeed] = await Promise.all([
-    getDashboardUsage(principal.orgId, reportWindow),
+  const [adoption, deviceFeed] = await Promise.all([
+    getTeamAdoption(principal.orgId, reportWindow, now),
     getDeviceActivityFeed(principal.orgId, { limit: 50 }),
   ]);
   return jsonSafe({
@@ -119,7 +119,7 @@ export async function loadActivityPage(principal: AppPrincipal, search: Activity
     rollingPeriod,
     periodLabel,
     cycleWindows,
-    usage,
+    adoption,
     deviceFeed,
   });
 }

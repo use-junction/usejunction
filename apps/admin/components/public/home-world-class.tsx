@@ -12,7 +12,7 @@ const privacySteps = [
   },
   {
     label: "You control the detail",
-    detail: "Work summaries and person-level views can be turned off",
+    detail: "Each login has its own usage switch",
   },
   {
     label: "Your infrastructure",
@@ -37,7 +37,7 @@ export function HomeWorldClass() {
               </h2>
               <p className="mt-4 text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
                 Privacy first. Observability second. No keystroke surveillance, browser capture, or
-                network interception—and richer work detail stays optional, so teams can turn it off.
+                network interception. Usage collection can be turned off per login.
               </p>
               <p className="mt-8 text-xs leading-5 text-muted-foreground/80">
                 Open source you can audit. Data stays on infrastructure your team controls.

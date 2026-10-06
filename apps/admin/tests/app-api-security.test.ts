@@ -26,6 +26,8 @@ describe("app API middleware boundary", () => {
   it("lets page-data handlers return JSON auth errors while UI routes stay protected", () => {
     expect(isPublicPath("/api/app/workspace-context")).toBe(true);
     expect(isPublicPath("/api/app/team/developer-1")).toBe(true);
+    expect(isPublicPath("/api/integrations/github/callback")).toBe(true);
+    expect(isPublicPath("/api/integrations/github/connect")).toBe(false);
     expect(isPublicPath("/dashboard")).toBe(false);
     expect(isPublicPath("/settings")).toBe(false);
   });

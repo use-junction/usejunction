@@ -3,6 +3,7 @@ import { loadEnvConfig } from "@next/env";
 import path from "node:path";
 import { hashOpaqueToken } from "../lib/security";
 import { flowKeyFromSession } from "../lib/signals/policies/flow";
+import { COLLECTION_NOTICE_VERSION, LEGAL_PRIVACY_VERSION, LEGAL_TERMS_VERSION } from "../lib/legal/versions";
 
 const loadedEnv = loadEnvConfig(path.join(__dirname, "../.."));
 if (!process.env.DATABASE_URL && loadedEnv.combinedEnv.DATABASE_URL) {
@@ -17,7 +18,7 @@ const teamInviteToken = process.env.E2E_TEAM_INVITE_TOKEN ?? "uj_team_e2e_calcul
 const orgInviteToken = process.env.E2E_ORG_INVITE_TOKEN ?? "uj_invite_e2e_calculation_member";
 const inviteeEmail = process.env.E2E_INVITEE_EMAIL ?? "invitee@example.com";
 const now = new Date("2026-07-16T12:00:00.000Z");
-const inviteExpiresAt = new Date("2026-08-16T12:00:00.000Z");
+const inviteExpiresAt = new Date("2027-12-16T12:00:00.000Z");
 const journey = flowKeyFromSession({
   appBefore: "Google Chrome",
   domainBefore: "github.com",
@@ -43,15 +44,36 @@ async function main() {
       lemonSqueezyCustomerId: "e2e-lemon-customer",
       lemonSqueezySubscriptionId: "e2e-lemon-subscription",
       lemonSqueezyQuantity: 5,
+      dataRegion: process.env.DEPLOYMENT_REGION === "eu" ? "eu" : "us",
+      usageRetentionDays: 1095,
     },
   });
   const passwordHash = await hash(password, 10);
-  const ownerUser = await prisma.user.create({ data: { name: "E2E Owner", email: ownerEmail, passwordHash, emailVerified: now } });
-  const developerUser = await prisma.user.create({ data: { name: "E2E Developer", email: developerEmail, passwordHash, emailVerified: now } });
+  const legalAcceptance = {
+    termsAcceptedAt: now,
+    termsVersion: LEGAL_TERMS_VERSION,
+    privacyVersion: LEGAL_PRIVACY_VERSION,
+  };
+  const ownerUser = await prisma.user.create({ data: { name: "E2E Owner", email: ownerEmail, passwordHash, emailVerified: now, ...legalAcceptance } });
+  const developerUser = await prisma.user.create({ data: { name: "E2E Developer", email: developerEmail, passwordHash, emailVerified: now, ...legalAcceptance } });
   await prisma.organizationMembership.createMany({
     data: [
-      { orgId: org.id, userId: ownerUser.id, role: "owner", onboardingCompletedAt: now },
-      { orgId: org.id, userId: developerUser.id, role: "user", onboardingCompletedAt: now },
+      {
+        orgId: org.id,
+        userId: ownerUser.id,
+        role: "owner",
+        onboardingCompletedAt: now,
+        collectionNoticeAckAt: now,
+        collectionNoticeVersion: COLLECTION_NOTICE_VERSION,
+      },
+      {
+        orgId: org.id,
+        userId: developerUser.id,
+        role: "user",
+        onboardingCompletedAt: now,
+        collectionNoticeAckAt: now,
+        collectionNoticeVersion: COLLECTION_NOTICE_VERSION,
+      },
     ],
   });
   await prisma.developer.create({ data: { id: "e2e-owner", orgId: org.id, name: "E2E Owner", email: ownerEmail, role: "owner", authUserId: ownerUser.id } });
@@ -94,6 +116,37 @@ async function main() {
       version: "1.17.16",
       lastCheckedAt: now,
     },
+  });
+
+  await prisma.toolAccount.createMany({
+    data: [
+      {
+        orgId: org.id,
+        userId: developer.id,
+        deviceId: device.id,
+        toolName: "cursor",
+        accountKey: "work",
+        email: developerEmail,
+        plan: "pro",
+        loginMethod: "email",
+        authPresent: true,
+        usageEnabled: true,
+        loggingEnabled: false,
+      },
+      {
+        orgId: org.id,
+        userId: developer.id,
+        deviceId: device.id,
+        toolName: "opencode",
+        accountKey: "personal",
+        email: developerEmail,
+        plan: null,
+        loginMethod: "email",
+        authPresent: true,
+        usageEnabled: false,
+        loggingEnabled: false,
+      },
+    ],
   });
 
   await prisma.billingPlanTemplate.create({
@@ -218,10 +271,10 @@ async function main() {
   await prisma.usageDaily.createMany({
     data: [
       {
-        orgId: org.id, developerId: developer.id, deviceId: device.id, date: new Date("2026-07-10T00:00:00.000Z"), provider: "cursor", product: "cursor", toolName: "cursor", model: "gpt-4.1", source: "vendor_verified", verified: true, requests: 10, inputTokens: BigInt(1_000_000), outputTokens: BigInt(500_000), costMicros: BigInt(5_000_000), costKind: "verified_usage", dedupeKey: "e2e:cursor:2026-07-10", observedAt: now,
+        orgId: org.id, developerId: developer.id, deviceId: device.id, date: new Date("2026-07-10T00:00:00.000Z"), provider: "cursor", product: "cursor", toolName: "cursor", model: "gpt-4.1", source: "vendor_verified", verified: true, requests: 10, inputTokens: BigInt(1_000_000), outputTokens: BigInt(500_000), costMicros: BigInt(5_000_000), costKind: "verified_usage", accountKey: "work", dedupeKey: "e2e:cursor:2026-07-10", observedAt: now,
       },
       {
-        orgId: org.id, developerId: developer.id, deviceId: device.id, date: new Date("2026-07-11T00:00:00.000Z"), provider: "cursor", product: "cursor", toolName: "cursor", model: "gpt-4.1", source: "estimated", requests: 5, inputTokens: BigInt(100), outputTokens: BigInt(50), costMicros: BigInt(1_000_000), costKind: "estimated_api", dedupeKey: "e2e:cursor:2026-07-11", observedAt: now,
+        orgId: org.id, developerId: developer.id, deviceId: device.id, date: new Date("2026-07-11T00:00:00.000Z"), provider: "cursor", product: "cursor", toolName: "cursor", model: "gpt-4.1", source: "estimated", requests: 5, inputTokens: BigInt(100), outputTokens: BigInt(50), costMicros: BigInt(1_000_000), costKind: "estimated_api", accountKey: "work", dedupeKey: "e2e:cursor:2026-07-11", observedAt: now,
       },
       {
         orgId: org.id, developerId: developer.id, connectionId: openAiConnection.id, date: new Date("2026-07-12T00:00:00.000Z"), provider: "openai", product: "api_platform", toolName: "openai-api", model: "gpt-5", source: "vendor_verified", verified: true, requests: 25, inputTokens: BigInt(2_000_000), outputTokens: BigInt(500_000), dedupeKey: "e2e:openai:usage:mapped", observedAt: now, metadata: { apiKeyId: "key_e2e_mapped", projectId: "project-production" },
@@ -239,10 +292,10 @@ async function main() {
         orgId: org.id, connectionId: anthropicConnection.id, date: new Date("2026-07-13T00:00:00.000Z"), provider: "anthropic", product: "api_platform", toolName: "anthropic-api", source: "vendor_verified", verified: true, costMicros: BigInt(8_000_000), costKind: "verified_usage", dedupeKey: "e2e:anthropic:cost", observedAt: now, metadata: { workspaceId: "workspace-ai", description: "Claude usage" },
       },
       {
-        orgId: org.id, developerId: developer.id, deviceId: device.id, date: new Date("2026-07-14T00:00:00.000Z"), provider: "opencode", product: "opencode", toolName: "opencode", model: "opencode-go/kimi-k2.7-code", source: "device_observed", verified: false, requests: 28, inputTokens: BigInt(121_126), outputTokens: BigInt(8_927), costMicros: BigInt(376_150), costKind: "actual_spend", metricKind: "usage", dedupeKey: "e2e:opencode:usage:2026-07-14", observedAt: now,
+        orgId: org.id, developerId: developer.id, deviceId: device.id, date: new Date("2026-07-14T00:00:00.000Z"), provider: "opencode", product: "opencode", toolName: "opencode", model: "opencode-go/kimi-k2.7-code", source: "device_observed", verified: false, requests: 28, inputTokens: BigInt(121_126), outputTokens: BigInt(8_927), costMicros: BigInt(376_150), costKind: "actual_spend", metricKind: "usage", accountKey: "personal", dedupeKey: "e2e:opencode:usage:2026-07-14", observedAt: now,
       },
       {
-        orgId: org.id, developerId: developer.id, deviceId: device.id, date: new Date("2026-07-14T00:00:00.000Z"), provider: "opencode", product: "opencode", toolName: "opencode", model: "opencode", source: "device_observed", verified: false, requests: 3, addedLines: 120, deletedLines: 30, metricKind: "productivity", dedupeKey: "e2e:opencode:local:2026-07-14", observedAt: now,
+        orgId: org.id, developerId: developer.id, deviceId: device.id, date: new Date("2026-07-14T00:00:00.000Z"), provider: "opencode", product: "opencode", toolName: "opencode", model: "opencode", source: "device_observed", verified: false, requests: 3, addedLines: 120, deletedLines: 30, metricKind: "productivity", accountKey: "personal", dedupeKey: "e2e:opencode:local:2026-07-14", observedAt: now,
       },
     ],
   });
@@ -297,6 +350,91 @@ async function main() {
       collectionMode: "app_domain",
       steps: [{ label: "github.com", startedAt: "2026-07-15T10:00:00.000Z", endedAt: "2026-07-15T10:00:30.000Z" }],
     },
+  });
+
+  const featureDay = new Date();
+  featureDay.setUTCHours(0, 0, 0, 0);
+  featureDay.setUTCDate(featureDay.getUTCDate() - 7);
+  const githubConnection = await prisma.providerConnection.create({
+    data: {
+      id: "e2e-github-connection",
+      orgId: org.id,
+      provider: "github",
+      product: "copilot",
+      method: "oauth",
+      status: "active",
+      externalOrgId: "acme",
+      config: { product: "copilot", org: "acme", installationId: "12345", accountType: "Organization", githubMemberLogins: "ada" },
+      permissions: { pull_requests: "read", contents: "read", issues: "read", metadata: "read", members: "read" },
+      lastSyncedAt: now,
+      createdByUserId: ownerUser.id,
+    },
+  });
+  const repo = await prisma.repository.create({
+    data: { id: "e2e-repo", orgId: org.id, host: "github.com", owner: "acme", name: "app" },
+  });
+  await prisma.externalIdentity.createMany({
+    data: [
+      { id: "e2e-github-ada", orgId: org.id, connectionId: githubConnection.id, developerId: developer.id, provider: "github", externalUserId: "ada", email: developerEmail, matchedBy: "email" },
+      { id: "e2e-github-ghost", orgId: org.id, connectionId: githubConnection.id, provider: "github", externalUserId: "ghost", matchedBy: null },
+    ],
+  });
+  const featurePr = await prisma.gitPullRequest.create({
+    data: {
+      id: "e2e-pr-482",
+      orgId: org.id,
+      connectionId: githubConnection.id,
+      repositoryId: repo.id,
+      number: 482,
+      title: "PAY-219 checkout",
+      state: "merged",
+      headRefName: "feature/pay-219-checkout",
+      authorLogin: "ada",
+      authorDeveloperId: developer.id,
+      url: "https://github.com/acme/app/pull/482",
+      githubCreatedAt: new Date(featureDay.getTime() - 86_400_000),
+      mergedAt: new Date(featureDay.getTime() + 18 * 3_600_000),
+      additions: 40,
+      deletions: 6,
+      changedFiles: 3,
+      ticketKeys: ["PAY-219"],
+    },
+  });
+  const unlinkedPr = await prisma.gitPullRequest.create({
+    data: {
+      id: "e2e-pr-12",
+      orgId: org.id,
+      connectionId: githubConnection.id,
+      repositoryId: repo.id,
+      number: 12,
+      title: "Tidy readme",
+      state: "merged",
+      authorLogin: "ada",
+      authorDeveloperId: developer.id,
+      githubCreatedAt: new Date(featureDay.getTime() + 8 * 3_600_000),
+      mergedAt: new Date(featureDay.getTime() + 9 * 3_600_000),
+      ticketKeys: [],
+    },
+  });
+  await prisma.gitCommit.createMany({
+    data: [
+      { orgId: org.id, repositoryId: repo.id, sha: "aaa111aaa111aaa111aaa111aaa111aaa111aaa1", authoredAt: new Date(featureDay.getTime() + 12 * 3_600_000), committedAt: new Date(featureDay.getTime() + 12 * 3_600_000), authorLogin: "ada", authorDeveloperId: developer.id, messageHeadline: "PAY-219 implement checkout", pullRequestId: featurePr.id, ticketKeys: ["PAY-219"] },
+      { orgId: org.id, repositoryId: repo.id, sha: "aaa222aaa222aaa222aaa222aaa222aaa222aaa2", authoredAt: new Date(featureDay.getTime() + 13 * 3_600_000), committedAt: new Date(featureDay.getTime() + 13 * 3_600_000), authorLogin: "ada", authorDeveloperId: developer.id, messageHeadline: "PAY-219 tests", pullRequestId: featurePr.id, ticketKeys: ["PAY-219"] },
+      { orgId: org.id, repositoryId: repo.id, sha: "bbb111bbb111bbb111bbb111bbb111bbb111bbb1", authoredAt: new Date(featureDay.getTime() + 8.5 * 3_600_000), committedAt: new Date(featureDay.getTime() + 8.5 * 3_600_000), authorLogin: "ada", authorDeveloperId: developer.id, messageHeadline: "readme", pullRequestId: unlinkedPr.id, ticketKeys: [] },
+      { orgId: org.id, repositoryId: repo.id, sha: "ccc111ccc111ccc111ccc111ccc111ccc111ccc1", authoredAt: new Date(featureDay.getTime() + 15 * 3_600_000), committedAt: new Date(featureDay.getTime() + 15 * 3_600_000), authorLogin: "ghost", messageHeadline: "drive-by", isDirectPush: true, ticketKeys: [] },
+    ],
+  });
+  await prisma.featureCostAllocation.createMany({
+    data: [
+      { orgId: org.id, date: featureDay, developerId: developer.id, repositoryId: repo.id, pullRequestId: featurePr.id, costKind: "verified_usage", costMicros: BigInt(4_000_000), weight: 2, method: "commit_split", calculationVersion: "usage-v2:feature-v4" },
+      { orgId: org.id, date: featureDay, developerId: developer.id, repositoryId: repo.id, commitSha: "bbb111bbb111bbb111bbb111bbb111bbb111bbb1", pullRequestId: unlinkedPr.id, costKind: "verified_usage", costMicros: BigInt(1_000_000), weight: 1, method: "commit_split", calculationVersion: "usage-v2:feature-v4" },
+    ],
+  });
+  await prisma.providerConnectionCapability.createMany({
+    data: [
+      { orgId: org.id, connectionId: githubConnection.id, capability: "pull_requests", status: "available", lastSuccessAt: now, lastCheckedAt: now },
+      { orgId: org.id, connectionId: githubConnection.id, capability: "org_members", status: "available", lastSuccessAt: now, lastCheckedAt: now, cursor: "1" },
+    ],
   });
 
   await prisma.teamInviteLink.create({

@@ -61,7 +61,7 @@ export function buildSitemapEntries(): SitemapEntry[] {
     { path: "/compare", lastModified: "2026-08-05", changeFrequency: "weekly", priority: 0.8 },
     // /for hub omitted — all /for/* pages are noindex to keep brand signals focused on home + solutions
     { path: "/solutions", lastModified: "2026-08-04", changeFrequency: "weekly", priority: 0.9 },
-    { path: "/blog", lastModified: "2026-07-19", changeFrequency: "weekly", priority: 0.7 },
+    { path: "/blog", lastModified: "2026-10-03", changeFrequency: "weekly", priority: 0.7 },
     { path: "/contact", lastModified: "2026-07-19", changeFrequency: "monthly", priority: 0.5 },
     { path: "/authors/dinuda-yaggahavita", lastModified: "2026-07-22", changeFrequency: "monthly", priority: 0.5 },
   ];

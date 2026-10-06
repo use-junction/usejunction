@@ -2,6 +2,8 @@
 
 UseJunction Signals is the activity-collection layer for AI work observability. **Phase 1 (current ship)** centers on **local coding-tool work extraction** (Cursor, Claude, Codex). Classic app/domain journey collection and browser-extension domain enrichment are reserved for a later agent (and extension) update.
 
+**EU hosted region:** work extraction and classic journey ingest are forced off. EU workspaces keep usage, cost, seats, and device health only. See [production-deployment.md](./production-deployment.md#eu-deployment).
+
 Signals is intentionally collection-first. It does not try to be workflow automation, routing, or recommendation logic yet.
 
 ## What Is Collected
@@ -98,7 +100,7 @@ The implementation exposes these endpoints:
 - `GET /api/signals/policy` - org policy read
 - `PATCH /api/signals/policy` - org policy update
 - `GET /api/signals/summary` - admin aggregate summary; accepts `days=1..366` or paired UTC `from`/`to` dates and returns the exact inclusive `windowDays` (the former `range` parameter is rejected)
-- `GET /api/me/signals-ledger` - personal ledger view
+- `GET /api/me/signals-ledger` - personal ledger: classic `sessions` plus `workSessions` (same LocalWorkSession rows managers see on the member work tab)
 
 The database models are:
 
@@ -114,9 +116,10 @@ The database models are:
 Signals is designed to be transparent:
 
 - the admin can see the collection policy
-- the employee can see the uploaded ledger
+- the employee can see the uploaded ledger (`/api/me/signals-ledger` and **My data**), including work sessions they own
 - work allowlists clipped asks/summaries when work extraction is on; classic journeys stay at app/domain flow level
-- richer work detail is optional and can be turned off
+- richer work detail is optional and can be turned off; it is unavailable on the EU hosted region
+- list payloads for managers strip `trace.userTurns`; owners still see their own asks on My data
 - the ingest layer rejects forbidden raw-content fields
 
 The intended privacy posture is:

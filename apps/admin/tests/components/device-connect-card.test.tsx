@@ -36,12 +36,17 @@ const enrollmentCredentials = {
 };
 
 function mockFetch(handlers: Record<string, () => Response | Promise<Response>>) {
+  const all = {
+    "/api/me/collection-notice": () =>
+      new Response(JSON.stringify({ acknowledged: true, notice: { title: "Collection notice" } }), { status: 200 }),
+    ...handlers,
+  };
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method ?? "GET";
-      for (const [pattern, handler] of Object.entries(handlers)) {
+      for (const [pattern, handler] of Object.entries(all)) {
         if (url.includes(pattern) && (pattern.includes("enrollment-token") ? method === "POST" : true)) {
           return handler();
         }
@@ -148,6 +153,36 @@ describe("DeviceConnectCard", () => {
         (call) => String(call[0]).includes("/api/onboarding") && call[1]?.method === "POST",
       ),
     ).toBe(false);
+  });
+
+  it("asks for collection notice acknowledgment before minting a token", async () => {
+    mockFetch({
+      "/api/onboarding?include=developer": () =>
+        new Response(JSON.stringify({ developer: { devices: [] } }), { status: 200 }),
+      "/api/me/collection-notice": () =>
+        new Response(
+          JSON.stringify({
+            acknowledged: false,
+            notice: {
+              title: "What this agent collects",
+              summary: "Usage and device health.",
+              collects: ["Usage"],
+              neverCollects: ["Keystrokes"],
+              whoSees: "Admins",
+              retention: "365 days",
+            },
+          }),
+          { status: 200 },
+        ),
+    });
+
+    render(<DeviceConnectCard />);
+
+    await waitFor(() => {
+      expect(screen.getByText("What this agent collects")).toBeTruthy();
+    });
+    expect(screen.queryByTestId("platform-command")).toBeNull();
+    expect(screen.getByRole("button", { name: "Continue to connect command" })).toBeTruthy();
   });
 
   it("finishes exactly once when both server sync checkpoints arrive", async () => {

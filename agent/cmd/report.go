@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -14,7 +14,6 @@ import (
 	"github.com/usejunction/agent/internal/configure"
 	"github.com/usejunction/agent/internal/localsync"
 	"github.com/usejunction/agent/internal/platformdirs"
-	ujsignals "github.com/usejunction/agent/internal/signals"
 	"github.com/usejunction/agent/internal/uninstall"
 	"github.com/usejunction/agent/internal/updater"
 )
@@ -34,6 +33,9 @@ const (
 	// collectRetryBase is the first backoff after a failed/incomplete collect.
 	// It doubles on repeated failures, capped at collectionInterval.
 	collectRetryBase = 1 * time.Minute
+	// featuresAuthorClaimInterval is how often mapped GitHub-author daemons
+	// claim a Features-queued remote usage sync when Ably is unavailable.
+	featuresAuthorClaimInterval = 2 * time.Minute
 )
 
 // errUsageQueuePending means the sync uploaded something but left rows queued.
@@ -125,6 +127,7 @@ var daemonCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		maybeRelocateDarwinDaemon()
 		if err := configure.RepairLegacyCodexGatewayConfig(); err != nil {
 			fmt.Printf("[daemon] codex config repair warning: %v\n", err)
 		}
@@ -139,6 +142,7 @@ var daemonCmd = &cobra.Command{
 		api := client.New(cfg)
 		collect := &collectStatus{}
 		remoteSyncSignals := make(chan struct{}, 1)
+		var featuresAuthorSync atomic.Bool
 
 		// doCollect runs one gated collect+report and returns the real error
 		// (including errUsageQueuePending) so callers can classify the outcome.
@@ -194,14 +198,10 @@ var daemonCmd = &cobra.Command{
 				fmt.Printf("[daemon] update installed; restart warning: %v\n", restartErr)
 			}
 			return nil
+		} else {
+			noteFeaturesAuthorSync(response, &featuresAuthorSync)
 		}
 		signalRemoteSync(remoteSyncSignals)
-		// Windows v1 intentionally collects coding telemetry/work sessions only.
-		// Do not start the foreground-window sampler even when the org enables
-		// classic Signals.
-		if classicSignalsSupported(runtime.GOOS) {
-			go ujsignals.NewRunner(api, cfg, verbose).Run(context.Background())
-		}
 
 		fmt.Println("Starting UseJunction daemon (Ctrl-C to stop)…")
 
@@ -212,10 +212,11 @@ var daemonCmd = &cobra.Command{
 		go runCollectLoop(cmd.Context(), doCollect, collect)
 		go runRemoteSyncWorker(cmd.Context(), api, doCollect, remoteSyncSignals)
 		go runRemoteSyncRealtime(cmd.Context(), api, remoteSyncSignals)
+		go runFeaturesAuthorSyncPoll(cmd.Context(), &featuresAuthorSync, remoteSyncSignals)
 
 		// Heartbeats own the main goroutine: they are the lifeline for presence,
 		// update directives, and uninstall, so they must always fire on cadence.
-		return runHeartbeatLoop(cmd.Context(), cfg, api, collect, remoteSyncSignals)
+		return runHeartbeatLoop(cmd.Context(), cfg, api, collect, remoteSyncSignals, &featuresAuthorSync)
 	},
 }
 
@@ -308,7 +309,7 @@ func runCollectLoop(
 // runHeartbeatLoop registers presence on cadence and applies update/uninstall
 // directives. It forwards the latest collect status to the control plane so the
 // server can alert on failures without a separate endpoint.
-func runHeartbeatLoop(ctx context.Context, cfg *config.Config, api *client.APIClient, collect *collectStatus, remoteSyncSignals chan<- struct{}) error {
+func runHeartbeatLoop(ctx context.Context, cfg *config.Config, api *client.APIClient, collect *collectStatus, remoteSyncSignals chan<- struct{}, featuresAuthorSync *atomic.Bool) error {
 	heartbeatTicker := time.NewTicker(heartbeatInterval)
 	wakeCheckTicker := time.NewTicker(wakeCheckInterval)
 	defer heartbeatTicker.Stop()
@@ -328,7 +329,7 @@ func runHeartbeatLoop(ctx context.Context, cfg *config.Config, api *client.APICl
 			}
 		}
 
-		shouldExit, err := runHeartbeatCycle(ctx, cfg, api, collect, remoteSyncSignals)
+		shouldExit, err := runHeartbeatCycle(ctx, cfg, api, collect, remoteSyncSignals, featuresAuthorSync)
 		if err != nil {
 			return err
 		}
@@ -345,6 +346,7 @@ func runHeartbeatCycle(
 	api *client.APIClient,
 	collect *collectStatus,
 	remoteSyncSignals chan<- struct{},
+	featuresAuthorSync *atomic.Bool,
 ) (shouldExit bool, err error) {
 	pending, gen := collect.pending()
 	response, err := heartbeatWithCollect(api, pending)
@@ -359,6 +361,7 @@ func runHeartbeatCycle(
 	if pending != nil {
 		collect.markReported(gen)
 	}
+	noteFeaturesAuthorSync(response, featuresAuthorSync)
 	signalRemoteSync(remoteSyncSignals)
 	if response.Uninstall {
 		fmt.Println("Control plane requested uninstall; removing agent…")
@@ -382,10 +385,6 @@ func runHeartbeatCycle(
 		return true, nil
 	}
 	return false, nil
-}
-
-func classicSignalsSupported(osName string) bool {
-	return osName != "windows"
 }
 
 func runReport(cmd *cobra.Command, args []string) error {
@@ -455,6 +454,32 @@ func heartbeatWithCollect(api *client.APIClient, collect *client.CollectStatus) 
 		TimeZone:           platformdirs.LocalIANATimeZone(),
 		LastCollect:        collect,
 	})
+}
+
+func heartbeatRequestsRemoteSync(resp *client.HeartbeatResponse) bool {
+	return resp != nil && (resp.PendingRemoteSync || resp.FeaturesAuthorSync)
+}
+
+func noteFeaturesAuthorSync(resp *client.HeartbeatResponse, flag *atomic.Bool) {
+	if flag == nil {
+		return
+	}
+	flag.Store(heartbeatRequestsRemoteSync(resp))
+}
+
+func runFeaturesAuthorSyncPoll(ctx context.Context, flag *atomic.Bool, signals chan<- struct{}) {
+	ticker := time.NewTicker(featuresAuthorClaimInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if flag != nil && flag.Load() {
+				signalRemoteSync(signals)
+			}
+		}
+	}
 }
 
 func applyUpdate(ctx context.Context, cfg *config.Config, api *client.APIClient, directive *client.AgentUpdateDirective) (bool, error) {

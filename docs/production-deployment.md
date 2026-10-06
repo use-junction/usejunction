@@ -2,6 +2,8 @@
 
 How hosted UseJunction (`https://usejunction.dev`) is deployed and what you must configure before go-live.
 
+To run a copy yourself (Vercel Deploy button, local Postgres, agent install), start with [Hosting](hosting.md).
+
 ## Architecture (hosted)
 
 | Piece | How it ships |
@@ -10,9 +12,7 @@ How hosted UseJunction (`https://usejunction.dev`) is deployed and what you must
 | Product database | Managed Postgres (`DATABASE_URL` on Vercel) |
 | Agent binaries (OTA) | GitHub Releases + protect promote workflow — see [agent-releases.md](./agent-releases.md) |
 
-There is **no** GitHub Actions workflow that deploys the web app. Merges to `main` (with the Vercel Git integration) deploy the control plane. Agent updates are a separate tag → promote path.
-
-Self-hosting uses Docker Compose under `infra/` and is out of scope here.
+There is **no** GitHub Actions workflow that deploys the web app. Merges to `main` (with the Vercel Git integration) deploy production. Agent updates are a separate tag → promote path.
 
 ## Vercel project settings
 
@@ -21,18 +21,93 @@ Confirm in the Vercel dashboard (or local `.vercel/project.json`):
 - Framework: Next.js
 - Root Directory: `apps/admin`
 - Install Command: `cd ../.. && corepack enable && pnpm install --frozen-lockfile`
-- Build: `apps/admin/vercel.json` generates Prisma, enforces client/server import boundaries, runs `next build`, then asserts that application UI routes were prerendered
-- Domains: `usejunction.dev` (www / `.com` redirect to apex via `next.config.ts`)
+- Build: `apps/admin/vercel.json` generates Prisma, applies migrations when `DATABASE_URL` is set, enforces client/server import boundaries, runs `next build`, then asserts that application UI routes were prerendered
+- Function region: `iad1`
+- Git: `Dinuda/usejunction`, production branch `main`
+- Domains: `usejunction.dev` (www / `.com` redirect to apex via `next.config.ts`); staging uses `staging.usejunction.dev` on the `staging` branch
+
+## Staging
+
+Staging lives on the **same** Vercel project (`admin`), not a second app. Push the `staging` git branch, check the deployment at `https://staging.usejunction.dev`, then use **Promote to Production** in the Vercel dashboard. That reuses the already-built deployment. Merges to `main` can still deploy production through the Git integration.
+
+| Piece | Staging value |
+|-------|----------------|
+| Vercel project | `admin` (root `apps/admin`, same install and build as production) |
+| Git branch | `staging` |
+| Domain | `staging.usejunction.dev` assigned to the `staging` branch |
+| Postgres | A **separate** managed database; never point staging at production `DATABASE_URL` |
+
+Vercel `NODE_ENV` is `production` on this deployment, so the same required secrets as Production apply — with **different values**. Set these on the Preview environment (or a Custom Environment named Staging assigned to the `staging` branch, if the Vercel plan supports it):
+
+| Variable | Notes |
+|----------|--------|
+| `DATABASE_URL` | Staging Postgres (pooled, Prisma-compatible) |
+| `AUTH_SECRET` | `openssl rand -base64 48` — do not copy production |
+| `INGEST_SECRET` | `openssl rand -base64 48` |
+| `CRON_SECRET` | `openssl rand -base64 48` |
+| `AGENT_RELEASE_OPERATIONS_TOKEN` | Staging-only token |
+| `ABLY_API_KEY` | Staging Ably app or key — do not copy production |
+| `NEXTAUTH_URL` | `https://staging.usejunction.dev` |
+| `NEXT_PUBLIC_APP_URL` | `https://staging.usejunction.dev` |
+| `AUTH_TRUST_HOST` | `true` |
+
+Copy the remaining optional Production variables (Resend, OAuth, GitHub App, Lemon) only when you need those flows on staging. Do not reuse production webhook secrets.
+
+The next staging deploy applies schema automatically when `DATABASE_URL` is set. Do not point staging at the production database.
+
+Vercel crons (`apps/admin/vercel.json`) and GitHub Actions (`.github/workflows/production-crons.yml`, `device-health.yml`, `provider-sync.yml`) stay **production-only**. They keep calling `https://usejunction.dev`. Do not point those jobs at staging.
+
+Hobby Preview env vars apply to every preview deployment, including pull requests. Isolate staging with a Custom Environment on Pro, **or** scope Preview variables to the `staging` git branch (`vercel env add NAME preview staging`) so pull request previews stay untouched.
+
+### First-time staging setup
+
+`usejunction.dev` DNS stays at GoDaddy (`ns35.domaincontrol.com` / `ns36.domaincontrol.com`). Vercel CLI is linked to project `admin`. There is **no** staging Postgres yet — do not copy Production `DATABASE_URL`.
+
+1. Create and push a `staging` branch from current `main` (Vercel rejects a git-branch domain until that ref exists on the connected GitHub repo):
+
+```bash
+git fetch origin
+git branch staging origin/main
+git push -u origin staging
+```
+
+2. Add a CNAME at GoDaddy: host `staging`, target `cname.vercel-dns.com`.
+
+3. In the Vercel dashboard, project `admin` → Settings → Domains → add `staging.usejunction.dev` assigned to git branch `staging`.
+
+4. Provision a **separate** Postgres database, then set branch-scoped Preview env (stdin, so values never land in the shell history file as `vercel env add` arguments):
+
+```bash
+printf '%s' 'postgresql://…staging…' | vercel env add DATABASE_URL preview staging
+printf '%s' "$(openssl rand -base64 48)" | vercel env add AUTH_SECRET preview staging
+printf '%s' "$(openssl rand -base64 48)" | vercel env add INGEST_SECRET preview staging
+printf '%s' "$(openssl rand -base64 48)" | vercel env add CRON_SECRET preview staging
+printf '%s' "$(openssl rand -base64 32)" | vercel env add AGENT_RELEASE_OPERATIONS_TOKEN preview staging
+printf '%s' "$(openssl rand -base64 32)" | vercel env add INTEGRATION_ENCRYPTION_KEY preview staging
+printf '%s' 'https://staging.usejunction.dev' | vercel env add NEXTAUTH_URL preview staging
+printf '%s' 'https://staging.usejunction.dev' | vercel env add NEXT_PUBLIC_APP_URL preview staging
+printf '%s' 'true' | vercel env add AUTH_TRUST_HOST preview staging
+```
+
+`ABLY_API_KEY` is already on Preview (shared with Production). Override it for branch `staging` when you want a separate Ably app.
+
+5. Redeploy the `staging` branch so the build applies migrations against that database.
+
+6. After the deployment is healthy, use **Promote to Production** on that deployment in the Vercel dashboard.
 
 ## Database migrations
 
-Vercel does **not** run Prisma migrations on deploy. After schema changes:
+Production (and any Vercel deploy with `DATABASE_URL`) runs `prisma migrate deploy` during the build via [`apps/admin/scripts/migrate-if-database.sh`](../apps/admin/scripts/migrate-if-database.sh). Preview builds without a database skip that step.
+
+To apply SQL without a deploy:
 
 ```bash
 DATABASE_URL='postgresql://…' pnpm --filter @usejunction/db exec prisma migrate deploy
 ```
 
-Apply against the **production** database before or immediately after shipping code that depends on the migration.
+EU is a separate database — a US production build does not migrate it. Run the command above against the EU URL, or deploy the EU project so its build migrates that database.
+
+How to author a new SQL migration and apply it locally is in [Database migrations](database-migrations.md).
 
 ## Database connection and function region
 
@@ -93,6 +168,9 @@ See [saas-billing-lemon.md](./saas-billing-lemon.md):
 - `SLACK_WEBHOOK_URL`, `SALES_NOTIFICATION_TO`
 - `INDEXNOW_KEY`, `GOOGLE_SITE_VERIFICATION`, `BING_SITE_VERIFICATION`, `NEXT_PUBLIC_TWITTER_HANDLE`
 - GitHub App: `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_PRIVATE_KEY`
+  - Repository permissions required for Work & spend: **Pull requests: read**, **Contents: read**, **Issues: read** (Metadata is already granted). Organization installs also need **Members: read** for author matching and **Organization Projects: read** for selected Projects. Missing Projects permission affects only Project enrichment, not repository sync. Existing installations must approve newly requested permissions once (orgs: `github.com/organizations/{org}/settings/installations/{id}/permissions/update`; personal: `github.com/settings/installations/{id}/permissions/update`). Personal installs skip Members and cannot use organization Projects.
+  - Install: set the App to **Any account**. Connect GitHub opens `github.com/settings/apps/{slug}/installations` (Install App) so the owner can pick a user or organization, then repositories. GitHub’s `/installations/new` skips that list when a personal install already exists. Setup URL: `{NEXT_PUBLIC_APP_URL}/api/integrations/github/callback` with **Redirect on update**.
+  - Copilot billing remains optional — personal accounts and orgs without Copilot still sync commits. Cost is allocated onto ticket keys in commit messages, not PRs.
 - PostHog product analytics: set both `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` and
   `NEXT_PUBLIC_POSTHOG_HOST` (for PostHog US Cloud, `https://us.i.posthog.com`);
   omit both to keep analytics disabled
@@ -109,6 +187,7 @@ Hobby Vercel only allows **once-per-day** native crons. The hourly report fan-ou
 | `GET/POST /api/cron/materialize-org-day-snapshots` | Materialize org day analytics snapshots | Vercel (`apps/admin/vercel.json`) | `45 0 * * *` |
 | `POST /api/cron/daily-report-send` | Email daily report teasers at 19:00 in each user’s timezone | GitHub Actions | `5 * * * *` |
 | `POST /api/cron/device-health` | Queue silent stale-device resyncs and send one 48-hour repair notice per outage | GitHub Actions | `*/15 * * * *` |
+| `POST /api/cron/provider-sync` | Pull due provider connections (Copilot + GitHub commits, then feature-cost allocation) | GitHub Actions (`.github/workflows/provider-sync.yml`) | `*/15 * * * *` |
 
 #### Recovery email alerts for reserved domains
 
@@ -153,6 +232,7 @@ WHERE dev.email ~* '@(example\\.com|example\\.org|example\\.net|localhost)$'
 |--------|--------|
 | `CRON_SECRET` | Same value as Vercel Production `CRON_SECRET` |
 | `CONTROL_PLANE_URL` | `https://usejunction.dev` (no trailing slash; already required for agent promote/pause) |
+| `CONTROL_PLANE_URL_EU` | `https://eu.usejunction.dev` (optional until the EU project is live; EU matrix jobs skip if unset) |
 
 ```bash
 gh secret set CRON_SECRET --env agent-production -b '<same as Vercel CRON_SECRET>'
@@ -180,6 +260,31 @@ Daily report emails are **separate** from the usage seal. The hourly `daily-repo
 
 **Local dev:** how to trigger the report cron, test the UI without email, and interpret `due` / `skipped` — [daily-reports.md](./daily-reports.md#run-the-report-job-locally).
 
+## EU deployment
+
+Hosted EU traffic is a **separate** Vercel project and Postgres database. Do not share `DATABASE_URL`, `AUTH_SECRET`, `CRON_SECRET`, or `ABLY_API_KEY` with the US project.
+
+| Piece | EU value |
+|-------|----------|
+| Vercel project | `admin-eu` (root `apps/admin`) |
+| Domain | `eu.usejunction.dev` |
+| Function region | `fra1` (or the region closest to the EU Postgres) |
+| Postgres | EU-region managed Postgres; run `prisma migrate deploy` against this URL only |
+| `DEPLOYMENT_REGION` / `NEXT_PUBLIC_DEPLOYMENT_REGION` | `eu` |
+| `NEXTAUTH_URL` / `NEXT_PUBLIC_APP_URL` | `https://eu.usejunction.dev` |
+| `NEXT_PUBLIC_POSTHOG_HOST` | `https://eu.i.posthog.com` (startup fails closed if a US host is set) |
+| `NEXT_PUBLIC_US_APP_URL` / `NEXT_PUBLIC_EU_APP_URL` | Used by the signup region picker |
+| Resend / Ably | Prefer EU-region options when the vendor offers them |
+| GitHub `CONTROL_PLANE_URL_EU` | `https://eu.usejunction.dev` on `agent-production` |
+
+Product behavior on the EU deployment:
+
+- Signals work extraction and classic journey ingest return 403.
+- Slack signup/login notifications send counts and method only (no name or email).
+- `Organization.dataRegion` is recorded as `eu` at workspace creation.
+
+Provisioning the Vercel project and EU database is a human step; this document is the checklist.
+
 ## Agent OTA (separate from web deploy)
 
 Pushing to `main` does **not** update enrolled devices.
@@ -200,15 +305,16 @@ A `404` means `curl | install.sh` will fail for customers without a local dev ch
 
 ## First-time go-live checklist
 
-1. [ ] Production Postgres provisioned; pooled Prisma-compatible `DATABASE_URL` set
-2. [ ] `prisma migrate deploy` against production
-3. [ ] Required Vercel env vars set; Production redeployed
-4. [ ] Vercel Function Region is closest to the database; preview `Server-Timing` budgets pass
-5. [ ] Sign-up / sign-in / email invite works (Resend)
-6. [ ] Domain `https://usejunction.dev` serves the app
-7. [ ] (If Team billing) Lemon keys + webhook configured
-8. [ ] GitHub `agent-production` env configured (`CONTROL_PLANE_URL`, `CRON_SECRET`, signing + promote secrets)
-9. [ ] First `agent-v*` candidate built and promoted when ready to OTA
+1. [ ] Staging Postgres provisioned; Preview (or Staging custom) env vars set; `staging.usejunction.dev` assigned to the `staging` branch
+2. [ ] `prisma migrate deploy` against staging, then production
+3. [ ] Production Postgres provisioned; pooled Prisma-compatible `DATABASE_URL` set
+4. [ ] Required Vercel env vars set; Production redeployed (or a staging deployment promoted)
+5. [ ] Vercel Function Region is closest to the database; preview `Server-Timing` budgets pass
+6. [ ] Sign-up / sign-in / email invite works (Resend)
+7. [ ] Domain `https://usejunction.dev` serves the app
+8. [ ] (If Team billing) Lemon keys + webhook configured
+9. [ ] GitHub `agent-production` env configured (`CONTROL_PLANE_URL`, `CRON_SECRET`, signing + promote secrets)
+10. [ ] First `agent-v*` candidate built and promoted when ready to OTA
 
 ## Related docs
 

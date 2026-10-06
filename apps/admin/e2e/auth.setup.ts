@@ -8,6 +8,15 @@ const ownerPassword = process.env.E2E_OWNER_PASSWORD ?? "e2e-password";
 const developerEmail = process.env.E2E_DEVELOPER_EMAIL ?? "developer@example.com";
 
 async function authenticate(page: Page, email: string, password: string, fileName: string) {
+  await page.context().addCookies([
+    {
+      name: "uj_consent",
+      value: encodeURIComponent(
+        JSON.stringify({ analytics: false, version: "2026-09-18", at: "2026-09-18T00:00:00.000Z" }),
+      ),
+      url: process.env.E2E_BASE_URL ?? "http://localhost:3001",
+    },
+  ]);
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);

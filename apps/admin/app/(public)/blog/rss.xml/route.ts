@@ -25,7 +25,8 @@ export function GET() {
       <pubDate>${new Date(post.updatedAt).toUTCString()}</pubDate>
       <description>${escapeXml(post.description)}</description>
       <author>hello@usejunction.dev (${escapeXml(post.author.name)})</author>
-      <category>${escapeXml(post.primaryKeyword)}</category>
+      <category>${escapeXml(post.category)}</category>
+      <enclosure url="${absoluteUrl(post.socialImage.src)}" type="image/png" length="0" />
     </item>`;
     })
     .join("\n");

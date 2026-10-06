@@ -16,6 +16,10 @@ function definedEnv(entries: Record<string, string | undefined>): Record<string,
   );
 }
 
+const forceDedicatedServer = Boolean(process.env.E2E_FORCE_WEB_SERVER);
+const e2ePort = process.env.E2E_PORT ?? (forceDedicatedServer ? "3011" : "3001");
+const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${e2ePort}`;
+
 const webServerEnv = definedEnv({
   DATABASE_URL: process.env.DATABASE_URL,
   NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? "ci-test-secret",
@@ -25,6 +29,11 @@ const webServerEnv = definedEnv({
   E2E_OWNER_EMAIL: process.env.E2E_OWNER_EMAIL,
   E2E_OWNER_PASSWORD: process.env.E2E_OWNER_PASSWORD,
   E2E_DEVELOPER_EMAIL: process.env.E2E_DEVELOPER_EMAIL,
+  DEPLOYMENT_REGION: process.env.DEPLOYMENT_REGION ?? "us",
+  NEXT_PUBLIC_DEPLOYMENT_REGION: process.env.NEXT_PUBLIC_DEPLOYMENT_REGION ?? process.env.DEPLOYMENT_REGION ?? "us",
+  NEXT_PUBLIC_SIGNALS_PRODUCT_ENABLED: process.env.NEXT_PUBLIC_SIGNALS_PRODUCT_ENABLED ?? "false",
+  PORT: e2ePort,
+  ...(forceDedicatedServer ? { NEXT_DIST_DIR: ".next-e2e" } : {}),
 });
 
 export default defineConfig({
@@ -38,7 +47,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { open: "never" }]] : "list",
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3001",
+    baseURL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "off",
@@ -46,9 +55,11 @@ export default defineConfig({
   webServer: process.env.E2E_BASE_URL
     ? undefined
     : {
-        command: "pnpm dev",
-        url: "http://localhost:3001/login",
-        reuseExistingServer: !process.env.CI,
+        command: forceDedicatedServer
+          ? `pnpm exec next dev --turbopack --port ${e2ePort}`
+          : "pnpm dev",
+        url: `${baseURL}/login`,
+        reuseExistingServer: !process.env.CI && !forceDedicatedServer,
         timeout: 120_000,
         env: webServerEnv,
       },

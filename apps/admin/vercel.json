@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm --filter @usejunction/db generate && pnpm check:client-boundaries && next build && pnpm check:client-build",
+  "buildCommand": "pnpm --filter @usejunction/db generate && bash ./scripts/migrate-if-database.sh && pnpm check:client-boundaries && next build && pnpm check:client-build",
   "crons": [
     {
       "path": "/api/cron/usage-daily-refresh",
@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/materialize-org-day-snapshots",
       "schedule": "45 0 * * *"
+    },
+    {
+      "path": "/api/cron/retention-enforce",
+      "schedule": "20 1 * * *"
     }
   ]
 }

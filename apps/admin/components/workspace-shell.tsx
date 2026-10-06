@@ -8,10 +8,12 @@ import { AppPageSkeleton } from "@/components/app-data-state";
 import { prefetchNavPage } from "@/lib/app-pages/nav-prefetch";
 import {
   Activity,
-  Home,
+  CircleDollarSign,
+  Database,
+  Eye,
+  GitPullRequest,
   Settings,
   Users,
-  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
@@ -24,14 +26,16 @@ import { SignalsMark } from "@/components/signals/signals-mark";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { WorkspaceUserMenu } from "@/components/workspace-user-menu";
 import type { OrgBillingStatus } from "@/lib/saas-billing/status";
-import { canManageSettings, canSeeOrgOverview } from "@/lib/rbac/permissions";
+import { canSeeOrgOverview } from "@/lib/rbac/permissions";
 import type { OrganizationRole } from "@/lib/rbac/permissions";
+import { signalsProductEnabled } from "@/lib/region";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
@@ -45,36 +49,48 @@ import {
 
 type NavIcon = LucideIcon | typeof SignalsMark;
 type NavItem = readonly [href: string, label: string, icon: NavIcon];
+type NavGroup = { label: string; items: NavItem[] };
 
-const adminNav: NavItem[] = [
-  ["/dashboard", "Home", Home],
-  ["/team", "Team", Users],
+const discoverAdmin: NavItem[] = [
+  ["/dashboard", "Coverage", Eye],
+  ["/activity", "Adoption", Activity],
+  ["/tools", "Cost", CircleDollarSign],
+  ["/work-spend", "Work", GitPullRequest],
   ["/signals", "Signals", SignalsMark],
-  ["/tools", "Tools", Wrench],
-  ["/activity", "Activity", Activity],
-  ["/settings", "Settings", Settings],
 ];
 
-const managerNav: NavItem[] = [
-  ["/dashboard", "Home", Home],
-  ["/team", "Team", Users],
-  ["/signals", "Signals", SignalsMark],
-  ["/tools", "Tools", Wrench],
-  ["/activity", "Activity", Activity],
-  ["/settings", "Settings", Settings],
+const discoverMember: NavItem[] = [
+  ["/dashboard", "Coverage", Eye],
+  ["/activity", "Adoption", Activity],
+  ["/tools", "Cost", CircleDollarSign],
 ];
 
-const userNav: NavItem[] = [
-  ["/dashboard", "Home", Home],
-  ["/tools", "My tools", Wrench],
-  ["/activity", "My activity", Activity],
-  ["/settings", "Settings", Settings],
+const peopleGroup: NavItem[] = [["/team", "Team", Users]];
+const youGroup: NavItem[] = [["/me/data", "My data", Database]];
+const configureGroup: NavItem[] = [["/settings", "Settings", Settings]];
+
+const adminNav: NavGroup[] = [
+  { label: "Discover", items: discoverAdmin },
+  { label: "People", items: peopleGroup },
+  { label: "You", items: youGroup },
+  { label: "Configure", items: configureGroup },
+];
+
+const memberNav: NavGroup[] = [
+  { label: "Discover", items: discoverMember },
+  { label: "You", items: youGroup },
+  { label: "Configure", items: configureGroup },
 ];
 
 function navForRole(role: OrganizationRole | null) {
-  if (canManageSettings(role)) return adminNav;
-  if (canSeeOrgOverview(role)) return managerNav;
-  return userNav;
+  const groups = canSeeOrgOverview(role) ? adminNav : memberNav;
+  if (signalsProductEnabled()) return groups;
+  return groups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter(([href]) => href !== "/signals"),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 type WorkspaceShellProps = {
@@ -89,7 +105,7 @@ type WorkspaceShellProps = {
   children: React.ReactNode;
 };
 
-const SIDEBAR_SKELETON_ITEMS = 6;
+const SIDEBAR_SKELETON_ITEMS = 8;
 
 function AppSidebar({
   active,
@@ -104,7 +120,7 @@ function AppSidebar({
   loading?: boolean;
   onNavigateStart: (href: string) => void;
 }) {
-  const nav = navForRole(role);
+  const groups = navForRole(role);
   const { setOpenMobile } = useSidebar();
   const queryClient = useQueryClient();
   const hoverTimers = useRef(new Map<string, number>());
@@ -137,54 +153,67 @@ function AppSidebar({
           <BrandLogo className="h-8 w-auto" />
         </Link>
       </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup className="pt-5">
-          <SidebarGroupContent>
-            <SidebarMenu aria-busy={loading || undefined} aria-label={loading ? "Loading navigation" : undefined}>
-              {loading
-                ? Array.from({ length: SIDEBAR_SKELETON_ITEMS }).map((_, index) => (
-                    <SidebarMenuItem key={index}>
-                      <SidebarMenuSkeleton showIcon />
-                    </SidebarMenuItem>
-                  ))
-                : nav.map(([href, label, Icon]) => {
+      <SidebarContent className="gap-0 pt-3">
+        {loading ? (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu aria-busy="true" aria-label="Loading navigation">
+                {Array.from({ length: SIDEBAR_SKELETON_ITEMS }).map((_, index) => (
+                  <SidebarMenuItem key={index}>
+                    <SidebarMenuSkeleton showIcon />
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : (
+          groups.map((group) => (
+            <SidebarGroup key={group.label} className="py-1">
+              <SidebarGroupLabel className="h-7 px-2 text-[11px] font-medium uppercase tracking-[0.16em] text-sidebar-foreground/45">
+                {group.label}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {group.items.map(([href, label, Icon]) => {
                     const isActive =
                       href === "/dashboard"
                         ? active === href || active.startsWith(`${href}?`)
                         : active === href || active.startsWith(`${href}/`) || active.startsWith(`${href}?`);
                     return (
-                    <SidebarMenuItem key={href}>
-                      <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
-                        <Link
-                          href={href}
-                          prefetch={false}
-                          aria-current={isActive ? "page" : undefined}
-                          onClick={(event) => {
-                            setOpenMobile(false);
-                            if (
-                              event.defaultPrevented ||
-                              event.button !== 0 ||
-                              event.metaKey ||
-                              event.ctrlKey ||
-                              event.shiftKey ||
-                              event.altKey
-                            ) {
-                              return;
-                            }
-                            onNavigateStart(href);
-                          }}
-                          onPointerEnter={() => warmNavCache(href)}
-                        >
-                          <Icon aria-hidden="true" />
-                          <span>{label}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
+                      <SidebarMenuItem key={href}>
+                        <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
+                          <Link
+                            href={href}
+                            prefetch={false}
+                            aria-current={isActive ? "page" : undefined}
+                            onClick={(event) => {
+                              setOpenMobile(false);
+                              if (
+                                event.defaultPrevented ||
+                                event.button !== 0 ||
+                                event.metaKey ||
+                                event.ctrlKey ||
+                                event.shiftKey ||
+                                event.altKey
+                              ) {
+                                return;
+                              }
+                              onNavigateStart(href);
+                            }}
+                            onPointerEnter={() => warmNavCache(href)}
+                          >
+                            <Icon aria-hidden="true" />
+                            <span>{label}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
                     );
                   })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ))
+        )}
       </SidebarContent>
       {!loading && billing && (
         <SidebarFooter className="mt-auto shrink-0 border-t-0 p-2 pt-0">

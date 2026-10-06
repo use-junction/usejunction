@@ -132,7 +132,7 @@ func finalizeAntigravityUsage(b *types.DailyUsage) {
 		b.TokenSemantics = types.TokenSemanticsVendor
 	}
 	b.Verified = false
-	if (b.InputTokens+b.OutputTokens+b.CacheReadTokens+b.ReasoningTokens) > 0 {
+	if (b.InputTokens + b.OutputTokens + b.CacheReadTokens + b.ReasoningTokens) > 0 {
 		b.EstimatedCost = EstimateCostForTool("antigravity", b.Model, b.InputTokens, b.OutputTokens, b.CacheReadTokens, b.CacheWriteTokens)
 		if b.EstimatedCost > 0 {
 			b.CostKind = types.CostKindEstimatedAPI
@@ -180,7 +180,6 @@ func ScanAntigravityLocal(forceFull bool) ([]types.DailyUsage, error) {
 	}
 	result := MergeAntigravityUsage(usageRows, localRows)
 	result = PruneAggregatesLookback(result, time.Now().UTC())
-	_ = saveCache(cacheFile, result)
 
 	usageOnly := make([]types.DailyUsage, 0)
 	localOnly := make([]types.DailyUsage, 0)
@@ -191,6 +190,10 @@ func ScanAntigravityLocal(forceFull bool) ([]types.DailyUsage, error) {
 			localOnly = append(localOnly, row)
 		}
 	}
+	usageOnly = stampSourceActivity("antigravity", antigravityUsageSource, usageOnly)
+	localOnly = stampSourceActivity("antigravity", antigravityLocalSource, localOnly)
+	result = MergeAntigravityUsage(usageOnly, localOnly)
+	_ = saveCache(cacheFile, result)
 	_ = CommitScanSnapshotUpdate(func(snap *ScanSnapshot) {
 		snap.Aggregates = ReplaceSourceAggregates(snap.Aggregates, "antigravity", antigravityUsageSource, usageOnly)
 		snap.Aggregates = ReplaceSourceAggregates(snap.Aggregates, "antigravity", antigravityLocalSource, localOnly)

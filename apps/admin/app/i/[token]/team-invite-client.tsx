@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { OAuthProviderButtons, getEnabledOAuthProviders } from "@/components/auth/oauth-provider-buttons";
+import { RegionPicker } from "@/components/auth/region-picker";
 import { Button } from "@/components/ui/button";
 import { userFacingError } from "@/lib/errors/user-facing";
 import { activateWorkspace } from "@/lib/api/client";
@@ -84,6 +85,7 @@ function InviteSignIn({
       statement="Visibility before control."
     >
       <div className="space-y-4">
+        <RegionPicker />
         <OAuthProviderButtons callbackUrl={callbackUrl} showEmailDivider={hasOAuth} emailDividerLabel="or use email" />
         <div className="space-y-3">
           <Button asChild className="w-full text-white">

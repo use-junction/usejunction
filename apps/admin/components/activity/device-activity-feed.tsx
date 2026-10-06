@@ -298,9 +298,8 @@ export function DeviceActivityFeed({
           <SheetHeader className="border-b border-border/70 p-5 text-left">
             <SheetTitle className="text-lg font-semibold tracking-tight">Device activity</SheetTitle>
             <SheetDescription>
-              Machine exchanges UseJunction requested and what was returned, plus gateway requests, work
-              sessions, and Signals journeys when available. Open a row for details and Inspect for the
-              sanitized payload.
+              Machine exchanges UseJunction requested and what was returned, plus gateway requests when
+              available. Open a row for details and Inspect for the sanitized payload.
             </SheetDescription>
           </SheetHeader>
           <div className="min-h-0 flex-1 overflow-hidden p-5">

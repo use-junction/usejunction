@@ -10,7 +10,10 @@ const workspaceRoutes = [
   "/dashboard?view=last_30_days&days=14",
   "/dashboard?view=last_30_days&from=2026-07-01&to=2026-07-16",
   "/activity",
+  "/features",
+  "/work-spend",
   "/settings",
+  "/me/data",
   "/team",
   "/team/e2e-developer",
   "/team/e2e-developer/work",
@@ -46,7 +49,7 @@ test("workspace startup has no bootstrap gate or duplicate page-data request", a
   });
 
   await page.goto("/dashboard");
-  await expect(page.getByRole("heading", { name: "Spend, traffic, coverage." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What's reporting?" })).toBeVisible();
 
   expect(appRequests).not.toContain("/api/app/bootstrap");
   // The client workspace context and destination page model each load at most once.
@@ -58,6 +61,12 @@ test("workspace startup has no bootstrap gate or duplicate page-data request", a
     dashboardRequests.filter((path) => !path.includes("slice=shell") && !path.includes("slice=metrics")).length,
   ).toBeLessThanOrEqual(1);
   expect(failedAppRequests).toEqual([]);
+});
+
+test("features redirects into work and spend and keeps the window", async ({ page }) => {
+  await page.goto("/features?days=30&repositoryId=repo-1");
+  await expect(page).toHaveURL(/\/work-spend\?days=30&repositoryId=repo-1$/);
+  await expect(page.locator("main")).toBeVisible();
 });
 
 for (const route of workspaceRoutes) {
@@ -83,11 +92,11 @@ test("unknown routes show branded 404 recovery", async ({ page }) => {
 
 test("owner chrome exposes nav, active-plan badge, and workspace switcher", async ({ page }) => {
   await page.goto("/dashboard");
-  await expect(page.getByRole("link", { name: "Home" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Coverage" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Team" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Signals" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Tools", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Activity" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Signals" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Cost", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Adoption" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Settings", exact: true })).toBeVisible();
   await expect(page.getByText("Plan", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Team plan", { exact: true })).toBeVisible();
@@ -95,12 +104,12 @@ test("owner chrome exposes nav, active-plan badge, and workspace switcher", asyn
   await expect(page.getByRole("combobox", { name: "Workspace" })).toBeVisible();
 });
 
-test("owner Team | You switcher scopes Dashboard, Activity, and Signals", async ({ page }) => {
+test("owner Team | You switcher scopes Dashboard and Activity", async ({ page }) => {
   await page.goto("/dashboard");
   const audience = page.getByRole("tablist", { name: "Audience" });
   await expect(audience).toBeVisible();
   await expect(audience.getByRole("tab", { name: "Team" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("heading", { name: "Spend, traffic, coverage." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What's reporting?" })).toBeVisible();
 
   await Promise.all([
     page.waitForURL(/scope=you/),
@@ -108,7 +117,7 @@ test("owner Team | You switcher scopes Dashboard, Activity, and Signals", async 
   ]);
   await expect(
     page
-      .getByRole("heading", { name: "Spend, traffic, coverage." })
+      .getByRole("heading", { name: "What's reporting?" })
       .or(page.getByRole("heading", { name: "Nothing reporting yet." }))
       .or(page.getByText(/Link a developer profile/i)),
   ).toBeVisible();
@@ -117,54 +126,34 @@ test("owner Team | You switcher scopes Dashboard, Activity, and Signals", async 
     page.waitForURL((url) => !url.searchParams.has("scope") || url.searchParams.get("scope") !== "you"),
     audience.getByRole("tab", { name: "Team" }).click(),
   ]);
-  await expect(page.getByRole("heading", { name: "Spend, traffic, coverage." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What's reporting?" })).toBeVisible();
 
   await page.goto("/activity");
   const activityAudience = page.getByRole("tablist", { name: "Audience" });
   await expect(activityAudience.getByRole("tab", { name: "Team" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("heading", { level: 1, name: "Activity." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Adoption." })).toBeVisible();
   await Promise.all([
     page.waitForURL(/\/activity\?.*scope=you/),
     activityAudience.getByRole("tab", { name: "You" }).click(),
   ]);
-  await expect(page.getByRole("heading", { name: "Your activity." })).toBeVisible();
-
-  await page.goto("/signals");
-  const signalsAudience = page.getByRole("tablist", { name: "Audience" });
-  await expect(signalsAudience).toBeVisible();
-  await Promise.all([
-    page.waitForURL(/\/signals\?.*scope=you/),
-    signalsAudience.getByRole("tab", { name: "You" }).click(),
-  ]);
-  await expect(page.getByText(/Your coding-tool work sessions|Link a developer profile/i)).toBeVisible();
-
-  await page.getByRole("navigation", { name: "Signals sections" }).getByRole("link", { name: "Activity" }).click();
-  await expect(page).toHaveURL(/\/signals\/activity/);
-  await expect(page).toHaveURL(/scope=you/);
-  await expect(page.getByRole("tablist", { name: "Audience" }).getByRole("tab", { name: "You" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  // Person filter is Team-only.
-  await expect(page.getByText("Person", { exact: true })).toHaveCount(0);
-
-  await page.goto("/signals/settings");
-  await expect(page.getByRole("tablist", { name: "Audience" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "How are you using it?" })).toBeVisible();
 });
 
-test("owner Activity Team|You share layout and Reports section", async ({ page }) => {
+test("owner Activity shows Team adoption and You usage with Reports", async ({ page }) => {
   await page.goto("/activity");
-  await expect(page.getByRole("heading", { level: 1, name: "Activity." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Adoption." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Who uses AI, day by day." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Needs a nudge." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Spread by tool." })).toBeVisible();
+  await page.getByText("Collection health and sent reports").click();
   await expect(page.getByRole("heading", { name: "Reports." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "By tool." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "By model." })).toBeVisible();
 
   const audience = page.getByRole("tablist", { name: "Audience" });
   await Promise.all([
     page.waitForURL(/scope=you/),
     audience.getByRole("tab", { name: "You" }).click(),
   ]);
-  await expect(page.getByRole("heading", { name: "Your activity." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How are you using it?" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Reports." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "By tool." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "By model." })).toBeVisible();
@@ -177,7 +166,7 @@ test("owner Activity Team|You share layout and Reports section", async ({ page }
 
 test("dashboard exposes seeded calculation output and all period controls", async ({ page }) => {
   await page.goto("/dashboard");
-  await expect(page.getByRole("heading", { name: "Spend, traffic, coverage." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What's reporting?" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Requests." })).toBeVisible();
   await expect(page.getByText("Subscription commitment")).toBeVisible();
   await expect(
@@ -208,57 +197,23 @@ test("dashboard exposes seeded calculation output and all period controls", asyn
   await expect(page).toHaveURL(/days=14/);
 });
 
-test("Signals filters update the URL and preserve selected calculation scope", async ({ page }) => {
-  await page.goto("/signals/activity");
-  await page.getByRole("link", { name: "Previous cycles" }).click();
-  await expect(page).toHaveURL(/view=previous_cycles/);
-  await page.goto("/signals/activity?view=last_30_days");
-  await page.getByRole("button", { name: "Adjust rolling period" }).click();
-  await page.getByRole("menuitem", { name: /Last 14 days/i }).click();
-  await expect(page).toHaveURL(/days=14/);
-  await page.getByLabel("AI tool").selectOption("cursor");
-  await expect(page).toHaveURL(/days=14.*tool=cursor/);
-  await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
+test("hidden Signals product routes redirect to dashboard", async ({ page }) => {
+  for (const route of [
+    "/signals",
+    "/signals/activity",
+    "/signals/settings",
+    "/signals/journeys?days=30",
+    "/signals/tools?days=30",
+    "/signals/journeys/github.com__cursor__slack.com?days=30",
+  ]) {
+    await page.goto(route);
+    await expect(page, route).toHaveURL(/\/dashboard/);
+  }
 });
 
-test("Signals overview shows work-off empty state and Settings CTA", async ({ page }) => {
-  await page.goto("/signals");
-  await expect(page.getByRole("heading", { name: "Signals" })).toBeVisible();
-  await expect(page.getByText(/Signals shows what works, what can be automated/i)).toBeVisible();
-  await expect(page.getByText(/^Insight$/i)).toHaveCount(0);
-  await page.getByRole("link", { name: "Open Settings" }).click();
-  await expect(page).toHaveURL(/\/settings/);
-  await expect(page.getByRole("heading", { name: "Signals", level: 2 })).toBeVisible();
-});
-
-test("Signals activity is work-only and classic journey routes redirect", async ({ page }) => {
-  await page.goto("/signals/activity");
-  await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Work" })).toBeVisible();
-  await expect(page.getByText(/Work extraction is off/i)).toBeVisible();
-  await expect(page.getByRole("link", { name: /github\.com.*Cursor.*slack\.com/i })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Current cycles" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Previous cycles" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Adjust rolling period" })).toBeVisible();
-
-  await page.goto("/signals/journeys?days=30");
-  await expect(page).toHaveURL(/\/signals\/activity/);
-
-  await page.goto("/signals/tools?days=30");
-  await expect(page).toHaveURL(/\/signals\/activity/);
-});
-
-test("Signals settings shows work-first retention controls", async ({ page }) => {
-  await page.goto("/signals/settings");
-  await expect(page.getByRole("heading", { name: "Boundaries", level: 1 })).toBeVisible();
-  await expect(page.getByText(/Turn on work extraction under Settings/i)).toBeVisible();
-  await expect(page.getByText(/Legacy app & domain sampling/i)).toHaveCount(0);
-  await expect(page.locator("#signals-retention")).toContainText("90 days");
-});
-
-test("Settings shows workspace, billing, Signals, and team visibility controls", async ({ page }) => {
+test("Settings shows workspace, billing, and team visibility controls", async ({ page }) => {
   await page.goto("/settings");
-  await expect(page.getByRole("heading", { name: "Settings.", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How is this set up?", level: 1 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Workspace", level: 2 })).toBeVisible();
   const billing = page.getByRole("region", { name: "Billing" });
   await expect(billing).toBeVisible();
@@ -272,10 +227,9 @@ test("Settings shows workspace, billing, Signals, and team visibility controls",
   await expect(billing.getByText("E2E Developer", { exact: true })).toBeVisible();
   await expect(billing.getByText("developer@example.com", { exact: true })).toBeVisible();
   await expect(billing.getByRole("button", { name: "Manage billing" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Signals", level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Signals", level: 2 })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Team visibility", level: 2 })).toBeVisible();
   await expect(page.getByLabel("Workspace name")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Turn on|Turn off/ }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /Allow for team|Restrict to admins/ }).first()).toBeVisible();
 });
 
@@ -299,13 +253,7 @@ test("settings mutations rename workspace and toggle team visibility", async ({ 
 });
 
 test("seeded usage totals stay consistent across owner calculation views", async ({ page }) => {
-  await page.goto("/activity");
-  await expect(page.getByText("Requests").first()).toBeVisible();
-  await expect(page.getByText("10").first()).toBeVisible();
-  await expect(page.getByText("1.5M").first()).toBeVisible();
-
   await page.goto("/tools");
-  await page.getByRole("tab", { name: "Subscriptions" }).click();
   await expect(page.getByText("$40.00").first()).toBeVisible();
   await expect(page.getByText("2 Cursor Pro")).toBeVisible();
 
@@ -345,7 +293,7 @@ test("team member mirrors dashboard rolling and cycle filters", async ({ page })
 
 test("team roster lists seeded members and opens invite dialog", async ({ page }) => {
   await page.goto("/team");
-  await expect(page.getByRole("heading", { name: "Team", exact: true, level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Who's here?", exact: true, level: 1 })).toBeVisible();
   await expect(page.getByText("E2E Developer").first()).toBeVisible();
   await expect(page.getByRole("link", { name: "Edit E2E Developer" })).toBeVisible();
   await expect(page.getByText("1 machine · 66 requests · current")).toBeVisible();
@@ -360,15 +308,16 @@ test("team roster lists seeded members and opens invite dialog", async ({ page }
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
 });
 
-test("member hub tabs expose work, coding, and fleet", async ({ page }) => {
+test("member hub tabs expose coding and fleet", async ({ page }) => {
   await page.goto("/team/e2e-developer");
   await expect(page.getByRole("heading", { name: "E2E Developer." })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Member sections" })).toBeVisible();
+  await expect(
+    page.getByRole("navigation", { name: "Member sections" }).getByRole("link", { name: "Work", exact: true }),
+  ).toHaveCount(0);
 
-  await page.getByRole("link", { name: "Work", exact: true }).click();
-  await expect(page).toHaveURL(/\/team\/e2e-developer\/work/);
-  await expect(page.getByRole("heading", { name: "Extracted work." })).toBeVisible();
-  await expect(page.getByText(/Work extraction is off|Open in Signals/i).first()).toBeVisible();
+  await page.goto("/team/e2e-developer/work");
+  await expect(page).toHaveURL(/\/team\/e2e-developer(?:\?|$)/);
 
   await page.getByRole("link", { name: "Coding", exact: true }).click();
   await expect(page).toHaveURL(/\/team\/e2e-developer\/coding/);
@@ -380,12 +329,7 @@ test("member hub tabs expose work, coding, and fleet", async ({ page }) => {
   await expect(page.getByText("e2e-laptop")).toBeVisible();
   await expect(page.getByText(/Agent 0\.1\.0/i)).toBeVisible();
   await expect(page.getByText("darwin").first()).toBeVisible();
-});
-
-test("classic Signals journey routes redirect to Activity", async ({ page }) => {
-  await page.goto("/signals/journeys/github.com__cursor__slack.com?days=30");
-  await expect(page).toHaveURL(/\/signals\/activity/);
-  await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open in Signals" })).toHaveCount(0);
 });
 
 test("onboarding resume shows workspace setup choices", async ({ page }) => {

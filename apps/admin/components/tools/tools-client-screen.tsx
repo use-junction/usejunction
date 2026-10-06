@@ -6,17 +6,14 @@ import { useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { SubscriptionInventory } from "@/components/tools/subscription-inventory";
+import type { CostOverview } from "@/lib/queries/tools/cost-overview";
 import { PageHeader } from "@/components/page-header";
 import { Panel } from "@/components/panel";
 import { ToolLogoTile } from "@/components/tools/tool-brand-icon";
 import { LocalSyncPanel } from "@/components/dashboard/local-sync-panel";
 import { ConnectionRepairBanner } from "@/components/dashboard/connection-repair-banner";
 import { SignalsKpi, SignalsSectionHeader } from "@/components/signals/signals-ui";
-import {
-  cycleViewShortSuffix,
-  type CycleView,
-  type CycleViewWindows,
-} from "@/lib/dashboard/cycle-view";
+import type { CycleView, CycleViewWindows } from "@/lib/dashboard/cycle-view";
 import type { RollingPeriod } from "@/lib/dashboard/period-prefs";
 import type { getDashboardTools } from "@/lib/queries/dashboard/tools";
 import type { RemoteSyncPanelContext } from "@/lib/sync/remote-sync-context";
@@ -146,8 +143,7 @@ function PersonalTools({
     <>
       <ConnectionRepairBanner scope="you" recoveryDevices={sync.recoveryDevices} />
       <PageHeader
-        title="Your tools, usage, spend."
-        description="Tools on your connected computers, with your requests, tokens, and live quota windows."
+        title="What are you paying for?"
       >
         {sync.deviceCount > 0 ? (
           <LocalSyncPanel
@@ -330,7 +326,7 @@ type ToolsPayload =
       subscriptions: Awaited<ReturnType<typeof listSubscriptions>>;
       error: string | null;
       syncContext: RemoteSyncPanelContext | null;
-      defaultTab: "activity" | "subscriptions";
+      costOverview: CostOverview | null;
     };
 
 export default function ToolsClientScreen() {
@@ -375,8 +371,7 @@ export default function ToolsClientScreen() {
     }
     return <PersonalTools data={personal} sync={syncContext} canBrowseTools={Boolean(canBrowseTools)} />;
   }
-  const { cycleView, rollingPeriod, cycleWindows, detected: data, syncContext, defaultTab } = query.data;
-  const periodSuffix = cycleViewShortSuffix(cycleView, rollingPeriod);
+  const { detected: data, syncContext, costOverview } = query.data;
 
   return (
     <>
@@ -385,13 +380,8 @@ export default function ToolsClientScreen() {
         detected={data}
         initialCatalog={serializedCatalog}
         initialSubscriptions={query.data.subscriptions}
-        defaultTab={defaultTab}
+        overview={costOverview}
         hasLocalSync={Boolean(syncContext?.deviceCount)}
-        cycleView={cycleView}
-        period={rollingPeriod}
-        periodSuffix={periodSuffix}
-        periodBasePath="/tools"
-        cycleWindows={cycleWindows}
       >
         {syncContext?.deviceCount ? (
           <LocalSyncPanel

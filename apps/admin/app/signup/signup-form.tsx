@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { OAuthProviderButtons, getEnabledOAuthProviders } from "@/components/auth/oauth-provider-buttons";
+import { RegionPicker } from "@/components/auth/region-picker";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ export function SignupForm() {
   const [email, setEmail] = useState(emailPrefill);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -35,10 +37,23 @@ export function SignupForm() {
     event.preventDefault();
     setError(null);
     setLoading(true);
+    if (!acceptedTerms) {
+      setError("Accept the Terms of Service and Privacy Policy to create an account.");
+      setLoading(false);
+      return;
+    }
     const response = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, email, password, confirmPassword, intent, from }),
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        confirmPassword,
+        intent,
+        from,
+        acceptTerms: true,
+      }),
     });
     const data = await response.json().catch(() => ({}));
     setLoading(false);
@@ -74,6 +89,7 @@ export function SignupForm() {
           </AlertDescription>
         </Alert>
       )}
+      <RegionPicker />
       <OAuthProviderButtons callbackUrl={oauthCallbackUrl} showEmailDivider />
       <form onSubmit={submit} className="space-y-4" aria-busy={loading}>
         <div className="space-y-2">
@@ -124,7 +140,27 @@ export function SignupForm() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        <Button type="submit" className="w-full" disabled={loading}>
+        <label className="flex items-start gap-2 text-sm leading-6 text-muted-foreground">
+          <input
+            type="checkbox"
+            className="mt-1 size-4 accent-[#08a8c4]"
+            checked={acceptedTerms}
+            onChange={(event) => setAcceptedTerms(event.target.checked)}
+            required
+          />
+          <span>
+            I agree to the{" "}
+            <a href="/terms" className="font-medium text-foreground underline underline-offset-4">
+              Terms of Service
+            </a>{" "}
+            and{" "}
+            <a href="/privacy" className="font-medium text-foreground underline underline-offset-4">
+              Privacy Policy
+            </a>
+            .
+          </span>
+        </label>
+        <Button type="submit" className="w-full" disabled={loading || !acceptedTerms}>
           {loading ? "Creating account…" : joiningInvite ? "Create account & continue" : "Create account"}
         </Button>
       </form>

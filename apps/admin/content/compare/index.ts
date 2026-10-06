@@ -326,7 +326,7 @@ export const compareEngineeringIntelligence: ContentPage = {
     {
       question: "Can we self-host UseJunction?",
       answer:
-        "Yes. UseJunction is open source under the UseJunction Community License and runs via Docker Compose on infrastructure you control.",
+        "Yes. UseJunction is open source under the UseJunction Community License and runs on infrastructure you control — Postgres and the Next.js control plane.",
     },
   ],
   relatedPaths: [

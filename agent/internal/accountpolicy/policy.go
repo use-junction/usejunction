@@ -11,6 +11,7 @@ const (
 
 type Account struct {
 	ToolName           string `json:"toolName"`
+	DisplayName        string `json:"displayName,omitempty"`
 	AccountKey         string `json:"accountKey"`
 	Email              string `json:"email,omitempty"`
 	Plan               string `json:"plan,omitempty"`

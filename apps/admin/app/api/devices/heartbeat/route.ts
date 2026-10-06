@@ -220,6 +220,32 @@ export async function POST(req: NextRequest) {
       logServerError("devices/heartbeat-full-usage-day", error);
     }
 
+    let pendingRemoteSync = false;
+    let featuresAuthorSync = false;
+    try {
+      const [pendingCount, githubAuthor, githubConnection] = await Promise.all([
+        prisma.deviceSyncRequestTarget.count({
+          where: {
+            deviceId: device.id,
+            status: "queued",
+            syncRequest: { expiresAt: { gt: new Date() } },
+          },
+        }),
+        prisma.externalIdentity.findFirst({
+          where: { orgId: device.orgId, provider: "github", developerId: device.userId },
+          select: { id: true },
+        }),
+        prisma.providerConnection.findFirst({
+          where: { orgId: device.orgId, provider: "github", status: { not: "disconnected" } },
+          select: { id: true },
+        }),
+      ]);
+      pendingRemoteSync = pendingCount > 0;
+      featuresAuthorSync = Boolean(githubAuthor && githubConnection);
+    } catch (error) {
+      logServerError("devices/heartbeat-features-sync", error);
+    }
+
     const reportedTimeZone =
       typeof body.timeZone === "string" ? body.timeZone.trim().slice(0, 64) : "";
     if (reportedTimeZone && isValidIanaTimeZone(reportedTimeZone) && device.user.authUserId) {
@@ -239,6 +265,8 @@ export async function POST(req: NextRequest) {
       deviceId: device.id,
       update,
       ...(fullUsageRescanDay ? { fullUsageRescanDay } : {}),
+      ...(pendingRemoteSync ? { pendingRemoteSync: true } : {}),
+      ...(featuresAuthorSync ? { featuresAuthorSync: true } : {}),
     });
   } catch (e) {
     logServerError("devices/heartbeat", e);

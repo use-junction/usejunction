@@ -21,6 +21,7 @@ var (
 	enrollEmail     string
 	enrollName      string
 	enrollSetup     bool
+	enrollAcceptNotice bool
 )
 
 type enrollResult struct {
@@ -35,6 +36,7 @@ type enrollOptions struct {
 	Setup         bool
 	Quiet         bool // suppress enroll success lines (onboard owns the narrative)
 	NoReportPrint bool // run report but suppress its text output
+	AcceptNotice  bool
 }
 
 func doEnroll(opts enrollOptions) (*enrollResult, error) {
@@ -51,16 +53,20 @@ func doEnroll(opts enrollOptions) (*enrollResult, error) {
 	if err := warnEnrollmentTarget(url, opts); err != nil {
 		return nil, err
 	}
+	if err := acceptCollectionNotice(opts); err != nil {
+		return nil, err
+	}
 
 	osName, arch := platformInfo()
 	resp, err := client.Enroll(url, client.EnrollRequest{
-		Token:        opts.Token,
-		Email:        opts.Email,
-		Name:         opts.Name,
-		Hostname:     hostname(),
-		OS:           osName,
-		Architecture: arch,
-		AgentVersion: config.Version,
+		Token:         opts.Token,
+		Email:         opts.Email,
+		Name:          opts.Name,
+		Hostname:      hostname(),
+		OS:            osName,
+		Architecture:  arch,
+		AgentVersion:  config.Version,
+		NoticeVersion: CollectionNoticeVersion,
 	})
 	if err != nil {
 		return nil, err
@@ -77,8 +83,9 @@ func doEnroll(opts enrollOptions) (*enrollResult, error) {
 	}
 	if resp.Otel != nil {
 		cfg.OtelEnabled = resp.Otel.Enabled
-		cfg.OtelMetricsEndpoint = resp.Otel.MetricsEndpoint
+		cfg.		OtelMetricsEndpoint = resp.Otel.MetricsEndpoint
 	}
+	cfg.CollectionNoticeVersion = CollectionNoticeVersion
 	if _, err := cfg.EnsureLocalSyncCredentials(); err != nil {
 		return nil, fmt.Errorf("local sync credentials: %w", err)
 	}
@@ -204,11 +211,12 @@ var enrollCmd = &cobra.Command{
 	Short: "Enroll this device with the UseJunction control plane",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		_, err := doEnroll(enrollOptions{
-			Token: enrollToken,
-			URL:   controlPlaneURL,
-			Email: enrollEmail,
-			Name:  enrollName,
-			Setup: enrollSetup,
+			Token:        enrollToken,
+			URL:          controlPlaneURL,
+			Email:        enrollEmail,
+			Name:         enrollName,
+			Setup:        enrollSetup,
+			AcceptNotice: enrollAcceptNotice,
 		})
 		return err
 	},
@@ -220,5 +228,6 @@ func init() {
 	enrollCmd.Flags().StringVar(&enrollEmail, "email", "", "Developer email")
 	enrollCmd.Flags().StringVar(&enrollName, "name", "", "Developer name")
 	enrollCmd.Flags().BoolVar(&enrollSetup, "setup", true, "Enable Claude OTEL and send initial report")
+	enrollCmd.Flags().BoolVar(&enrollAcceptNotice, "accept-collection-notice", false, "Acknowledge the device collection notice")
 	rootCmd.AddCommand(enrollCmd)
 }

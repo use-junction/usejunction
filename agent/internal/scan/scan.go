@@ -29,10 +29,10 @@ import (
 
 // usageHit is one parsed usage observation from a session line.
 type usageHit struct {
-	date, model                  string
-	input, output, cacheRead     int
-	cacheWrite, reasoning        int
-	ok                           bool
+	date, model              string
+	input, output, cacheRead int
+	cacheWrite, reasoning    int
+	ok                       bool
 }
 
 // lineParser extracts usage metadata from a single JSONL object.
@@ -82,7 +82,7 @@ func scanJSONLDirs(tool string, roots []string, parser lineParser, forceFull boo
 	cacheFile := filepath.Join(config.CacheDir(), tool+".json")
 	current, keys, _ := CollectJSONLWatermarks(roots)
 	snap, _ := LoadScanSnapshot()
-	if !forceFull && JSONLSourcesUnchanged(snap, roots, current, keys) {
+	if !forceFull && JSONLSourcesUnchanged(snap, roots, current, keys) && !sessionHintsChanged(tool, snap.AccountFiles, current) {
 		if rows := AggregatesForTools(snap, tool); len(rows) > 0 || len(keys) == 0 {
 			return rows, nil
 		}
@@ -90,13 +90,15 @@ func scanJSONLDirs(tool string, roots []string, parser lineParser, forceFull boo
 
 	buckets := map[string]*types.DailyUsage{}
 	seen := map[string]bool{}
+	accountFiles := snap.cloneAccountFiles()
+	signedIn := SignedInAccount(tool)
 
 	for _, root := range roots {
 		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 			if err != nil || info.IsDir() || !strings.HasSuffix(path, ".jsonl") {
 				return nil
 			}
-			processFile(path, tool, parser, buckets, seen)
+			processFile(path, tool, parser, buckets, seen, accountFiles, signedIn)
 			return nil
 		})
 	}
@@ -127,6 +129,7 @@ func scanJSONLDirs(tool string, roots []string, parser lineParser, forceFull boo
 
 	_ = saveCache(cacheFile, result)
 	_ = CommitScanSnapshotUpdate(func(snap *ScanSnapshot) {
+		snap.mergeAccountFiles(accountFiles)
 		snap.Aggregates = ReplaceToolNamesAggregates(snap.Aggregates, []string{tool}, result)
 		if snap.Sources == nil {
 			snap.Sources = map[string]SourceWatermark{}
@@ -157,6 +160,8 @@ func processFile(
 	parser lineParser,
 	buckets map[string]*types.DailyUsage,
 	seen map[string]bool,
+	accountFiles map[string]string,
+	signedIn string,
 ) {
 	repository := repositoryForSessionFile(path)
 	f, err := os.Open(path)
@@ -165,6 +170,8 @@ func processFile(
 	}
 	defer f.Close()
 
+	sessionHint := SessionAccountHint(tool, path)
+	accountKey := RememberFile(accountFiles, path, sessionHint, signedIn)
 	lastModel := ""
 	_ = forEachJSONLLine(f, defaultJSONLMaxKeep, func(line []byte) error {
 		var row map[string]any
@@ -176,6 +183,9 @@ func processFile(
 			if model := codexModelFromRow(row); model != "" {
 				lastModel = model
 			}
+		}
+		if acc := AccountFromRecord(row); acc != "" && sessionHint == "" {
+			accountKey = RememberFile(accountFiles, path, acc, signedIn)
 		}
 
 		hit := parser(row)
@@ -207,10 +217,10 @@ func processFile(
 		if repository != nil {
 			repoKey = repository.Host + "/" + repository.Owner + "/" + repository.Name
 		}
-		key := hit.date + "|" + hit.model + "|" + repoKey
+		key := hit.date + "|" + hit.model + "|" + repoKey + "|" + accountKey
 		if buckets[key] == nil {
 			buckets[key] = &types.DailyUsage{
-				Date: hit.date, ToolName: tool, Model: hit.model,
+				Date: hit.date, ToolName: tool, Model: hit.model, AccountKey: accountKey,
 				Repository: repository, Source: "local_scan",
 			}
 		}

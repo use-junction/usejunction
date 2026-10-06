@@ -20,6 +20,7 @@ import type {
 import type { WorkActivitySession } from "@/lib/signals/queries/get-work-activity";
 import { formatCompactNumber, formatRelativeTime, formatShortDate, formatUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { signalsProductEnabled } from "@/lib/region";
 
 function toneForPace(code: QuotaPaceCode) {
   switch (code) {
@@ -302,6 +303,7 @@ function PlanCardButton({
             </p>
           ) : null}
 
+          {signalsProductEnabled() ? (
           <section className="min-w-0">
             <p className="mb-3 text-[0.65rem] uppercase tracking-[0.08em] text-muted-foreground">
               Recent work
@@ -320,6 +322,7 @@ function PlanCardButton({
               </p>
             )}
           </section>
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

@@ -39,28 +39,29 @@ func extractCodex() []client.WorkSession {
 }
 
 type codexWorkState struct {
-	id             string
-	toolName       string
-	model          string
-	effort         string
-	originator     string
-	summary        string // prefer last good headline
-	repo           *client.RepositoryReport
-	toolCounts     map[string]int
-	toolOrder      []string
-	toolSeen       map[string]bool
-	events         []toolEvent
-	files          []string
-	fileSeen       map[string]bool
-	startedAt      time.Time
-	endedAt        time.Time
-	userTurns      int
-	assistantTurns int
-	abortedTurns   int
-	firstUser      string
-	capturedTurns  []client.WorkTraceUserTurn
-	fileChanges    []client.WorkTraceFileChange
-	sawEditWrite   bool
+	id              string
+	toolName        string
+	model           string
+	effort          string
+	originator      string
+	accountKey      string
+	summary         string // prefer last good headline
+	repo            *client.RepositoryReport
+	toolCounts      map[string]int
+	toolOrder       []string
+	toolSeen        map[string]bool
+	events          []toolEvent
+	files           []string
+	fileSeen        map[string]bool
+	startedAt       time.Time
+	endedAt         time.Time
+	userTurns       int
+	assistantTurns  int
+	abortedTurns    int
+	firstUser       string
+	capturedTurns   []client.WorkTraceUserTurn
+	fileChanges     []client.WorkTraceFileChange
+	sawEditWrite    bool
 	changeNarrative *client.WorkTraceChangeNarrative
 }
 
@@ -93,6 +94,7 @@ func extractCodexFile(path string) (client.WorkSession, bool) {
 	if state.model == "" && len(state.toolCounts) == 0 && state.summary == "" {
 		return client.WorkSession{}, false
 	}
+	accountKey := scan.FileAccount(path, state.accountKey, scan.SignedInAccount("codex"))
 
 	meta := map[string]any{}
 	if state.originator != "" {
@@ -144,6 +146,7 @@ func extractCodexFile(path string) (client.WorkSession, bool) {
 	session := client.WorkSession{
 		LocalID:        "codex:" + clip(state.id, 120),
 		ToolName:       state.toolName,
+		AccountKey:     accountKey,
 		Model:          clip(state.model, 128),
 		Title:          clip(state.summary, 240),
 		Tldr:           clip(state.summary, 500),
@@ -214,6 +217,9 @@ func applyCodexRow(state *codexWorkState, row map[string]any) {
 		if originator, _ := payload["originator"].(string); originator != "" {
 			state.originator = originator
 			state.toolName = codexToolNameFromOriginator(originator)
+		}
+		if acc := scan.AccountFromRecord(row); acc != "" {
+			state.accountKey = acc
 		}
 		if git, ok := payload["git"].(map[string]any); ok {
 			if raw, _ := git["repository_url"].(string); raw != "" {

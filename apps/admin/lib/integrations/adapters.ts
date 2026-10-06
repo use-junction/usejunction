@@ -157,31 +157,54 @@ function githubHeaders(token: string) {
   return { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2026-03-10" };
 }
 
+function isCopilotUnavailable(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\(403\)|\(404\)/.test(message);
+}
+
 const github: ProviderAdapter = {
   provider: "github",
   products: ["copilot"],
   async validate(context) {
     const org = String(context.config.org ?? "");
-    if (!org) throw new Error("GitHub organization is required");
-    await fetchJson(`https://api.github.com/orgs/${encodeURIComponent(org)}/copilot/billing`, { headers: githubHeaders(context.credential) });
-    return { externalOrgId: org, permissions: ["copilot_seats:read", "copilot_metrics:read"] };
+    if (!org) throw new Error("GitHub account is required");
+    if (String(context.config.accountType ?? "").toLowerCase() === "user") {
+      return { externalOrgId: org, permissions: [] };
+    }
+    try {
+      await fetchJson(`https://api.github.com/orgs/${encodeURIComponent(org)}/copilot/billing`, { headers: githubHeaders(context.credential) });
+      return { externalOrgId: org, permissions: ["copilot_seats:read", "copilot_metrics:read"] };
+    } catch (error) {
+      if (!isCopilotUnavailable(error)) throw error;
+      return { externalOrgId: org, permissions: [] };
+    }
   },
   async sync(context) {
     const org = String(context.config.org ?? "");
-    if (!org) throw new Error("GitHub organization is required");
+    if (!org) throw new Error("GitHub account is required");
     const headers = githubHeaders(context.credential);
+    if (String(context.config.accountType ?? "").toLowerCase() === "user") {
+      // Personal installs have no org Copilot billing APIs; code sync still runs via GitHub App token.
+      return { externalOrgId: org, permissions: [], members: [], seats: [], usage: [] };
+    }
     const members: ProviderMember[] = [];
     const seats: ProviderSeat[] = [];
-    for (let pageNumber = 1; pageNumber <= 50; pageNumber += 1) {
-      const response = await fetchJson<Row>(`https://api.github.com/orgs/${encodeURIComponent(org)}/copilot/billing/seats?per_page=100&page=${pageNumber}`, { headers });
-      const rows: Row[] = response.seats ?? [];
-      for (const row of rows) {
-        const login = String(row.assignee?.login ?? row.assignee?.id ?? "");
-        if (!login) continue;
-        members.push({ externalUserId: login.toLowerCase(), name: login, metadata: { githubId: row.assignee?.id } });
-        seats.push({ externalUserId: login.toLowerCase(), product: "copilot", plan: row.plan_type, status: row.pending_cancellation_date ? "pending_cancellation" : "active", assignedAt: row.created_at ? new Date(row.created_at) : null, lastActivityAt: row.last_activity_at ? new Date(row.last_activity_at) : null, metadata: { editor: row.last_activity_editor ?? null } });
+    let copilotAvailable = true;
+    try {
+      for (let pageNumber = 1; pageNumber <= 50; pageNumber += 1) {
+        const response = await fetchJson<Row>(`https://api.github.com/orgs/${encodeURIComponent(org)}/copilot/billing/seats?per_page=100&page=${pageNumber}`, { headers });
+        const rows: Row[] = response.seats ?? [];
+        for (const row of rows) {
+          const login = String(row.assignee?.login ?? row.assignee?.id ?? "");
+          if (!login) continue;
+          members.push({ externalUserId: login.toLowerCase(), name: login, metadata: { githubId: row.assignee?.id } });
+          seats.push({ externalUserId: login.toLowerCase(), product: "copilot", plan: row.plan_type, status: row.pending_cancellation_date ? "pending_cancellation" : "active", assignedAt: row.created_at ? new Date(row.created_at) : null, lastActivityAt: row.last_activity_at ? new Date(row.last_activity_at) : null, metadata: { editor: row.last_activity_editor ?? null } });
+        }
+        if (rows.length < 100) break;
       }
-      if (rows.length < 100) break;
+    } catch (error) {
+      if (!isCopilotUnavailable(error)) throw error;
+      copilotAvailable = false;
     }
     const usage: ProviderUsage[] = [];
     const dates = range(context, context.initialSync ? 28 : 3);
@@ -200,10 +223,16 @@ const github: ProviderAdapter = {
           }));
         }
       } catch (error) {
-        if (!String(error).includes("404")) throw error;
+        if (!isCopilotUnavailable(error) && !String(error).includes("404")) throw error;
       }
     }
-    return { externalOrgId: org, permissions: ["copilot_seats:read", "copilot_metrics:read"], members, seats, usage };
+    return {
+      externalOrgId: org,
+      permissions: copilotAvailable ? ["copilot_seats:read", "copilot_metrics:read"] : [],
+      members,
+      seats,
+      usage,
+    };
   },
 };
 

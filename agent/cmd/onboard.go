@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/spf13/cobra"
+	"github.com/usejunction/agent/internal/client"
 	"github.com/usejunction/agent/internal/config"
 	"github.com/usejunction/agent/internal/configure"
 	"github.com/usejunction/agent/internal/providers"
@@ -18,11 +18,13 @@ import (
 )
 
 var (
-	onboardToken    string
-	onboardURL      string
-	onboardEmail    string
-	onboardName     string
-	onboardComplete bool
+	onboardToken        string
+	onboardURL          string
+	onboardEmail        string
+	onboardName         string
+	onboardComplete     bool
+	onboardAcceptNotice bool
+	onboardAccounts     string
 )
 
 var onboardCmd = &cobra.Command{
@@ -30,9 +32,10 @@ var onboardCmd = &cobra.Command{
 	Short: "Animated first-run enroll, tool scan, and success panel",
 	Long: `Runs the branded first-run experience:
   1. Enroll this device
-  2. Enable Claude Code OpenTelemetry metrics export
-  3. Scan for AI coding tools
-  4. Show a status card
+  2. Choose which signed-in accounts to collect from, provider by provider
+  3. Upload initial usage and scan for AI coding tools
+  4. Turn on Claude Code metrics export, if Claude Code is installed
+  5. Show a status card
 
 After the installer starts the background agent, call again with --complete
 to print the success panel (admin URL + PATH tips).`,
@@ -56,8 +59,8 @@ func runOnboardComplete() error {
 	}
 	cliPath, _ := os.Executable()
 	if cliPath == "" {
-		home, _ := os.UserHomeDir()
-		cliPath = filepath.Join(home, ".usejunction", "bin", "usejunction")
+		id := config.CurrentServiceIdentity()
+		cliPath = id.CLISymlinkPath(config.ConfigDir())
 	}
 	if format == "json" {
 		printJSON(map[string]any{
@@ -89,6 +92,10 @@ func runOnboard() error {
 		if err != nil {
 			return err
 		}
+		selection, err := runAccountSelection(context.Background(), client.New(res.cfg), onboardAccounts)
+		if err != nil {
+			return err
+		}
 		tools := detectTools()
 		printJSON(map[string]any{
 			"deviceId":      res.cfg.DeviceID,
@@ -96,6 +103,7 @@ func runOnboard() error {
 			"agentVersion":  config.Version,
 			"toolsDetected": len(tools),
 			"tools":         tools,
+			"accounts":      selection,
 		})
 		return nil
 	}
@@ -111,23 +119,20 @@ func runOnboard() error {
 		Setup:         false,
 		Quiet:         true,
 		NoReportPrint: true,
+		AcceptNotice:  onboardAcceptNotice,
 	})
 	if err != nil {
 		enrollStep.Fail(err.Error())
 		return err
 	}
-	enrollStep.Done(fmt.Sprintf("device %s", res.cfg.DeviceID))
-	ui.QuietLine("Config saved to " + config.ConfigPath())
+	enrollStep.Done(deviceLabel(res.cfg.DeviceID))
+	ui.QuietLine("Settings  " + homeRelative(config.ConfigPath()))
 
-	setupStep := ui.StepStart("Enabling Claude Code metrics")
+	// Written quietly so Claude Code metrics work even if it is installed later;
+	// only mentioned once we know Claude Code is on this machine.
 	setupErr := configure.RunSetup(res.cfg, configure.SetupOptions{EnableOtel: true})
-	if setupErr != nil {
-		setupStep.Fail(setupErr.Error())
-		ui.WarnLine(fmt.Sprintf("setup warning: %v", setupErr))
-	} else {
-		setupStep.Done("OpenTelemetry usage export → UseJunction")
-		ui.QuietLine("Writes ~/.usejunction/claude-env.sh so Claude Code can send usage metrics")
-	}
+
+	chooseOnboardAccounts(client.New(res.cfg))
 
 	toolIDs := providerToolIDs()
 	reportPanel := ui.ScanPanelStart("Uploading initial usage", toolIDs)
@@ -139,6 +144,8 @@ func runOnboard() error {
 			reportPanel.ToolFinish(message, false)
 		case "scan-tool-skip":
 			reportPanel.ToolFinish(message, true)
+		case "scan-tool-absent":
+			reportPanel.ToolAbsent(message)
 		default:
 			if label := humanizeCollectProgress(step, message); label != "" {
 				reportPanel.Update(label)
@@ -171,16 +178,93 @@ func runOnboard() error {
 		tools = detectTools()
 	}
 	scanStep.Done(fmt.Sprintf("%d found", len(tools)))
-	fmt.Println()
 	for _, t := range tools {
 		ui.ToolReveal(t.ToolName, t.Configured)
 	}
+	reportClaudeMetrics(tools, setupErr)
 
-	ui.StatusSummary(res.cfg.DeviceID, res.cfg.OrgID, config.Version, len(tools))
 	if reportErr != nil && !errors.Is(reportErr, errUsageQueuePending) {
 		return fmt.Errorf("initial sync incomplete: %w", reportErr)
 	}
 	return nil
+}
+
+// deviceLabel names the device by hostname, with a short device id for support.
+func deviceLabel(deviceID string) string {
+	short := deviceID
+	if len(short) > 8 {
+		short = short[:8]
+	}
+	host, _ := os.Hostname()
+	host = strings.TrimSuffix(host, ".local")
+	if host == "" {
+		return "device " + short
+	}
+	return fmt.Sprintf("%s · %s", host, short)
+}
+
+// homeRelative shortens a path under the home directory to ~/…
+func homeRelative(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" || !strings.HasPrefix(path, home) {
+		return path
+	}
+	return "~" + strings.TrimPrefix(path, home)
+}
+
+// reportClaudeMetrics mentions the Claude Code metrics export only when Claude
+// Code was found, so the step never appears before we know anything about it.
+func reportClaudeMetrics(tools []types.ToolStatus, setupErr error) {
+	found := false
+	for _, tool := range tools {
+		if tool.ToolName == "claude" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return
+	}
+	step := ui.StepStart("Claude Code metrics")
+	if setupErr != nil {
+		step.Fail(setupErr.Error())
+		ui.WarnLine("Claude Code usage will not export until this is fixed: usejunction setup")
+		return
+	}
+	step.Done("usage export on")
+	ui.QuietLine("Claude Code sends usage through ~/.usejunction/claude-env.sh")
+}
+
+// chooseOnboardAccounts lets the developer pick accounts before the first
+// report reads any usage. Failures leave collection off and are not fatal.
+func chooseOnboardAccounts(api *client.APIClient) {
+	findStep := ui.StepStart("Finding signed-in accounts")
+	accounts, err := loadSelectableAccounts(context.Background(), api)
+	if err != nil {
+		findStep.Fail(err.Error())
+		ui.WarnLine("collection stays off until you choose accounts: usejunction accounts select")
+		return
+	}
+	providerNames := map[string]bool{}
+	for _, account := range accounts {
+		providerNames[providerDisplayName(account)] = true
+	}
+	findStep.Done(fmt.Sprintf("%d across %d %s", len(accounts), len(providerNames), map[bool]string{true: "provider", false: "providers"}[len(providerNames) == 1]))
+	if len(accounts) == 0 {
+		return
+	}
+
+	selection, err := chooseAccounts(api, accounts, onboardAccounts)
+	saveStep := ui.StepStart("Saving account choices")
+	if err != nil {
+		saveStep.Fail(err.Error())
+		ui.WarnLine("collection stays off until you choose accounts: usejunction accounts select")
+		return
+	}
+	saveStep.Done(accountSelectionSummary(selection))
+	if selection.On < selection.Offered {
+		ui.QuietLine("Change this any time: usejunction accounts select")
+	}
 }
 
 func providerToolIDs() []string {
@@ -218,7 +302,7 @@ func detectTools() []types.ToolStatus {
 // humanizeCollectProgress maps collect progress callbacks to short onboard labels.
 func humanizeCollectProgress(step, message string) string {
 	switch step {
-	case "scan-tool-start", "scan-tool-done", "scan-tool-skip":
+	case "scan-tool-start", "scan-tool-done", "scan-tool-skip", "scan-tool-absent":
 		return ""
 	case "scan":
 		// Tool rows in ScanPanel already cover per-tool scan progress.
@@ -229,15 +313,13 @@ func humanizeCollectProgress(step, message string) string {
 	}
 	switch step {
 	case "heartbeat":
-		return "Registering local agent"
+		return "Connecting to UseJunction"
 	case "upload-tools":
 		return "Preparing inventory"
 	case "upload-models":
 		return "Uploading local models"
 	case "upload-usage":
 		return "Syncing usage"
-	case "work-extract":
-		return "Extracting work sessions"
 	case "complete":
 		return "Finishing sync"
 	default:
@@ -251,5 +333,7 @@ func init() {
 	onboardCmd.Flags().StringVar(&onboardEmail, "email", "", "Developer email")
 	onboardCmd.Flags().StringVar(&onboardName, "name", "", "Developer name")
 	onboardCmd.Flags().BoolVar(&onboardComplete, "complete", false, "Print the post-install success panel only")
+	onboardCmd.Flags().BoolVar(&onboardAcceptNotice, "accept-collection-notice", false, "Acknowledge the device collection notice")
+	onboardCmd.Flags().StringVar(&onboardAccounts, "accounts", os.Getenv("USEJUNCTION_ACCOUNTS"), `Skip the account picker: "all", "none", or a comma-separated list of emails, providers, or provider:email`)
 	rootCmd.AddCommand(onboardCmd)
 }

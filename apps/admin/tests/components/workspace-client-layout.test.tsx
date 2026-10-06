@@ -46,6 +46,11 @@ vi.mock("@tanstack/react-query", async () => {
   };
 });
 
+vi.mock("@/components/legal/legal-acceptance-gate", () => ({
+  LegalAcceptanceGate: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+vi.mock("@/components/new-collection-banner", () => ({ NewCollectionBanner: () => null }));
 vi.mock("@/components/workspace-shell", () => ({
   WorkspaceShell: ({
     children,

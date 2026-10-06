@@ -44,3 +44,9 @@ func All() []Provider {
 		&LMStudioProvider{},
 	}
 }
+
+// MultiAccountProvider is implemented by providers that can see logins other
+// than the active one on this device (each gets its own collection switch).
+type MultiAccountProvider interface {
+	OtherAccounts(ctx context.Context) []types.ToolAccount
+}

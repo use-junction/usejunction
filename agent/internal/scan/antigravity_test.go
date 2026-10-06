@@ -211,9 +211,9 @@ func TestScanAntigravityBrainTranscript(t *testing.T) {
 		t.Fatal(err)
 	}
 	transcript := strings.Join([]string{
-		`{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-07-22T18:39:16Z","content":"<USER_SETTINGS_CHANGE>\nThe user changed setting ` + "`Model Selection`" + ` from None to Gemini 3.6 Flash (High).\n</USER_SETTINGS_CHANGE>"}`,
-		`{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-22T18:39:16Z","tool_calls":[{"name":"list_dir"}]}`,
-		`{"step_index":2,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-07-22T18:40:00Z"}`,
+		`{"step_index":0,"source":"USER_EXPLICIT","type":"USER_INPUT","status":"DONE","created_at":"2026-09-01T18:39:16Z","content":"<USER_SETTINGS_CHANGE>\nThe user changed setting ` + "`Model Selection`" + ` from None to Gemini 3.6 Flash (High).\n</USER_SETTINGS_CHANGE>"}`,
+		`{"step_index":1,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-09-01T18:39:16Z","tool_calls":[{"name":"list_dir"}]}`,
+		`{"step_index":2,"source":"MODEL","type":"PLANNER_RESPONSE","status":"DONE","created_at":"2026-09-01T18:40:00Z"}`,
 	}, "\n") + "\n"
 	path := filepath.Join(dir, "transcript.jsonl")
 	if err := os.WriteFile(path, []byte(transcript), 0o644); err != nil {
@@ -237,7 +237,7 @@ func TestScanAntigravityBrainTranscript(t *testing.T) {
 	if rows[0].Requests != 2 {
 		t.Fatalf("requests = %d", rows[0].Requests)
 	}
-	if rows[0].Date != "2026-07-22" {
+	if rows[0].Date != "2026-09-01" {
 		t.Fatalf("date = %q", rows[0].Date)
 	}
 	if rows[0].Source != antigravityLocalSource {

@@ -149,9 +149,9 @@ func protoTimestampMillis(ts []byte) (int64, bool) {
 type protoWireKind int
 
 const (
-	protoWireVarint protoWireKind = 0
+	protoWireVarint  protoWireKind = 0
 	protoWireFixed64 protoWireKind = 1
-	protoWireBytes  protoWireKind = 2
+	protoWireBytes   protoWireKind = 2
 	protoWireFixed32 protoWireKind = 5
 )
 

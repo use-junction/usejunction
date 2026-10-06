@@ -30,8 +30,25 @@ vi.mock("posthog-js", () => ({
     identify: mocks.identify,
     group: mocks.group,
     reset: mocks.reset,
+    init: vi.fn(),
+    opt_out_capturing: vi.fn(),
   },
 }));
+
+vi.mock("@/lib/consent/analytics-consent", () => ({
+  hasAnalyticsConsent: () => true,
+  analyticsConsentChangeEvent: "uj:analytics-consent",
+}));
+
+vi.mock("@/lib/posthog/client", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/posthog/client")>("@/lib/posthog/client");
+  return {
+    ...actual,
+    isPostHogConfigured: true,
+    startPostHogIfConsented: vi.fn(() => true),
+    resetPostHogIdentity: () => mocks.reset(),
+  };
+});
 
 beforeEach(() => {
   cleanup();

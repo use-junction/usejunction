@@ -387,11 +387,9 @@ function PersonalHome({
       <ConnectionRepairBanner scope="you" recoveryDevices={data.sync.recoveryDevices} />
       <ConnectMachineBanner show={empty} />
       <PageHeader
-        title={empty ? "Nothing reporting yet." : "Spend, traffic, coverage."}
+        title={empty ? "Nothing reporting yet." : "What's reporting?"}
         description={
-          empty
-            ? "Connect a machine to see your plans, usage, and traffic."
-            : undefined
+          empty ? "Connect a machine to see your plans, usage, and traffic." : undefined
         }
         actions={
           !empty && allowPeriodControls ? (
@@ -778,7 +776,7 @@ export default function DashboardPage() {
       <SubscriptionUpgradedBanner isTeam={isTeamPlan} />
       <ConnectMachineBanner show={needsPersonalConnect} />
       <PageHeader
-        title={empty ? "Nothing reporting yet." : "Spend, traffic, coverage."}
+        title={empty ? "Nothing reporting yet." : "What's reporting?"}
         description={
           empty
             ? "Connect a machine, then invite people. Metrics show up as soon as the first request lands."

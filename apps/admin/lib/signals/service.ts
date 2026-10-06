@@ -1,4 +1,5 @@
 import { prisma } from "@usejunction/db";
+import { signalsAllowed } from "@/lib/region";
 import { enforceDeviceActivityRetention } from "@/lib/activity/record-device-activity-event";
 import {
   SIGNALS_COLLECTION_MODE,
@@ -51,8 +52,8 @@ export async function getEffectiveSignalsPolicy(orgId: string): Promise<Effectiv
     excludedDomains: normalizeList(policy.excludedDomains, defaultExcludedDomains),
     storeEvents: false,
     // Work extraction is independent of classic app/domain collection.
-    workExtractionEnabled: policy.workExtractionEnabled,
-    rawWorkTextEnabled: policy.rawWorkTextEnabled,
+    workExtractionEnabled: signalsAllowed() ? policy.workExtractionEnabled : false,
+    rawWorkTextEnabled: signalsAllowed() ? policy.rawWorkTextEnabled : false,
     workExtractionStartedAt: policy.workExtractionStartedAt?.toISOString() ?? null,
     updatedAt: policy.updatedAt.toISOString(),
   };

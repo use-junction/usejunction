@@ -70,7 +70,7 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     const commonHeaders = [
-      { key: "Content-Security-Policy", value: `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://assets.calendly.com https://*.posthog.com${process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'"}; style-src 'self' 'unsafe-inline' https://assets.calendly.com; img-src 'self' data: https:; font-src 'self' data: https://assets.calendly.com; connect-src 'self' https: http://127.0.0.1:* http://localhost:*; worker-src 'self' blob: data:; frame-src https://calendly.com https://*.calendly.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` },
+      { key: "Content-Security-Policy", value: `default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://assets.calendly.com https://*.posthog.com https://eu.i.posthog.com https://us.i.posthog.com${process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'"}; style-src 'self' 'unsafe-inline' https://assets.calendly.com; img-src 'self' data: https:; font-src 'self' data: https://assets.calendly.com; connect-src 'self' https: http://127.0.0.1:* http://localhost:* https://eu.i.posthog.com https://us.i.posthog.com; worker-src 'self' blob: data:; frame-src https://calendly.com https://*.calendly.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'` },
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "X-Frame-Options", value: "DENY" },
       { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },

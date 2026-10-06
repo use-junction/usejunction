@@ -3,8 +3,11 @@ package cmd
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/usejunction/agent/internal/client"
 )
 
 func TestClassifyCollect(t *testing.T) {
@@ -77,5 +80,32 @@ func TestCollectStatusWarningsCapped(t *testing.T) {
 	}
 	if len(got.Warnings) != 8 {
 		t.Fatalf("warnings = %d, want capped at 8", len(got.Warnings))
+	}
+}
+
+func TestHeartbeatRequestsRemoteSync(t *testing.T) {
+	if heartbeatRequestsRemoteSync(nil) {
+		t.Fatal("nil response must not request remote sync")
+	}
+	if heartbeatRequestsRemoteSync(&client.HeartbeatResponse{}) {
+		t.Fatal("empty response must not request remote sync")
+	}
+	if !heartbeatRequestsRemoteSync(&client.HeartbeatResponse{PendingRemoteSync: true}) {
+		t.Fatal("pending remote sync must request a claim")
+	}
+	if !heartbeatRequestsRemoteSync(&client.HeartbeatResponse{FeaturesAuthorSync: true}) {
+		t.Fatal("mapped GitHub author must poll for Features usage sync")
+	}
+}
+
+func TestNoteFeaturesAuthorSync(t *testing.T) {
+	var flag atomic.Bool
+	noteFeaturesAuthorSync(&client.HeartbeatResponse{FeaturesAuthorSync: true}, &flag)
+	if !flag.Load() {
+		t.Fatal("expected Features author flag to be set")
+	}
+	noteFeaturesAuthorSync(&client.HeartbeatResponse{}, &flag)
+	if flag.Load() {
+		t.Fatal("expected Features author flag to clear when the heartbeat drops it")
 	}
 }

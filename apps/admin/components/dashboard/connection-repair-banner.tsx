@@ -106,6 +106,7 @@ export function ConnectionRepairBanner({ recoveryDevices = [], scope = "you" }: 
         onOpenChange={(open) => {
           if (!open) setRepairDevice(null);
         }}
+        onRepaired={() => router.refresh()}
       />
     </>
   );

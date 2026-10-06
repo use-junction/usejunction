@@ -519,11 +519,24 @@ type cursorEventsCache struct {
 
 const cursorEventsSourceKey = "cursor:usage-events"
 const cursorEventsSource = "cursor_usage_events"
-const cursorEventsCacheVersion = "3"
+const cursorEventsCacheVersion = "4"
 const cursorEventsCalcVersion = "usage-v2"
 
 func cursorEventsCachePath() string {
 	return filepath.Join(config.CacheDir(), "cursor-usage-events.json")
+}
+
+func stampCursorEventAccount(rows []types.DailyUsage, accountKey string) []types.DailyUsage {
+	accountKey = strings.TrimSpace(accountKey)
+	if accountKey == "" {
+		return rows
+	}
+	out := make([]types.DailyUsage, 0, len(rows))
+	for _, row := range rows {
+		row.AccountKey = accountKey
+		out = append(out, row)
+	}
+	return out
 }
 
 func finalizeCursorEventRows(rows []types.DailyUsage) []types.DailyUsage {
@@ -578,15 +591,15 @@ func ScanCursorUsageEvents(ctx context.Context, forceFull bool) ([]types.DailyUs
 	if !forceFull && needsCursorEventsRebuild(snap) {
 		forceFull = true
 	}
-	if !forceFull {
-		if cached, err := loadCursorEventsCache(cachePath); err == nil {
-			return finalizeCursorEventRows(cached), nil
-		}
-	}
-
 	token, err := cursorAccessToken()
 	if err != nil {
 		return nil, err
+	}
+	accountKey := cursorAccountKey(token)
+	if !forceFull {
+		if cached, err := loadCursorEventsCache(cachePath); err == nil {
+			return stampCursorEventAccount(finalizeCursorEventRows(cached), accountKey), nil
+		}
 	}
 	cookie, err := cursorSessionCookie(token)
 	if err != nil {
@@ -605,8 +618,12 @@ func ScanCursorUsageEvents(ctx context.Context, forceFull bool) ([]types.DailyUs
 	incrementalMerge := !forceFull && !watermarkTime.IsZero()
 	if incrementalMerge {
 		for _, row := range scan.AggregatesForSource(snap, "cursor", cursorEventsSource) {
+			if strings.TrimSpace(row.AccountKey) != "" && strings.TrimSpace(row.AccountKey) != accountKey {
+				continue
+			}
 			key := row.Date + "|" + row.Model
 			cp := row
+			cp.AccountKey = accountKey
 			buckets[key] = &cp
 		}
 	}
@@ -667,7 +684,7 @@ func ScanCursorUsageEvents(ctx context.Context, forceFull bool) ([]types.DailyUs
 			key := date + "|" + model
 			if buckets[key] == nil {
 				buckets[key] = &types.DailyUsage{
-					Date: date, ToolName: "cursor", Model: model,
+					Date: date, ToolName: "cursor", Model: model, AccountKey: accountKey,
 					Source:         cursorEventsSource,
 					MetricKind:     types.MetricKindUsage,
 					TokenSemantics: types.TokenSemanticsVendor, CalculationVersion: cursorEventsCalcVersion,
@@ -705,10 +722,17 @@ func ScanCursorUsageEvents(ctx context.Context, forceFull bool) ([]types.DailyUs
 	// Warm path: first page newest timestamp matches prior watermark and we
 	// already had aggregates — nothing new arrived.
 	if !forceFull && prevWM.Extra != "" && newestEventTS == prevWM.Extra && reachedPriorWatermark {
-		if rows := scan.AggregatesForSource(snap, "cursor", cursorEventsSource); len(rows) > 0 {
-			finalized := finalizeCursorEventRows(rows)
+		var thisAccount []types.DailyUsage
+		for _, row := range scan.AggregatesForSource(snap, "cursor", cursorEventsSource) {
+			if strings.TrimSpace(row.AccountKey) != "" && strings.TrimSpace(row.AccountKey) != accountKey {
+				continue
+			}
+			thisAccount = append(thisAccount, row)
+		}
+		if len(thisAccount) > 0 {
+			finalized := stampCursorEventAccount(finalizeCursorEventRows(thisAccount), accountKey)
 			_ = saveCursorEventsCache(cachePath, buildCursorEventsCache(newestEventTS, finalized))
-			snap.Aggregates = scan.ReplaceSourceAggregates(snap.Aggregates, "cursor", cursorEventsSource, finalized)
+			snap.Aggregates = scan.ReplaceAccountSourceAggregates(snap.Aggregates, "cursor", cursorEventsSource, accountKey, finalized)
 			if snap.Sources == nil {
 				snap.Sources = map[string]scan.SourceWatermark{}
 			}
@@ -726,10 +750,10 @@ func ScanCursorUsageEvents(ctx context.Context, forceFull bool) ([]types.DailyUs
 		finalizeCursorEventCost(b)
 		result = append(result, *b)
 	}
-	result = scan.PruneAggregatesLookback(result, time.Now().UTC())
+	result = stampCursorEventAccount(scan.PruneAggregatesLookback(result, time.Now().UTC()), accountKey)
 	_ = saveCursorEventsCache(cachePath, buildCursorEventsCache(newestEventTS, result))
 
-	snap.Aggregates = scan.ReplaceSourceAggregates(snap.Aggregates, "cursor", cursorEventsSource, result)
+	snap.Aggregates = scan.ReplaceAccountSourceAggregates(snap.Aggregates, "cursor", cursorEventsSource, accountKey, result)
 	if snap.Sources == nil {
 		snap.Sources = map[string]scan.SourceWatermark{}
 	}

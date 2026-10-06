@@ -11,6 +11,7 @@ import { formatCompactNumber, formatUsd } from "@/lib/format";
 import { buildMemberPlanBoard, planBoardLeadLabel } from "@/lib/quotas/plan-board";
 import type { WorkActivitySession } from "@/lib/signals/queries/get-work-activity";
 import { canonicalToolKey } from "@/lib/tools/catalog";
+import { signalsProductEnabled } from "@/lib/region";
 
 export default function MemberOverviewClientScreen() {
   const searchParams = useSearchParams();
@@ -107,6 +108,7 @@ export default function MemberOverviewClientScreen() {
         )}
       </section>
 
+      {signalsProductEnabled() ? (
       <section className="mt-10">
         <div className="mb-4 flex items-end justify-between gap-3">
           <div>
@@ -135,6 +137,7 @@ export default function MemberOverviewClientScreen() {
           <p className="border p-4 text-sm text-muted-foreground">Work extraction is off.</p>
         )}
       </section>
+      ) : null}
     </>
   );
 }

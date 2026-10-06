@@ -47,6 +47,8 @@ func ScanCopilot(refresh bool) ([]types.DailyUsage, error) {
 		}
 		result = append(result, *b)
 	}
+	prev, _ := loadCache(cacheFile)
+	result = StampObservedActivity(prev, result, SignedInAccount("copilot"))
 	_ = saveCache(cacheFile, result)
 	return result, nil
 }

@@ -84,7 +84,7 @@ func TestProcessCodexFileKeepsUsageAfterOversizedLine(t *testing.T) {
 	}
 
 	buckets := map[string]*types.DailyUsage{}
-	processCodexFile(path, buckets)
+	processCodexFile(path, buckets, map[string]string{}, "acct-test")
 
 	totalReq, totalIn, totalOut := 0, 0, 0
 	for _, b := range buckets {

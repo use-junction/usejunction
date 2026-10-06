@@ -37,7 +37,6 @@ test("Add a team tool sheet lists Codex/Work once and creates a ChatGPT subscrip
   });
 
   await page.goto("/tools");
-  await page.getByRole("tab", { name: "Subscriptions" }).click();
   await page.getByRole("button", { name: /Add tool/i }).first().click();
 
   const sheet = page.getByRole("dialog");
@@ -85,7 +84,6 @@ test("adding ChatGPT / Codex persists through the real subscriptions API", async
 
   try {
     await page.goto("/tools");
-    await page.getByRole("tab", { name: "Subscriptions" }).click();
     await page.getByRole("button", { name: /Add tool/i }).first().click();
 
     const sheet = page.getByRole("dialog");
@@ -135,7 +133,6 @@ test("Add a team tool sheet recovers from create errors without crashing", async
   });
 
   await page.goto("/tools");
-  await page.getByRole("tab", { name: "Subscriptions" }).click();
   await page.getByRole("button", { name: /Add tool/i }).first().click();
 
   const sheet = page.getByRole("dialog");

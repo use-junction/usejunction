@@ -30,6 +30,7 @@ type codexSessionState struct {
 	prevTotal  tokenTuple
 	originator string
 	toolName   string
+	accountKey string
 	lastDate   string
 	// first-seen tool names for a discreet flow digest (names only).
 	flowOrder []string
@@ -56,12 +57,14 @@ func ScanCodex(codexHome string, forceFull bool) ([]types.DailyUsage, error) {
 
 	cacheFile := filepath.Join(config.CacheDir(), "codex.json")
 	buckets := map[string]*types.DailyUsage{}
+	accountFiles := snap.cloneAccountFiles()
+	signedIn := SignedInAccount(codexToolName)
 	for _, root := range dirs {
 		_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 			if err != nil || info.IsDir() || !strings.HasSuffix(path, ".jsonl") {
 				return nil
 			}
-			processCodexFile(path, buckets)
+			processCodexFile(path, buckets, accountFiles, signedIn)
 			return nil
 		})
 	}
@@ -104,6 +107,7 @@ func ScanCodex(codexHome string, forceFull bool) ([]types.DailyUsage, error) {
 
 	_ = saveCache(cacheFile, result)
 	_ = CommitScanSnapshotUpdate(func(snap *ScanSnapshot) {
+		snap.mergeAccountFiles(accountFiles)
 		snap.Aggregates = ReplaceToolNamesAggregates(snap.Aggregates, []string{codexToolName, codexWorkToolName}, result)
 		if snap.Sources == nil {
 			snap.Sources = map[string]SourceWatermark{}
@@ -123,10 +127,11 @@ func ScanCodex(codexHome string, forceFull bool) ([]types.DailyUsage, error) {
 	return result, nil
 }
 
-func processCodexFile(path string, buckets map[string]*types.DailyUsage) {
+func processCodexFile(path string, buckets map[string]*types.DailyUsage, accountFiles map[string]string, signedIn string) {
 	state := &codexSessionState{
-		toolName: codexToolName,
-		flowSeen: map[string]bool{},
+		toolName:   codexToolName,
+		flowSeen:   map[string]bool{},
+		accountKey: RememberFile(accountFiles, path, "", signedIn),
 	}
 	var repository *types.RepositoryIdentity
 
@@ -145,6 +150,9 @@ func processCodexFile(path string, buckets map[string]*types.DailyUsage) {
 		if originator := codexOriginatorFromRow(row); originator != "" {
 			state.originator = originator
 			state.toolName = codexToolNameFromOriginator(originator)
+		}
+		if acc := AccountFromRecord(row); acc != "" {
+			state.accountKey = RememberFile(accountFiles, path, acc, signedIn)
 		}
 		if repository == nil {
 			repository = repositoryFromCodexRow(row)
@@ -179,10 +187,10 @@ func processCodexFile(path string, buckets map[string]*types.DailyUsage) {
 		if repository != nil {
 			repoKey = repository.Host + "/" + repository.Owner + "/" + repository.Name
 		}
-		key := hit.date + "|" + state.toolName + "|" + hit.model + "|" + repoKey
+		key := hit.date + "|" + state.toolName + "|" + hit.model + "|" + repoKey + "|" + state.accountKey
 		if buckets[key] == nil {
 			buckets[key] = &types.DailyUsage{
-				Date: hit.date, ToolName: state.toolName, Model: hit.model,
+				Date: hit.date, ToolName: state.toolName, Model: hit.model, AccountKey: state.accountKey,
 				Repository: repository, Source: "local_scan",
 				MetricKind: types.MetricKindUsage, TokenSemantics: types.TokenSemanticsOpenAI,
 				Metadata: codexSurfaceMetadata(state.originator, "usage"),
@@ -237,10 +245,10 @@ func recordCodexToolCall(
 	}
 
 	model := "tool:" + name
-	key := date + "|" + state.toolName + "|" + model + "|"
+	key := date + "|" + state.toolName + "|" + model + "|" + "|" + state.accountKey
 	if buckets[key] == nil {
 		buckets[key] = &types.DailyUsage{
-			Date: date, ToolName: state.toolName, Model: model,
+			Date: date, ToolName: state.toolName, Model: model, AccountKey: state.accountKey,
 			Source: "local_scan", MetricKind: types.MetricKindProductivity,
 			Metadata: codexSurfaceMetadata(state.originator, "tool_inventory"),
 		}
@@ -257,10 +265,10 @@ func emitCodexFlowDigest(buckets map[string]*types.DailyUsage, state *codexSessi
 		digest = digest[:200]
 	}
 	model := "flow:" + digest
-	key := state.lastDate + "|" + state.toolName + "|" + model + "|"
+	key := state.lastDate + "|" + state.toolName + "|" + model + "|" + "|" + state.accountKey
 	if buckets[key] == nil {
 		buckets[key] = &types.DailyUsage{
-			Date: state.lastDate, ToolName: state.toolName, Model: model,
+			Date: state.lastDate, ToolName: state.toolName, Model: model, AccountKey: state.accountKey,
 			Source: "local_scan", MetricKind: types.MetricKindProductivity,
 			Metadata: codexSurfaceMetadata(state.originator, "tool_flow"),
 		}

@@ -6,6 +6,7 @@ import { useParams, usePathname, useSearchParams } from "next/navigation";
 import { MemberHubNav } from "@/components/developers/member-hub-nav";
 import { MemberHubPeriodFilter } from "@/components/developers/member-hub-period";
 import { MemberRemoveButton } from "@/components/developers/member-remove-button";
+import { MemberPrivacyActions } from "@/components/developers/member-privacy-actions";
 import { MemberRoleSelect } from "@/components/developers/member-role-select";
 import { PageHeader } from "@/components/page-header";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
@@ -15,6 +16,7 @@ import { teamMemberHubKey, teamMemberWorkKey } from "@/lib/app-pages/query-keys"
 import type { TeamMemberHubPayload, TeamMemberWorkPayload } from "@/lib/app-pages/team-member";
 import { canManageSettings } from "@/lib/rbac/permissions";
 import type { WorkActivityV1 } from "@/lib/signals/queries/get-work-activity";
+import { signalsProductEnabled } from "@/lib/region";
 
 export type MemberClientData = TeamMemberHubPayload & {
   section: "overview" | "coding" | "fleet" | "work";
@@ -47,7 +49,7 @@ export function MemberClientLayout({ children }: { children: React.ReactNode }) 
     teamMemberHubKey(developerId, periodQuery),
     `/api/app/team/${encodeURIComponent(developerId)}${periodQuery ? `?${periodQuery}` : ""}`,
   );
-  const needsWork = section === "overview" || section === "work";
+  const needsWork = signalsProductEnabled() && (section === "overview" || section === "work");
   const workLimit = section === "work" ? 200 : 4;
   const workQueryString = useMemo(() => {
     const params = new URLSearchParams(periodQuery);
@@ -88,7 +90,7 @@ export function MemberClientLayout({ children }: { children: React.ReactNode }) 
           <Breadcrumb><BreadcrumbList><BreadcrumbItem><BreadcrumbLink asChild><Link href="/team" prefetch={false}>Team</Link></BreadcrumbLink></BreadcrumbItem><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{developer.name}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
         }
         title={`${developer.name}.`}
-        description={`${developer.email} · work, tools, and plan pace.`}
+        description={`${developer.email} · ${signalsProductEnabled() ? "work, tools, and plan pace." : "tools and plan pace."}`}
         actions={
           <MemberHubPeriodFilter
             className="shrink-0 self-start sm:self-end"
@@ -97,9 +99,10 @@ export function MemberClientLayout({ children }: { children: React.ReactNode }) 
         }
       >
         {canManageSettings(role) ? (
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <MemberRoleSelect developerId={developer.id} role={developer.role} memberName={developer.name} />
             <MemberRemoveButton developerId={developer.id} memberName={developer.name} locked={developer.role === "owner"} />
+            <MemberPrivacyActions developerId={developer.id} role={role} />
           </div>
         ) : <p className="text-xs uppercase tracking-[0.08em] text-muted-foreground">Role: {developer.role}</p>}
         <MemberHubNav developerId={developerId} />

@@ -1,3 +1,5 @@
+import { euPostHogMisconfiguration } from "../region";
+
 const DEFAULT_SECRET_VALUES = new Set([
   "admin",
   "change-me-in-production",
@@ -85,6 +87,7 @@ export function assertSecureProductionEnv(env = process.env) {
     env.DEMO_ENROLLMENT_TOKEN ? secretProblem("DEMO_ENROLLMENT_TOKEN", env.DEMO_ENROLLMENT_TOKEN, 24) : null,
     validateHttpsUnlessLoopback("NEXT_PUBLIC_APP_URL", env.NEXT_PUBLIC_APP_URL),
     validateHttpsUnlessLoopback("NEXTAUTH_URL", env.NEXTAUTH_URL),
+    euPostHogMisconfiguration(env),
     ...lemonBillingProblems(env),
   ].filter(Boolean);
 

@@ -89,3 +89,24 @@ test("auth, seat, and issue helpers enqueue Slack payloads without throwing", as
   assert.match(String((payloads[4] as { text: string }).text), /billing\/checkout/);
   assert.match(String((payloads[5] as { text: string }).text), /webhooks\/lemonsqueezy/);
 });
+
+test("EU signups and logins omit name and email", async () => {
+  process.env.SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/test";
+  process.env.DEPLOYMENT_REGION = "eu";
+  const payloads: Array<{ text: string }> = [];
+  globalThis.fetch = async (_url, init) => {
+    payloads.push(JSON.parse(String(init?.body)));
+    return new Response("ok", { status: 200 });
+  };
+
+  notifyUserSignedUp({ email: "secret@example.com", name: "Secret", method: "email" });
+  notifyUserLoggedIn({ email: "secret@example.com", name: "Secret", provider: "google" });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  delete process.env.DEPLOYMENT_REGION;
+
+  assert.equal(payloads.length, 2);
+  assert.match(payloads[0].text, /New signup via email/);
+  assert.doesNotMatch(payloads[0].text, /secret@example.com/);
+  assert.doesNotMatch(JSON.stringify(payloads[0]), /Secret/);
+  assert.doesNotMatch(payloads[1].text, /secret@example.com/);
+});

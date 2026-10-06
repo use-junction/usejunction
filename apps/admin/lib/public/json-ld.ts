@@ -70,6 +70,7 @@ export function buildHomeJsonLd() {
       knowsAbout: [
         "AI coding spend management",
         "AI coding seat utilization",
+        "CodexBar for teams",
         "CodexBar for Windows teams",
         "Cursor usage tracking",
         "Claude Code plan usage",
@@ -164,6 +165,22 @@ export function buildContentJsonLd(page: ContentPage) {
   return graph;
 }
 
+function blogWordCount(post: BlogPost): number {
+  const inline = (parts: { text: string }[]) => parts.map((part) => part.text).join(" ");
+  const text = [
+    post.answer,
+    ...post.takeaways,
+    ...post.blocks.map((block) => {
+      if (block.type === "heading") return block.text;
+      if (block.type === "list") return block.items.map(inline).join(" ");
+      if (block.type === "image") return "";
+      return inline(block.content);
+    }),
+    ...(post.faq ?? []).flatMap((item) => [item.question, item.answer]),
+  ].join(" ");
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
 export function buildBlogPostJsonLd(post: BlogPost) {
   const url = absoluteUrl(post.path);
   const authorUrl = absoluteUrl(post.author.path);
@@ -172,13 +189,28 @@ export function buildBlogPostJsonLd(post: BlogPost) {
     {
       "@context": "https://schema.org",
       "@type": "BlogPosting",
+      "@id": `${url}#article`,
       headline: post.title,
       description: post.description,
-      image: [absoluteUrl(post.socialImage.src)],
+      abstract: post.answer,
+      image: [post.socialImage, post.heroImage].map((image) => ({
+        "@type": "ImageObject",
+        url: absoluteUrl(image.src),
+        width: image.width,
+        height: image.height,
+        caption: image.alt,
+      })),
+      thumbnailUrl: absoluteUrl(post.heroImage.src),
       datePublished: post.publishedAt,
       dateModified: post.updatedAt,
-      articleSection: "AI coding observability",
+      inLanguage: "en",
+      articleSection: post.category,
+      wordCount: blogWordCount(post),
+      timeRequired: `PT${post.readingMinutes}M`,
       keywords: [post.primaryKeyword, ...(post.secondaryKeywords ?? []), ...post.topics].join(", "),
+      about: { "@type": "Thing", name: post.primaryKeyword },
+      mentions: post.topics.map((name) => ({ "@type": "Thing", name })),
+      isPartOf: { "@type": "Blog", "@id": `${absoluteUrl("/blog")}#blog`, name: `${siteConfig.name} Blog`, url: absoluteUrl("/blog") },
       author: {
         "@type": "Person",
         name: post.author.name,

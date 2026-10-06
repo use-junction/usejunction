@@ -1,43 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChevronRight, Loader2, Plus, Users } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Empty, EmptyDescription, EmptyTitle } from "@/components/ui/empty";
-import { MobileDataCard, MobileDataField, MobileDataList } from "@/components/ui/mobile-data";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { CycleViewPicker } from "@/components/dashboard/cycle-view-picker";
-import { HubTabList } from "@/components/hub-nav";
 import { Panel } from "@/components/panel";
 import { PageHeader } from "@/components/page-header";
 import { SignalsKpi, SignalsSectionHeader } from "@/components/signals/signals-ui";
 import { cn } from "@/lib/utils";
-import { formatCompactNumber, formatMicrosAsCurrency } from "@/lib/format";
+import { formatMicrosAsCurrency } from "@/lib/format";
 import { AddSubscriptionSheet } from "./add-subscription-sheet";
+import { CostOverviewView } from "./cost-overview-view";
+import type { CostOverview } from "@/lib/queries/tools/cost-overview";
 import { ToolLogoTile } from "./tool-brand-icon";
-import { aggregateTeamQuotas, teamQuotaSummaryLabel } from "@/lib/quotas/display";
-import { canonicalToolKey, findCatalogTool, subscriptionToolKeys } from "@/lib/tools/catalog";
+import { subscriptionToolKeys } from "@/lib/tools/catalog";
 import type { DashboardToolsData } from "@/lib/queries/dashboard/tools";
-import type { CycleView, CycleViewWindows } from "@/lib/dashboard/cycle-view";
-import { DEFAULT_ROLLING_PERIOD, type RollingPeriod } from "@/lib/dashboard/period-prefs";
 
 // API Credits UI intentionally omitted; ApiCreditPool + /api/tools/api-credit-pools remain frozen.
-const toolsViews = [
-  { id: "subscriptions", label: "Subscriptions" },
-  { id: "activity", label: "Activity" },
-] as const;
-
-type ToolsView = (typeof toolsViews)[number]["id"];
 
 type CatalogTool = {
   key: string;
@@ -82,32 +62,21 @@ export function SubscriptionInventory({
   detected,
   initialCatalog,
   initialSubscriptions,
-  defaultTab = "subscriptions",
+  overview = null,
   hasLocalSync = false,
-  title = "Tools, seats, spend.",
-  description = "Manage team subscriptions and compare purchased seats with usage and quotas.",
-  cycleView = "current_cycles",
-  period = DEFAULT_ROLLING_PERIOD,
-  periodSuffix = "current",
-  periodBasePath = "/tools",
-  cycleWindows,
+  title = "What are we paying for?",
+  description = "This month's AI bill, what moves it, and what each tool costs.",
   children,
 }: {
   detected: DashboardToolsData | null;
   initialCatalog?: CatalogTool[];
   initialSubscriptions?: Subscription[];
-  defaultTab?: ToolsView;
+  overview?: CostOverview | null;
   hasLocalSync?: boolean;
   title?: string;
   description?: string;
-  cycleView?: CycleView;
-  period?: RollingPeriod;
-  periodSuffix?: string;
-  periodBasePath?: string;
-  cycleWindows?: CycleViewWindows;
   children?: ReactNode;
 }) {
-  const [view, setView] = useState<ToolsView>(defaultTab);
   const [catalog, setCatalog] = useState<CatalogTool[]>(initialCatalog ?? []);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>(initialSubscriptions ?? []);
   const [loading, setLoading] = useState(initialSubscriptions === undefined);
@@ -168,25 +137,14 @@ export function SubscriptionInventory({
 
   return (
     <>
-      <PageHeader
-        title={title}
-        description={description}
-        actions={
-          <HubTabList
-            items={[...toolsViews]}
-            value={view}
-            onChange={(id) => setView(id as ToolsView)}
-            className="border-b border-border"
-            aria-label="Tools views"
-          />
-        }
-      >
+      <PageHeader title={title} description={description}>
         {children}
       </PageHeader>
 
-      {view === "subscriptions" ? (
+      {overview ? <CostOverviewView data={overview} /> : null}
+
         <div className="space-y-10">
-          <div className="grid items-start gap-y-8 sm:grid-cols-2 xl:grid-cols-4">
+          <div className={cn("grid items-start gap-y-8 sm:grid-cols-2 xl:grid-cols-4", overview && "hidden")}>
             <SignalsKpi
               label="Active tools"
               hero
@@ -216,8 +174,8 @@ export function SubscriptionInventory({
 
           <Panel as="section">
             <SignalsSectionHeader
-              title="Company tools."
-              description="Plans your team can assign to developers."
+              title="Manage plans."
+              description="Plans and seats your team pays for. Edit a plan to enter your real price."
               bordered
               action={
                 <Button size="sm" className="rounded-none" onClick={() => openAdd()}>
@@ -316,16 +274,6 @@ export function SubscriptionInventory({
             )}
           </Panel>
         </div>
-      ) : (
-        <ActivityPanel
-          data={detected}
-          cycleView={cycleView}
-          period={period}
-          periodSuffix={periodSuffix}
-          periodBasePath={periodBasePath}
-          cycleWindows={cycleWindows}
-        />
-      )}
 
       <AddSubscriptionSheet
         open={addOpen}
@@ -334,218 +282,5 @@ export function SubscriptionInventory({
         onCreated={load}
       />
     </>
-  );
-}
-
-function TeamQuotaCell({
-  quotas,
-}: {
-  quotas: DashboardToolsData["tools"][number]["quotas"];
-}) {
-  const aggregate = aggregateTeamQuotas(quotas ?? []);
-  if (!aggregate) {
-    return <span className="text-muted-foreground">—</span>;
-  }
-  return (
-    <span
-      className="text-xs tabular-nums text-muted-foreground"
-      title="Average of each person's primary quota window. Open the tool for per-person limits."
-    >
-      {teamQuotaSummaryLabel(aggregate)}
-    </span>
-  );
-}
-
-function ActivityPanel({
-  data,
-  cycleView,
-  period,
-  periodSuffix,
-  periodBasePath,
-  cycleWindows,
-}: {
-  data: DashboardToolsData | null;
-  cycleView: CycleView;
-  period: RollingPeriod;
-  periodSuffix: string;
-  periodBasePath: string;
-  cycleWindows?: CycleViewWindows;
-}) {
-  const router = useRouter();
-  const tools = data?.tools ?? [];
-  const totals = {
-    requests: tools.reduce((sum, tool) => sum + tool.requests, 0),
-    inputTokens: tools.reduce((sum, tool) => sum + tool.inputTokens, 0),
-    outputTokens: tools.reduce((sum, tool) => sum + tool.outputTokens, 0),
-    cost: tools.reduce((sum, tool) => sum + tool.cost, 0),
-  };
-  const periodLabel = periodSuffix.charAt(0).toUpperCase() + periodSuffix.slice(1);
-
-  return (
-    <div className="space-y-10">
-      <div className="flex justify-end">
-        <CycleViewPicker
-          view={cycleView}
-          period={period}
-          basePath={periodBasePath}
-          cycleWindows={cycleWindows}
-        />
-      </div>
-
-      <div className="grid items-start gap-y-8 sm:grid-cols-2 xl:grid-cols-4">
-        <SignalsKpi
-          label="Requests"
-          hero
-          className="pl-5"
-          value={totals.requests.toLocaleString()}
-          sub={periodLabel}
-        />
-        <SignalsKpi
-          label="Input tokens"
-          className="sm:border-l sm:border-border sm:pl-8"
-          value={formatCompactNumber(totals.inputTokens)}
-          sub={periodLabel}
-        />
-        <SignalsKpi
-          label="Output tokens"
-          className="xl:border-l xl:border-border xl:pl-8"
-          value={formatCompactNumber(totals.outputTokens)}
-          sub={periodLabel}
-        />
-        <SignalsKpi
-          label="Usage cost"
-          className="sm:border-l sm:border-border sm:pl-8"
-          value={`$${totals.cost.toFixed(2)}`}
-          sub={periodLabel}
-        />
-      </div>
-
-      {!tools.length ? (
-        <Panel as="section">
-          <Empty className="min-h-0 gap-2 border-0 py-10 md:py-10">
-            <EmptyTitle className="text-base">No activity yet</EmptyTitle>
-            <EmptyDescription>
-              Requests, tokens, and usage cost appear here after developers enroll the command-line agent.
-            </EmptyDescription>
-          </Empty>
-        </Panel>
-      ) : (
-        <Panel as="section">
-          <SignalsSectionHeader
-            title="Activity."
-            description="Requests, tokens, and cost by tool. Plan use is averaged across people — open a tool for per-person windows."
-            bordered
-          />
-          <MobileDataList>
-            {tools.map((tool) => {
-              const toolKey = canonicalToolKey(tool.toolName);
-              const catalogTool = findCatalogTool(toolKey);
-              const href = catalogTool ? `/tools/${catalogTool.key}` : null;
-              const content = (
-                <>
-                  <div className="flex min-w-0 items-center gap-3">
-                    <ToolLogoTile tool={tool.toolName} size="sm" />
-                    <p className="truncate text-sm font-medium capitalize">{tool.toolName.replaceAll("-", " ")}</p>
-                  </div>
-                  <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
-                    <MobileDataField label={`Requests (${periodSuffix})`} value={tool.requests.toLocaleString()} />
-                    <MobileDataField label={`Cost (${periodSuffix})`} value={`$${tool.cost.toFixed(2)}`} />
-                    <MobileDataField label="Input" value={formatCompactNumber(tool.inputTokens)} />
-                    <MobileDataField label="Output" value={formatCompactNumber(tool.outputTokens)} />
-                    <MobileDataField className="col-span-2" label="Plan use" value={<TeamQuotaCell quotas={tool.quotas} />} />
-                  </dl>
-                </>
-              );
-
-              return (
-                <MobileDataCard key={tool.toolName}>
-                  {href ? (
-                    <Link href={href} prefetch={false} className="block min-w-0 outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      {content}
-                      <span className="mt-4 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary">
-                        Open <ChevronRight className="size-4" />
-                      </span>
-                    </Link>
-                  ) : content}
-                </MobileDataCard>
-              );
-            })}
-          </MobileDataList>
-          <Table containerClassName="hidden md:block" className="min-w-[840px] text-left text-sm">
-            <TableHeader className="text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">
-              <TableRow>
-                <TableHead className="pb-3 pr-4 pt-1 font-medium">Tool</TableHead>
-                <TableHead className="pb-3 pr-4 pt-1 text-right font-medium">Requests ({periodSuffix})</TableHead>
-                <TableHead className="pb-3 pr-4 pt-1 text-right font-medium">Input ({periodSuffix})</TableHead>
-                <TableHead className="pb-3 pr-4 pt-1 text-right font-medium">Output ({periodSuffix})</TableHead>
-                <TableHead className="pb-3 pr-4 pt-1 text-right font-medium">Cost ({periodSuffix})</TableHead>
-                <TableHead className="pb-3 pr-4 pt-1 text-right font-medium">Plan use</TableHead>
-                <TableHead className="pb-3 pt-1 text-right font-medium">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tools.map((tool) => {
-                const toolKey = canonicalToolKey(tool.toolName);
-                const catalogTool = findCatalogTool(toolKey);
-                const href = catalogTool ? `/tools/${catalogTool.key}` : null;
-
-                return (
-                  <TableRow
-                    key={tool.toolName}
-                    className={cn(
-                      "transition-colors",
-                      href &&
-                        "cursor-pointer hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/40",
-                    )}
-                    tabIndex={href ? 0 : undefined}
-                    onClick={href ? () => router.push(href) : undefined}
-                    onKeyDown={
-                      href
-                        ? (event) => {
-                            if (event.key === "Enter" || event.key === " ") {
-                              event.preventDefault();
-                              router.push(href);
-                            }
-                          }
-                        : undefined
-                    }
-                  >
-                    <TableCell className="py-5 pr-4">
-                      <div className="flex items-center gap-3">
-                        <ToolLogoTile tool={tool.toolName} size="sm" />
-                        <span className="font-medium capitalize">{tool.toolName.replaceAll("-", " ")}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-5 pr-4 text-right tabular-nums">{tool.requests.toLocaleString()}</TableCell>
-                    <TableCell className="py-5 pr-4 text-right tabular-nums">{formatCompactNumber(tool.inputTokens)}</TableCell>
-                    <TableCell className="py-5 pr-4 text-right tabular-nums">{formatCompactNumber(tool.outputTokens)}</TableCell>
-                    <TableCell className="py-5 pr-4 text-right tabular-nums">${tool.cost.toFixed(2)}</TableCell>
-                    <TableCell className="py-5 pr-4 text-right">
-                      <TeamQuotaCell quotas={tool.quotas} />
-                    </TableCell>
-                    <TableCell
-                      className="py-5 text-right"
-                      onClick={(event) => event.stopPropagation()}
-                      onKeyDown={(event) => event.stopPropagation()}
-                    >
-                      {href ? (
-                        <Button variant="outline" size="sm" className="rounded-none" asChild>
-                          <Link href={href} prefetch={false}>
-                            Open
-                            <ChevronRight />
-                          </Link>
-                        </Button>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </Panel>
-      )}
-    </div>
   );
 }

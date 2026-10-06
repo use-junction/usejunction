@@ -6,7 +6,7 @@ import { createHash } from "crypto";
 import { prisma } from "@usejunction/db";
 import { normalizeUusWireRecord, uusContentFingerprint, uusPartitionKey } from "@usejunction/usage-schema";
 import { ingestLocalUsageBatch, type LocalUsageInputRow } from "@/lib/ingest/local-usage-batch";
-import { filterGatedUsageToolNames } from "@/lib/privacy/account-collection";
+import { deviceAllowedUsageAccounts } from "@/lib/privacy/account-collection";
 import { keepUsageRow } from "@/lib/privacy/account-collection-policy";
 import { invalidateAnalyticsCache } from "@/lib/analytics/query/invalidation";
 import { markOrgUsageDaysDirty, ORG_DAY_SNAPSHOT_VERSION } from "@/lib/analytics/snapshots";
@@ -272,6 +272,7 @@ export async function startUsageSync(params: {
   let quotasWarning: string | undefined;
   let accountsReported: Array<{
     toolName: string;
+    accountKey?: string | null;
     plan: string | null;
     email: string | null;
     authPresent?: boolean;
@@ -340,6 +341,7 @@ export async function startUsageSync(params: {
         // Still surface tools for quota prune even when account hash is unchanged.
         accountsReported = items.map((item) => ({
           toolName: String(item.toolName ?? "").trim(),
+          accountKey: typeof item.accountKey === "string" ? item.accountKey.trim() : "",
           plan: typeof item.plan === "string" ? item.plan.trim() || null : null,
           email: typeof item.email === "string" ? item.email.trim() || null : null,
           authPresent: Boolean(item.authPresent),
@@ -376,11 +378,10 @@ export async function startUsageSync(params: {
         : quotasInventoryContentHash(items);
 
     try {
-      const allowedQuotaTools = await filterGatedUsageToolNames(
-        params.deviceId,
-        items.map((item) => String(item.toolName ?? "")),
+      const allowedQuotaAccounts = await deviceAllowedUsageAccounts(params.deviceId);
+      const allowedItems = items.filter((item) =>
+        keepUsageRow(String(item.toolName ?? ""), item.accountKey, allowedQuotaAccounts),
       );
-      const allowedItems = items.filter((item) => keepUsageRow(String(item.toolName ?? ""), allowedQuotaTools));
       const device = await prisma.device.findFirst({
         where: { id: params.deviceId, orgId: params.orgId },
         select: { quotasContentHash: true },
@@ -409,8 +410,14 @@ export async function startUsageSync(params: {
       if (accountsReported.length > 0 && (quotasApplied === "updated" || quotasApplied === "unchanged")) {
         await pruneQuotaToolsMissingWindows({
           deviceId: params.deviceId,
-          accountTools: accountsReported.map((row) => row.toolName),
-          quotaTools: items.map((item) => String(item.toolName ?? "").trim()).filter(Boolean),
+          accounts: accountsReported.map((row) => ({
+            toolName: row.toolName,
+            accountKey: row.accountKey,
+          })),
+          quotas: items.map((item) => ({
+            toolName: String(item.toolName ?? "").trim(),
+            accountKey: String(item.accountKey ?? "").trim(),
+          })),
         });
       }
     } catch (error) {
@@ -583,11 +590,10 @@ export async function ingestUsageSyncChunk(params: {
   }
 
   const observedAt = params.observedAt ?? new Date();
-  const allowedGatedTools = await filterGatedUsageToolNames(
-    params.deviceId,
-    params.rows.map((row) => String(row.toolName ?? "")),
+  const allowedUsageAccounts = await deviceAllowedUsageAccounts(params.deviceId);
+  const rows = params.rows.filter((row) =>
+    keepUsageRow(String(row.toolName ?? ""), typeof row.accountKey === "string" ? row.accountKey : "", allowedUsageAccounts),
   );
-  const rows = params.rows.filter((row) => keepUsageRow(String(row.toolName ?? ""), allowedGatedTools));
   const upsertStart = performance.now();
   const { upserted, changedDates } = await ingestLocalUsageBatch({
     orgId: params.orgId,
@@ -607,6 +613,7 @@ export async function ingestUsageSyncChunk(params: {
     const partitionKey = uusPartitionKey({
       date: normalized.date,
       tool: normalized.tool,
+      accountKey: normalized.accountKey,
       model: normalized.model ?? "",
       source: normalized.source,
       repository: normalized.repository,
@@ -924,16 +931,21 @@ export async function reconcileDeviceDayPartitions(params: {
   if (!orphanKeys.length) return { removed: 0 };
 
   const orphanUsageDailyOr = orphanKeys.map((key) => {
-    const [date = "", tool = "", model = "", source = "", ...repoParts] = key.split("|");
-    void source;
-    void repoParts;
+    const parts = key.split("|");
+    const scoped = parts.length >= 6;
+    const date = parts[0] ?? "";
+    const tool = parts[1] ?? "";
+    const accountKey = scoped ? (parts[2] ?? "") : "";
+    const model = scoped ? (parts[3] ?? "") : (parts[2] ?? "");
+    const contains = scoped
+      ? `:${date}:${tool}:${accountKey}:${model}:`
+      : `:${date}:${tool}:${model}:`;
     return {
       date: utcDate(date),
       toolName: tool,
+      ...(scoped ? { accountKey } : {}),
       model,
-      dedupeKey: {
-        contains: `:${date}:${tool}:${model}:`,
-      },
+      dedupeKey: { contains },
     };
   });
 

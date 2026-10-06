@@ -5,7 +5,6 @@ test("Add a team tool sheet lists OpenCode with Zen and multi-provider plans", a
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   await page.goto("/tools");
-  await page.getByRole("tab", { name: "Subscriptions" }).click();
   await page.getByRole("button", { name: /Add tool/i }).first().click();
 
   const sheet = page.getByRole("dialog");

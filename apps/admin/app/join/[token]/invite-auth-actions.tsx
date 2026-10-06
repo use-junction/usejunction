@@ -1,6 +1,7 @@
 "use client";
 
 import { OAuthProviderButtons, getEnabledOAuthProviders } from "@/components/auth/oauth-provider-buttons";
+import { RegionPicker } from "@/components/auth/region-picker";
 import { Button } from "@/components/ui/button";
 
 export function InviteAuthActions({ token }: { token: string }) {
@@ -9,6 +10,7 @@ export function InviteAuthActions({ token }: { token: string }) {
 
   return (
     <div className="space-y-4">
+      <RegionPicker />
       <OAuthProviderButtons callbackUrl={callbackUrl} showEmailDivider={hasOAuth} emailDividerLabel="or use email" />
       <div className="space-y-3">
         <Button asChild className="w-full text-white">

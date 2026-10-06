@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
             contentHash: quotas.contentHash,
             items: (quotas.items ?? []).map((item) => ({
               toolName: String(item.toolName ?? ""),
+              accountKey: typeof item.accountKey === "string" ? item.accountKey : "",
               windowType: String(item.windowType ?? ""),
               usedPercent: typeof item.usedPercent === "number" ? item.usedPercent : null,
               resetAt: typeof item.resetAt === "string" ? item.resetAt : null,

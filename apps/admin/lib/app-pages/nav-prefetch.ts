@@ -3,7 +3,8 @@ import { appFetch } from "@/lib/api/client";
 import {
   activityKey,
   dashboardShellKey,
-  signalsOverviewKey,
+  workSpendKey,
+  myDataKey,
   teamKey,
   toolsKey,
 } from "@/lib/app-pages/query-keys";
@@ -17,7 +18,8 @@ const NAV_PREFETCH_TARGETS: Record<string, { queryKey: readonly unknown[]; url: 
   "/team": { queryKey: teamKey(), url: "/api/app/team" },
   "/tools": { queryKey: toolsKey(), url: "/api/app/tools" },
   "/activity": { queryKey: activityKey(), url: "/api/app/activity" },
-  "/signals": { queryKey: signalsOverviewKey(), url: "/api/app/signals/overview" },
+  "/work-spend": { queryKey: workSpendKey(), url: "/api/app/work-spend" },
+  "/me/data": { queryKey: myDataKey, url: "/api/app/me/data" },
 };
 
 const NAV_PREFETCH_STALE_TIME = 5 * 60 * 1000;

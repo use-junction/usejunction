@@ -43,7 +43,7 @@ It does **not** prove UI chrome, Playwright-only navigation, or gateway ingest p
 | **Org** | `e2e-calculation-fixture` (“Calculation E2E”) |
 | **Seed** | `apps/admin/e2e/seed.ts` |
 | **asOf** | Pinned `2026-07-16T12:00:00.000Z` |
-| **DB** | Usually root `.env` → `localhost:5432` (Docker Postgres) |
+| **DB** | Usually root `.env` → `localhost:5432` |
 | **Script** | `apps/admin/scripts/verify-calculation-run.ts` (CLI) / `apps/admin/scripts/lib/run-calculation-verification.ts` (library) |
 | **Purpose** | CI-friendly correctness; fixed expected dollars/calls |
 
@@ -75,7 +75,7 @@ Fixed expectations (current cycles, Cursor tool line):
 | **Script** | `apps/admin/scripts/verify-local-data-run.ts` |
 | **Purpose** | Catch env-specific drift; reconcile device cache vs control plane |
 
-Important: root `.env` (Docker `:5433`) and `apps/admin/.env` (local `:5432`) can point at **different databases**. Local verification must use the admin env that the running app and agent actually use.
+Important: root `.env` and `apps/admin/.env` can point at **different databases**. Local verification must use the admin env that the running app and agent actually use.
 
 ## Surfaces and views
 
@@ -148,8 +148,8 @@ The verifier mirrors `apps/admin/lib/analytics/query/sql.ts` (see also [usage-ac
 ### Golden fixture
 
 ```sh
-# DB on :5433 (root .env), schema current
-pnpm db:push
+# DB on :5432 (root .env), schema current
+pnpm --filter @usejunction/db exec prisma migrate deploy
 pnpm --filter @usejunction/admin e2e:seed
 
 cd apps/admin
@@ -250,7 +250,7 @@ Current-cycle commitment on that run: **$80** (Cursor Pro+ $60 + Codex Plus $20)
 | Tool page ≠ org cursor | Alias / tool-name filter |
 | Member ≠ org | Orphan rows without `developerId`; multi-member split |
 | Cache ≠ member verified | Stale agent upload; wrong `orgId`/`userId` in config |
-| Empty / only e2e org on “local” run | Wrong `DATABASE_URL` (Docker :5433 vs app :5432) |
+| Empty / only e2e org on “local” run | Wrong `DATABASE_URL` (root `.env` vs `apps/admin/.env`) |
 | Roster count off | Soft-removed developers (`removed_at`) |
 
 ## Artifacts

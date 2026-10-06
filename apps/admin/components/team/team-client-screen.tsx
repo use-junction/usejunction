@@ -112,15 +112,7 @@ export default function TeamClientScreen() {
 
   return (
     <>
-      <PageHeader
-        title="Team"
-        description={
-          empty
-            ? "Share an invite link (or email it). Teammates open it, sign up or sign in, and install the agent."
-            : "Manage workspace members, plans, devices, and usage."
-        }
-        actions={<InvitePeopleDialog />}
-      >
+      <PageHeader title="Who's here?" actions={<InvitePeopleDialog />}>
         <HubTabList
           items={teamViews}
           value={view}

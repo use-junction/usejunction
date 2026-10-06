@@ -61,6 +61,19 @@ test("production env guard accepts complete Lemon billing configuration", () => 
   );
 });
 
+test("production env guard rejects a US PostHog host on an EU deployment", () => {
+  assert.throws(
+    () =>
+      assertSecureProductionEnv({
+        ...secureProductionEnv,
+        DEPLOYMENT_REGION: "eu",
+        NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: "phc_test",
+        NEXT_PUBLIC_POSTHOG_HOST: "https://us.i.posthog.com",
+      }),
+    /EU PostHog host/,
+  );
+});
+
 test("remote HTTP URLs are rejected while loopback HTTP is allowed", () => {
   assert.equal(validateHttpsUnlessLoopback("APP", "http://127.0.0.1:3001"), null);
   assert.equal(validateHttpsUnlessLoopback("APP", "https://app.example.com"), null);

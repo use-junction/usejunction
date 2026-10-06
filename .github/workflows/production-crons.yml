@@ -1,7 +1,8 @@
 # Hobby Vercel only allows once-per-day native crons. Hourly report fan-out is
 # triggered here. Secrets live on the agent-production environment (not repo secrets):
-#   CRON_SECRET        — same value as Vercel Production
-#   CONTROL_PLANE_URL  — e.g. https://usejunction.dev (already used by agent releases)
+#   CRON_SECRET            — same value as Vercel Production
+#   CONTROL_PLANE_URL      — e.g. https://usejunction.dev
+#   CONTROL_PLANE_URL_EU   — e.g. https://eu.usejunction.dev (optional until EU is live)
 name: Production crons
 
 on:
@@ -13,31 +14,45 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: production-crons-daily-report-send
-  cancel-in-progress: false
-
 jobs:
   daily-report-send:
-    name: Daily report send
+    name: Daily report send (${{ matrix.region }})
     runs-on: ubuntu-latest
     environment: agent-production
-    # PDF generation can approach the route maxDuration (300s)
     timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        region: [us, eu]
+    concurrency:
+      group: production-crons-daily-report-send-${{ matrix.region }}
+      cancel-in-progress: false
     steps:
       - name: Require environment secrets
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          CONTROL_PLANE_URL: ${{ secrets.CONTROL_PLANE_URL }}
+          CONTROL_PLANE_URL: ${{ matrix.region == 'eu' && secrets.CONTROL_PLANE_URL_EU || secrets.CONTROL_PLANE_URL }}
+          REGION: ${{ matrix.region }}
         run: |
-          if [ -z "$CRON_SECRET" ] || [ -z "$CONTROL_PLANE_URL" ]; then
-            echo "::error::Set agent-production environment secrets CRON_SECRET and CONTROL_PLANE_URL (Settings → Environments → agent-production)"
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Set agent-production environment secret CRON_SECRET"
             exit 1
           fi
+          if [ -z "$CONTROL_PLANE_URL" ]; then
+            if [ "$REGION" = "eu" ]; then
+              echo "::notice::CONTROL_PLANE_URL_EU is not set; skipping EU cron"
+              echo "skip=true" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "::error::Set agent-production environment secret CONTROL_PLANE_URL"
+            exit 1
+          fi
+          echo "skip=false" >> "$GITHUB_ENV"
+          echo "CONTROL_PLANE_URL=$CONTROL_PLANE_URL" >> "$GITHUB_ENV"
       - name: POST /api/cron/daily-report-send
+        if: env.skip != 'true'
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          CONTROL_PLANE_URL: ${{ secrets.CONTROL_PLANE_URL }}
         run: |
           set -euo pipefail
           base="${CONTROL_PLANE_URL%/}"

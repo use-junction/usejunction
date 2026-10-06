@@ -6,13 +6,19 @@ const link = (value: string, href: string, strong = false) => ({ text: value, hr
 
 const images = {
   hero: {
+    src: "/blog/ai-coding-observability-vs-jellyfish-dx-linearb/cover.webp",
+    alt: "Four searches mapped to four tools: PR delays to LinearB, developer attrition to DX, R&D allocation to Jellyfish, and AI coding spend to UseJunction",
+    width: 1200,
+    height: 630,
+  },
+  visibility: {
     src: "/blog/what-is-ai-coding-observability/cross-tool-visibility.webp",
     alt: "Cross-tool AI coding visibility for seat utilization, cost, and plan usage across Cursor, Claude Code, and Copilot",
     width: 1024,
     height: 559,
   },
   social: {
-    src: "/blog/what-is-ai-coding-observability/social-card.png",
+    src: "/blog/ai-coding-observability-vs-jellyfish-dx-linearb/social.png",
     alt: "Cursor seat waste and AI coding observability — UseJunction vs Jellyfish, DX, and LinearB",
     width: 1200,
     height: 630,
@@ -21,12 +27,20 @@ const images = {
 
 export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
   slug: "ai-coding-observability-vs-jellyfish-dx-linearb",
+  category: "AI Spend",
   path: "/blog/ai-coding-observability-vs-jellyfish-dx-linearb",
   title: "Cursor Seat Waste & AI Coding Observability: UseJunction vs Jellyfish, DX, and LinearB",
   description:
     "See Cursor, Claude, and Copilot plan usage across your team. Learn which tool answers your search — seat waste, delivery bottlenecks, DevEx, or eng-finance reporting.",
   answer:
     "If you need org-wide visibility into Cursor, Claude Code, Copilot, and other AI coding tools — cost, seat utilization, quota pressure, and device health in one place — UseJunction is built for that job. Jellyfish, DX, and LinearB solve different problems: finance reporting, developer experience, and delivery bottlenecks. They will not answer “are we wasting Cursor Pro seats?” or “what is our AI coding stack costing per developer?”",
+  takeaways: [
+    "Jellyfish, DX, LinearB, and UseJunction answer different searches. Pick the one that matches the pain.",
+    "LinearB is for delivery bottlenecks, DX is for developer experience, and Jellyfish is for engineering-finance alignment.",
+    "None of those three reconciles Cursor, Claude Code, and Copilot seats against real usage.",
+    "UseJunction compares purchased seats and plan cycles to verified usage on enrolled devices, across vendors.",
+    "Run the check before renewal: list every tool, compare seats to usage, and confirm enrollment coverage.",
+  ],
   primaryKeyword: "Cursor seat utilization",
   secondaryKeywords: [
     "how to see Cursor plan usage for my team",
@@ -84,7 +98,7 @@ export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
     {
       question: "Can I self-host UseJunction?",
       answer:
-        "Yes. UseJunction runs under the UseJunction Community License with Docker Compose. Data stays on infrastructure you control.",
+        "Yes. UseJunction runs under the UseJunction Community License. Data stays on infrastructure you control.",
     },
     {
       question: "How is UseJunction different from Helicone or Langfuse?",
@@ -93,7 +107,6 @@ export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
     },
   ],
   blocks: [
-    { type: "image", image: images.hero },
     {
       type: "paragraph",
       content: [
@@ -116,7 +129,7 @@ export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
         text(" were not built to own."),
       ],
     },
-    { type: "heading", text: "The problem: AI coding spend is opaque" },
+    { type: "heading", text: "Why is AI coding spend so hard to see?" },
     {
       type: "paragraph",
       content: [
@@ -157,7 +170,8 @@ export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
         text("."),
       ],
     },
-    { type: "heading", text: "What UseJunction solves (five searches, one product)" },
+    { type: "heading", text: "What does UseJunction solve?" },
+    { type: "image", image: images.visibility },
     {
       type: "list",
       items: [
@@ -186,7 +200,7 @@ export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
         ],
       ],
     },
-    { type: "heading", text: "Where Jellyfish, DX, and LinearB fit — and why they’re the wrong first call" },
+    { type: "heading", text: "Where do Jellyfish, DX, and LinearB fit?" },
     {
       type: "paragraph",
       content: [
@@ -242,7 +256,7 @@ export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
         text(" — including when to stack tools."),
       ],
     },
-    { type: "heading", text: "LinearB: delivery and PR bottlenecks" },
+    { type: "heading", text: "When should you use LinearB?" },
     {
       type: "paragraph",
       content: [
@@ -251,7 +265,7 @@ export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
         text(": cycle time by stage, DORA metrics, gitStream automation. It does not reconcile Cursor seat waste or Claude Max quotas across your org."),
       ],
     },
-    { type: "heading", text: "DX: developer experience and retention" },
+    { type: "heading", text: "When should you use DX?" },
     {
       type: "paragraph",
       content: [
@@ -260,7 +274,7 @@ export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
         text(": structured surveys, DXI, friction before attrition. It does not give finance a per-developer AI coding cost ledger."),
       ],
     },
-    { type: "heading", text: "Jellyfish: engineering ↔ business alignment" },
+    { type: "heading", text: "When should you use Jellyfish?" },
     {
       type: "paragraph",
       content: [
@@ -269,7 +283,7 @@ export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
         text(" need allocation, investment narratives, and R&D capitalization. It is not a multi-vendor AI coding fleet monitor."),
       ],
     },
-    { type: "heading", text: "UseJunction: AI coding observability" },
+    { type: "heading", text: "When should you use UseJunction?" },
     {
       type: "paragraph",
       content: [
@@ -278,7 +292,7 @@ export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
         text(" are the fire. A local agent on each laptop reports usage signals. An admin control plane rolls up cost, plan cycles, seat waste, and device health. Self-host under the Community License."),
       ],
     },
-    { type: "heading", text: "UseJunction vs native vendor dashboards" },
+    { type: "heading", text: "How does UseJunction compare to vendor dashboards?" },
     {
       type: "list",
       items: [
@@ -289,11 +303,11 @@ export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
         [text("Keystroke / hours tracking: ", true), text("no — by design in UseJunction")],
       ],
     },
-    { type: "heading", text: "How UseJunction works" },
+    { type: "heading", text: "How does UseJunction work?" },
     {
       type: "list",
       items: [
-        [text("Deploy ", true), text("the admin control plane (hosted or self-hosted via Docker).")],
+        [text("Deploy ", true), text("the admin control plane (hosted or self-hosted).")],
         [text("Enroll ", true), text("developer devices with a lightweight local agent.")],
         [text("See ", true), text("org-wide usage: tools, models, cost, plan cycles, device health.")],
         [text("Act ", true), text("before renewal: reclaim idle seats, fix key provisioning, investigate quota spikes.")],
@@ -305,7 +319,7 @@ export const AI_CODING_OBSERVABILITY_VS_EI_POST: BlogPost = {
         text("Privacy first: no keystroke surveillance, browser capture, or network interception. Optional work-detail signals can be turned off per person or team."),
       ],
     },
-    { type: "heading", text: "What to do before your next renewal" },
+    { type: "heading", text: "What should you do before your next renewal?" },
     {
       type: "list",
       items: [

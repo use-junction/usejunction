@@ -154,6 +154,14 @@ type HeartbeatResponse struct {
 	// cron. Agents run one full local usage rescan when this exceeds their
 	// persisted lastFullUsageRescanDay.
 	FullUsageRescanDay string `json:"fullUsageRescanDay,omitempty"`
+	// PendingRemoteSync is set when the control plane has a queued remote usage
+	// sync for this device (Features GitHub author wake, dashboard sync, or
+	// stale auto-recovery). The daemon claims immediately and on a short poll.
+	PendingRemoteSync bool `json:"pendingRemoteSync,omitempty"`
+	// FeaturesAuthorSync is set when Features is connected to GitHub and this
+	// device belongs to a mapped GitHub author. The daemon polls for remote
+	// usage syncs between heartbeats so Ably is not required.
+	FeaturesAuthorSync bool `json:"featuresAuthorSync,omitempty"`
 }
 
 type AblyTokenRequest struct {
@@ -249,6 +257,7 @@ type AccountReport struct {
 
 type QuotaReport struct {
 	ToolName         string   `json:"toolName"`
+	AccountKey       string   `json:"accountKey,omitempty"`
 	WindowType       string   `json:"windowType"`
 	UsedPercent      *float64 `json:"usedPercent,omitempty"`
 	ResetAt          *string  `json:"resetAt,omitempty"`
@@ -259,6 +268,7 @@ type QuotaReport struct {
 type UsageAggregate struct {
 	Date               string            `json:"date"`
 	ToolName           string            `json:"toolName"`
+	AccountKey         string            `json:"accountKey,omitempty"`
 	Model              string            `json:"model"`
 	InputTokens        int               `json:"inputTokens"`
 	OutputTokens       int               `json:"outputTokens"`
@@ -486,6 +496,7 @@ type WorkTraceFileChange struct {
 type WorkSession struct {
 	LocalID        string            `json:"localId"`
 	ToolName       string            `json:"toolName"`
+	AccountKey     string            `json:"accountKey,omitempty"`
 	Model          string            `json:"model,omitempty"`
 	Mode           string            `json:"mode,omitempty"`
 	Title          string            `json:"title,omitempty"`
@@ -785,13 +796,14 @@ func (c *APIClient) ReportWorkSessions(sessions []WorkSession) error {
 // --- Enrollment (no Bearer token needed) ------------------------------------
 
 type EnrollRequest struct {
-	Token        string `json:"token"`
-	Email        string `json:"email,omitempty"`
-	Name         string `json:"name,omitempty"`
-	Hostname     string `json:"hostname"`
-	OS           string `json:"os"`
-	Architecture string `json:"architecture"`
-	AgentVersion string `json:"agentVersion"`
+	Token         string `json:"token"`
+	Email         string `json:"email,omitempty"`
+	Name          string `json:"name,omitempty"`
+	Hostname      string `json:"hostname"`
+	OS            string `json:"os"`
+	Architecture  string `json:"architecture"`
+	AgentVersion  string `json:"agentVersion"`
+	NoticeVersion string `json:"noticeVersion,omitempty"`
 }
 
 type EnrollResponse struct {

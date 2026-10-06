@@ -57,7 +57,14 @@ func (p *ClaudeProvider) ProbeQuota(ctx context.Context) ([]types.QuotaSnapshot,
 	return quotas, err
 }
 
+func (p *ClaudeProvider) OtherAccounts(ctx context.Context) []types.ToolAccount {
+	return probe.ClaudeOtherAccounts()
+}
+
 func (p *ClaudeProvider) ScanLocalUsage(ctx context.Context, refresh bool) ([]types.DailyUsage, error) {
+	// Desktop-launched sessions name their login; everything else falls back
+	// to the active one.
+	scan.SetSessionAccounts(p.ID(), probe.ClaudeSessionAccountKeys())
 	home, _ := os.UserHomeDir()
 	roots := []string{
 		filepath.Join(claudeConfigDir(), "projects"),

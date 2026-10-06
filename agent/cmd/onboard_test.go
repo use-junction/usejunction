@@ -6,7 +6,7 @@ func TestHumanizeCollectProgress(t *testing.T) {
 	if got := humanizeCollectProgress("scan", "Scanning cursor"); got != "" {
 		t.Fatalf("expected scan messages suppressed for panel UI, got %q", got)
 	}
-	if got := humanizeCollectProgress("heartbeat", ""); got != "Registering local agent" {
+	if got := humanizeCollectProgress("heartbeat", ""); got != "Connecting to UseJunction" {
 		t.Fatalf("expected heartbeat fallback, got %q", got)
 	}
 	if got := humanizeCollectProgress("upload-usage", "  Syncing usage (934 rows)  "); got != "Syncing usage (934 rows)" {

@@ -11,6 +11,7 @@ export { loadSignalsActivityPage } from "./signals-activity";
 export { loadSignalsSettingsPage } from "./signals-settings";
 export { loadSignalsWorkDetailPage } from "./signals-work-detail";
 export { loadSettingsPage, loadNotificationPreferences, loadOrgSettingsPage } from "./settings";
+export { loadFeaturesPage } from "./features";
 export { principalFromWorkspace } from "./principal";
 export { makeServerQueryClient } from "./server-query-client";
 export { flattenSearchParams, searchParamsToQueryString } from "./search-params";

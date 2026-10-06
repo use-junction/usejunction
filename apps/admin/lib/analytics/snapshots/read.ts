@@ -33,6 +33,7 @@ export type SnapshotDayTotals = {
 
 export type SnapshotToolTotals = {
   toolName: string;
+  accountKey?: string;
   requests: number;
   tokens: number;
   cost: number;
@@ -49,6 +50,7 @@ export type SnapshotToolTotals = {
 export type SnapshotToolDay = {
   date: string;
   toolName: string;
+  accountKey?: string;
   requests: number;
   verifiedUsageCost: number;
   estimatedApiCost: number;
@@ -56,6 +58,7 @@ export type SnapshotToolDay = {
 
 export type SnapshotModelTotals = {
   toolName: string;
+  accountKey?: string;
   modelName: string;
   developerId: string;
   requests: number;
@@ -96,6 +99,7 @@ function parseIds(value: unknown): string[] {
 type SnapshotRow = {
   date: Date;
   toolName: string;
+  accountKey: string;
   developerId: string;
   modelName: string;
   requests: number;
@@ -242,9 +246,10 @@ function foldSnapshotRows(
     if (row.modelName !== "") {
       if (options.toolNames?.length && !options.toolNames.includes(row.toolName)) continue;
       if (options.includeModels) {
-        const key = `${row.developerId}|${row.toolName}|${row.modelName}`;
+        const key = `${row.developerId}|${row.toolName}|${row.accountKey}|${row.modelName}`;
         const existing = modelAcc.get(key) ?? {
           toolName: row.toolName,
+          accountKey: row.accountKey,
           modelName: row.modelName,
           developerId: row.developerId,
           requests: 0,
@@ -316,14 +321,17 @@ function foldSnapshotRows(
     toolDays.push({
       date,
       toolName: row.toolName,
+      accountKey: row.accountKey,
       requests: row.requests,
       verifiedUsageCost: verified,
       estimatedApiCost: estimated,
     });
 
     if (options.includeTools) {
-      const existing = toolAcc.get(row.toolName) ?? {
+      const toolKey = `${row.toolName}|${row.accountKey}`;
+      const existing = toolAcc.get(toolKey) ?? {
         toolName: row.toolName,
+        accountKey: row.accountKey,
         requests: 0,
         tokens: 0,
         cost: 0,
@@ -349,7 +357,7 @@ function foldSnapshotRows(
       existing.actualSpendCost += actual;
       existing.cost += verified + estimated;
       existing.activeDevelopers = Math.max(existing.activeDevelopers, row.activeDevelopers);
-      toolAcc.set(row.toolName, existing);
+      toolAcc.set(toolKey, existing);
     }
   }
 
@@ -358,12 +366,13 @@ function foldSnapshotRows(
     for (const row of rows) {
       if (row.toolName === "" || row.modelName !== "") continue;
       if (options.toolNames?.length && !options.toolNames.includes(row.toolName)) continue;
-      const set = toolDevIds.get(row.toolName) ?? new Set<string>();
+      const toolKey = `${row.toolName}|${row.accountKey}`;
+      const set = toolDevIds.get(toolKey) ?? new Set<string>();
       for (const id of parseIds(row.activeDeveloperIds)) set.add(id);
-      toolDevIds.set(row.toolName, set);
+      toolDevIds.set(toolKey, set);
     }
-    for (const [toolName, ids] of toolDevIds) {
-      const tool = toolAcc.get(toolName);
+    for (const [toolKey, ids] of toolDevIds) {
+      const tool = toolAcc.get(toolKey);
       if (tool && ids.size > 0) tool.activeDevelopers = ids.size;
     }
   }

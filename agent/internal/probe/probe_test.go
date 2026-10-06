@@ -481,6 +481,12 @@ func TestClaudePlanFromOAuthAccount(t *testing.T) {
 	if got := claudePlanFromOAuthAccount(claudeJSONOAuthAccount{SeatTier: "team_premium"}); got != "team-premium" {
 		t.Fatalf("seatTier team_premium = %q", got)
 	}
+	if got := claudePlanFromOAuthAccount(claudeJSONOAuthAccount{OrganizationType: "claude_pro", BillingType: "stripe_subscription"}); got != "pro" {
+		t.Fatalf("claude_pro org = %q, want pro", got)
+	}
+	if got := claudePlanFromOAuthAccount(claudeJSONOAuthAccount{OrganizationType: "claude_max"}); got != "max" {
+		t.Fatalf("claude_max org = %q, want max", got)
+	}
 	if got := claudePlanFromOAuthAccount(claudeJSONOAuthAccount{BillingType: "stripe_subscription"}); got != "" {
 		t.Fatalf("consumer stripe = %q", got)
 	}

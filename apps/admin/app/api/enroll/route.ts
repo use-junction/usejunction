@@ -8,6 +8,7 @@ import { getPublicAppUrl } from "@/lib/public-url";
 import { hashOpaqueToken } from "@/lib/security";
 import { limitedJson } from "@/lib/security/http";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
+import { COLLECTION_NOTICE_VERSION } from "@/lib/legal/versions";
 import { logServerError } from "@/lib/errors/public";
 
 async function consumeEnrollmentToken(tx: Prisma.TransactionClient, enrollmentId: string) {
@@ -26,7 +27,9 @@ export async function POST(req: NextRequest) {
     if (!parsedBody.ok) return parsedBody.response;
     const body = parsedBody.data as Record<string, unknown>;
     const { hostname, os, architecture, agentVersion } = body;
-    const token = String(body.token ?? "");
+    const token = String(body.token ?? "").trim();
+    const noticeVersion = String(body.noticeVersion ?? "").trim();
+    const noticedAt = noticeVersion === COLLECTION_NOTICE_VERSION ? new Date() : null;
 
     if (!token) {
       return NextResponse.json({ error: "token required" }, { status: 400 });
@@ -100,6 +103,8 @@ export async function POST(req: NextRequest) {
               agentVersion: normalizeAgentVersion(agentVersion, repairTarget.agentVersion),
               deviceToken: `rotated:repair:${randomUUID()}`,
               deviceTokenHash,
+              collectionNoticeAckAt: noticedAt ?? undefined,
+              collectionNoticeVersion: noticedAt ? noticeVersion : undefined,
               localEndpoint: null,
               localSyncTokenHash: null,
               localSyncTokenEnc: null,
@@ -118,6 +123,8 @@ export async function POST(req: NextRequest) {
             agentVersion: normalizeAgentVersion(agentVersion, "0.1.0"),
             deviceToken: `rotated:new:${randomUUID()}`,
             deviceTokenHash,
+            collectionNoticeAckAt: noticedAt,
+            collectionNoticeVersion: noticedAt ? noticeVersion : null,
           },
         });
       });

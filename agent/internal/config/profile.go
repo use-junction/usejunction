@@ -136,17 +136,36 @@ func (s AgentServiceIdentity) LaunchdPlistPath(home string) string {
 	return filepath.Join(home, "Library", "LaunchAgents", s.LaunchdPlist)
 }
 
-// AppBundlePath returns the macOS app bundle path under configDir.
-func (s AgentServiceIdentity) AppBundlePath(configDir string) string {
-	return filepath.Join(configDir, s.AppName+".app")
+// AppBundlePath returns the visible macOS app bundle (not under the hidden
+// config dir). USEJUNCTION_HOME only relocates data, not the .app.
+func (s AgentServiceIdentity) AppBundlePath() string {
+	return filepath.Join(userApplicationsDir(), s.AppName+".app")
 }
 
 // DaemonBinaryPath returns the macOS daemon executable inside the app bundle.
-func (s AgentServiceIdentity) DaemonBinaryPath(configDir string) string {
-	return filepath.Join(s.AppBundlePath(configDir), "Contents", "MacOS", "usejunction")
+func (s AgentServiceIdentity) DaemonBinaryPath() string {
+	return filepath.Join(s.AppBundlePath(), "Contents", "MacOS", "usejunction")
 }
 
-// PreviousAppBundlePath returns the rollback app bundle path.
-func (s AgentServiceIdentity) PreviousAppBundlePath(configDir string) string {
-	return filepath.Join(configDir, s.AppName+".previous.app")
+// PreviousAppBundlePath returns the rollback app bundle path beside the visible app.
+func (s AgentServiceIdentity) PreviousAppBundlePath() string {
+	return filepath.Join(userApplicationsDir(), s.AppName+".previous.app")
+}
+
+// LegacyAppBundlePath returns the pre-unhide bundle location under the data home.
+func (s AgentServiceIdentity) LegacyAppBundlePath(configDir string) string {
+	return filepath.Join(configDir, s.AppName+".app")
+}
+
+// CLISymlinkPath returns the PATH shim under the data home.
+func (s AgentServiceIdentity) CLISymlinkPath(configDir string) string {
+	return filepath.Join(configDir, "bin", s.CLIName)
+}
+
+func userApplicationsDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "Applications"
+	}
+	return filepath.Join(home, "Applications")
 }

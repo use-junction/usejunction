@@ -94,6 +94,7 @@ type RangeAggregateRow = {
   toolName: string;
   developerId: string;
   modelName: string;
+  accountKey: string;
   isDayTotal: number;
   isDeveloperGrain: number;
   isModelGrain: number;
@@ -264,10 +265,10 @@ async function materializeOrgUsageRangeUnlocked(
           WHERE effective_metric_kind <> 'productivity'
             AND (requests > 0 OR sessions > 0 OR input_tokens > 0 OR output_tokens > 0 OR active_seconds > 0)
         ) OVER (
-          PARTITION BY date, developer_id, provider, product, tool_name, model
+          PARTITION BY date, developer_id, provider, product, tool_name, model, COALESCE(account_key, '')
         ) AS best_activity_priority,
         MIN(cost_priority) FILTER (WHERE cost_micros > 0) OVER (
-          PARTITION BY date, provider, tool_name, model
+          PARTITION BY date, provider, tool_name, model, COALESCE(account_key, '')
         ) AS best_cost_priority
       FROM classified
     ), canonical AS (
@@ -288,6 +289,7 @@ async function materializeOrgUsageRangeUnlocked(
         CASE WHEN GROUPING(COALESCE(tool_name, '')) = 1 THEN '' ELSE COALESCE(tool_name, '') END AS tool_name_value,
         CASE WHEN GROUPING(COALESCE(developer_id, '')) = 1 THEN '' ELSE COALESCE(developer_id, '') END AS developer_id_value,
         CASE WHEN GROUPING(COALESCE(model, '')) = 1 THEN '' ELSE COALESCE(model, '') END AS model_name_value,
+        CASE WHEN GROUPING(COALESCE(account_key, '')) = 1 THEN '' ELSE COALESCE(account_key, '') END AS account_key_value,
         GROUPING(COALESCE(tool_name, '')) AS is_day_total,
         CASE WHEN GROUPING(COALESCE(developer_id, '')) = 0 THEN 1 ELSE 0 END AS is_developer_grain,
         CASE WHEN GROUPING(COALESCE(model, '')) = 0 THEN 1 ELSE 0 END AS is_model_grain,
@@ -352,11 +354,11 @@ async function materializeOrgUsageRangeUnlocked(
       FROM selected
       GROUP BY GROUPING SETS (
         (date),
-        (date, COALESCE(tool_name, '')),
+        (date, COALESCE(tool_name, ''), COALESCE(account_key, '')),
         (date, COALESCE(developer_id, '')),
-        (date, COALESCE(developer_id, ''), COALESCE(tool_name, '')),
-        (date, COALESCE(tool_name, ''), COALESCE(model, '')),
-        (date, COALESCE(developer_id, ''), COALESCE(tool_name, ''), COALESCE(model, ''))
+        (date, COALESCE(developer_id, ''), COALESCE(tool_name, ''), COALESCE(account_key, '')),
+        (date, COALESCE(tool_name, ''), COALESCE(model, ''), COALESCE(account_key, '')),
+        (date, COALESCE(developer_id, ''), COALESCE(tool_name, ''), COALESCE(model, ''), COALESCE(account_key, ''))
       )
     )
     SELECT
@@ -364,6 +366,7 @@ async function materializeOrgUsageRangeUnlocked(
       tool_name_value AS "toolName",
       developer_id_value AS "developerId",
       model_name_value AS "modelName",
+      account_key_value AS "accountKey",
       is_day_total AS "isDayTotal",
       is_developer_grain AS "isDeveloperGrain",
       is_model_grain AS "isModelGrain",
@@ -394,6 +397,7 @@ async function materializeOrgUsageRangeUnlocked(
     toolName: string;
     developerId: string;
     modelName: string;
+    accountKey: string;
     metricVersion: string;
     requests: number;
     sessions: number;
@@ -443,6 +447,7 @@ async function materializeOrgUsageRangeUnlocked(
     const toolName = isDayTotal ? "" : (row.toolName ?? "");
     const developerId = row.developerId ?? "";
     const modelName = isModelGrain ? (row.modelName ?? "") : "";
+    const accountKey = toolName === "" ? "" : (row.accountKey ?? "");
     // Model grains require a tool name; day-total rows keep model empty.
     if (isModelGrain && toolName === "") continue;
     // Empty model from the model grouping set duplicates the tool rollup — skip.
@@ -461,6 +466,7 @@ async function materializeOrgUsageRangeUnlocked(
       toolName,
       developerId: isDeveloperGrain ? developerId : "",
       modelName,
+      accountKey,
       metricVersion,
       requests: Number(row.requests),
       sessions: Number(row.sessions),
@@ -493,6 +499,7 @@ async function materializeOrgUsageRangeUnlocked(
       toolName: "",
       developerId: "",
       modelName: "",
+      accountKey: "",
       metricVersion,
       requests: 0,
       sessions: 0,
@@ -519,7 +526,7 @@ async function materializeOrgUsageRangeUnlocked(
   // Dedupe by unique key in case GROUPING SETS emit overlapping empty grains.
   const deduped = new Map<string, (typeof writeRows)[number]>();
   for (const row of writeRows) {
-    const key = `${isoDay(row.date)}|${row.toolName}|${row.developerId}|${row.modelName}`;
+    const key = `${isoDay(row.date)}|${row.toolName}|${row.developerId}|${row.modelName}|${row.accountKey}`;
     deduped.set(key, row);
   }
   const finalRows = [...deduped.values()];
@@ -849,6 +856,7 @@ export async function ensureOrgUsageDaySnapshots(
               toolName: "",
               developerId: "",
               modelName: "",
+              accountKey: "",
               metricVersion,
               requests: 0,
               sessions: 0,

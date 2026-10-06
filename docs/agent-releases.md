@@ -4,7 +4,7 @@ This document is the canonical guide for how UseJunction ships agent updates, ho
 
 For hosting the control plane on Vercel (env vars, DB migrations, crons), see [production-deployment.md](./production-deployment.md).
 
-The key design goal is that release creation and release activation are separate events.
+The key design goal is that release creation and release- activation are separate events.
 
 - Tagging creates an immutable candidate.
 - Promotion activates a candidate into the fleet.
@@ -581,10 +581,10 @@ There are two different local loops. Do not confuse them.
 
 ### Two agents on one machine
 
-| Profile | Home | CLI | Service |
-|---------|------|-----|---------|
-| `default` | `~/.usejunction` | `usejunction` | `com.usejunction.agent` |
-| `test` | `~/.usejunction-test` | `usejunction-test` | `com.usejunction.agent.test` |
+| Profile | Home | macOS app | CLI | Service |
+|---------|------|-----------|-----|---------|
+| `default` | `~/.usejunction` | `~/Applications/UseJunction.app` | `usejunction` | `com.usejunction.agent` |
+| `test` | `~/.usejunction-test` | `~/Applications/UseJunctionTest.app` | `usejunction-test` | `com.usejunction.agent.test` |
 
 Loopback installs (`http://localhost:3001`) auto-select the **test** profile so local dev never overwrites production enrollment. Both agents can run concurrently (separate config, launchd job, and local-sync port `47833` for test).
 
@@ -612,7 +612,7 @@ pnpm dev:agent
 Hot reload:
 
 - builds from this checkout with a `0.0.0-dev.<sha>.<unix>` version stamp
-- packages/swaps into `~/.usejunction-test` and restarts launchd/systemd (`com.usejunction.agent.test`)
+- packages/swaps the Darwin app into `~/Applications/UseJunctionTest.app` (data stays in `~/.usejunction-test`) and restarts launchd/systemd (`com.usejunction.agent.test`)
 - keeps the existing test enrollment
 - does **not** create a GitHub Release, promote a fleet rollout, or update `/api/agent-releases/latest`
 
@@ -685,6 +685,30 @@ Classic app/domain journeys and browser-extension domain enrichment are reserved
 - Browser extension: keep the session model stable; implement `BrowserContextProvider` via native messaging (today: `NoopBrowserContextProvider`). Extension install is separate from agent OTA; if a native-messaging host must live in the agent, ship it as a normal agent release (same promote/heartbeat updater)
 - Product UI until then: Overview / Journeys / Tools are demoted or marked “later update” when classic is off
 
+## macOS app location (visible bundle)
+
+From agent **v0.3.5**, the Darwin `.app` is no longer stored under the hidden data home. This avoids EDR `persistence_deception` alerts that fire on launchd children inside `~/.usejunction`.
+
+| Piece | Location |
+|-------|----------|
+| App | `~/Applications/UseJunction.app` (test: `UseJunctionTest.app`) |
+| Config, logs, CLI shim, cache | `~/.usejunction` (test: `~/.usejunction-test`) |
+| LaunchAgent | `~/Library/LaunchAgents/com.usejunction.agent.plist` — `ProgramArguments` points at the visible Mach-O |
+
+**New installs** (`install.sh`) write the visible path and delete any leftover `~/.usejunction/UseJunction.app`.
+
+**Already-enrolled Macs** keep working via OTA: the first heartbeat that installs ≥ `0.3.5` replaces the hidden Mach-O, then `usejunction daemon` copies the bundle to `~/Applications`, rewrites the LaunchAgent, and exits so launchd starts the visible binary. Later OTAs update `~/Applications/.../usejunction` in place.
+
+If a device is already quarantined as INFECTED, the customer’s EDR admin may still need to allow/unquarantine the old path once; new installs never create it.
+
+Ship this layout with:
+
+```bash
+git tag agent-v0.3.5
+git push origin agent-v0.3.5
+# then promote via Agent release control, version=0.3.5
+```
+
 ## Future macOS menu bar companion
 
 A tiny macOS menu bar UI may ship in a later agent release. It is **not** required for agent function today.
@@ -692,7 +716,7 @@ A tiny macOS menu bar UI may ship in a later agent release. It is **not** requir
 Contract when that release ships:
 
 - **macOS-only companion.** Linux stays headless. No Windows agent path.
-- **Daemon remains launchd-owned.** `~/Library/LaunchAgents/com.usejunction.agent.plist` continues to run `…/UseJunction.app/Contents/MacOS/usejunction daemon`. The menu bar does not own KeepAlive or collection.
+- **Daemon remains launchd-owned.** `~/Library/LaunchAgents/com.usejunction.agent.plist` continues to run `~/Applications/UseJunction.app/Contents/MacOS/usejunction daemon`. The menu bar does not own KeepAlive or collection.
 - **Tray talks to existing local APIs.** Status and “Sync now” use loopback localsync HTTP (`127.0.0.1`, default port from config) plus `~/.usejunction/config.json` (token/port). No new IPC channel.
 - **Bundle layout.** Optional second binary at `Contents/MacOS/UseJunctionMenu` beside `usejunction`. Packaging already accepts `USEJUNCTION_MENU_BINARY` or a 4th arg to `scripts/package-macos-app.sh` when that binary exists.
 - **Delivery via auto-update, not reinstall.** Existing enrolled Macs should get the tray from a normal agent release. The first menu-bar-bearing release must:
@@ -740,5 +764,6 @@ Common failure modes:
 | `No active agent release is published on …` | `/api/agent-releases/latest` returns 404 — nothing promoted (or release paused) | Run **Agent release control** promote workflow; confirm with `curl …/api/agent-releases/latest` |
 | Install worked locally (`localhost:3001`) but fails on prod | Local admin injects `USEJUNCTION_ROOT`; prod has no promoted release | Promote a release for prod customers; use `USEJUNCTION_ROOT` for pre-promote dev enroll |
 | GitHub shows `agent-v0.3.7` but install still fails | Tag ≠ activation; installer trusts control plane, not GitHub alone | Promote that version to the control plane |
+| SentinelOne `persistence_deception` on `~/.usejunction/UseJunction.app` | Hidden-home LaunchAgent child (fixed in v0.3.5) | Promote ≥ `0.3.5`; if already quarantined, unquarantine/allow then wait for OTA or `install.sh --upgrade` |
 
 See [Install script behavior (prod vs dev)](#install-script-behavior-prod-vs-dev) for the full decision flow.

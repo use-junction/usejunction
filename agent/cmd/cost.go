@@ -25,6 +25,7 @@ func usageToAggregate(u types.DailyUsage) client.UsageAggregate {
 	return client.UsageAggregate{
 		Date:               u.Date,
 		ToolName:           u.ToolName,
+		AccountKey:         u.AccountKey,
 		Model:              u.Model,
 		InputTokens:        u.InputTokens,
 		OutputTokens:       u.OutputTokens,
@@ -58,6 +59,7 @@ func aggregateToUsage(u client.UsageAggregate) types.DailyUsage {
 	return types.DailyUsage{
 		Date:               u.Date,
 		ToolName:           u.ToolName,
+		AccountKey:         u.AccountKey,
 		Model:              u.Model,
 		InputTokens:        u.InputTokens,
 		OutputTokens:       u.OutputTokens,

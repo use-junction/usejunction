@@ -7,6 +7,7 @@ import { ToolBrandLabel } from "@/components/tools/tool-brand-icon";
 import { useMemberClientData } from "@/components/developers/member-client-layout";
 import { formatCompactNumber, formatRelativeTime, formatUsd } from "@/lib/format";
 import { canonicalToolKey } from "@/lib/tools/catalog";
+import { signalsProductEnabled } from "@/lib/region";
 
 export default function MemberFleetClientScreen() {
   const { developerId, personal, selectedPeriodLabel } = useMemberClientData();
@@ -20,6 +21,7 @@ export default function MemberFleetClientScreen() {
             The device reporting into this workspace, plus tool traffic for {selectedPeriodLabel}.
           </p>
         </div>
+        {signalsProductEnabled() ? (
         <Link
           href={`/signals/activity?developerId=${encodeURIComponent(developerId)}`}
           className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
@@ -27,6 +29,7 @@ export default function MemberFleetClientScreen() {
           Open in Signals
           <ArrowUpRight className="size-3" />
         </Link>
+        ) : null}
       </div>
 
       <div className="grid gap-10 lg:grid-cols-2">

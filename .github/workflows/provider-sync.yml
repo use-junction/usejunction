@@ -1,0 +1,63 @@
+# Vercel Hobby's native cron is daily-only, so provider connection pulls
+# (Copilot + GitHub PRs/commits) run from the protected production-cron environment.
+name: Provider sync
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  provider-sync:
+    name: Provider sync (${{ matrix.region }})
+    runs-on: ubuntu-latest
+    environment: agent-production
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        region: [us, eu]
+    concurrency:
+      group: production-crons-provider-sync-${{ matrix.region }}
+      cancel-in-progress: false
+    steps:
+      - name: Require environment secrets
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          CONTROL_PLANE_URL: ${{ matrix.region == 'eu' && secrets.CONTROL_PLANE_URL_EU || secrets.CONTROL_PLANE_URL }}
+          REGION: ${{ matrix.region }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Set agent-production environment secret CRON_SECRET"
+            exit 1
+          fi
+          if [ -z "$CONTROL_PLANE_URL" ]; then
+            if [ "$REGION" = "eu" ]; then
+              echo "::notice::CONTROL_PLANE_URL_EU is not set; skipping EU cron"
+              echo "skip=true" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "::error::Set agent-production environment secret CONTROL_PLANE_URL"
+            exit 1
+          fi
+          echo "skip=false" >> "$GITHUB_ENV"
+          echo "CONTROL_PLANE_URL=$CONTROL_PLANE_URL" >> "$GITHUB_ENV"
+      - name: POST /api/cron/provider-sync
+        if: env.skip != 'true'
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          base="${CONTROL_PLANE_URL%/}"
+          code=$(curl -sS -o /tmp/provider-sync-body.json -w "%{http_code}" \
+            -X POST "$base/api/cron/provider-sync" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            --max-time 300)
+          echo "HTTP $code"
+          cat /tmp/provider-sync-body.json || true
+          echo
+          test "$code" = "200"

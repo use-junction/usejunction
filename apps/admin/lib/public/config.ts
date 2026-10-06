@@ -16,6 +16,7 @@ export const siteConfig = {
   seoTitle: "UseJunction — AI Coding Spend Management for Teams",
   /** Homepage meta keywords only — not shown in visible hero copy. */
   homeSeoKeywords: [
+    "CodexBar for teams",
     "CodexBar for Windows",
     "Codex Bar for Windows",
     "Win-CodexBar alternative for teams",
@@ -23,9 +24,9 @@ export const siteConfig = {
     "AI coding spend management for teams",
   ],
   url: process.env.NEXTAUTH_URL ?? "https://usejunction.dev",
-  githubUrl: "https://github.com/Dinuda/usejunction",
-  docsUrl: "https://github.com/Dinuda/usejunction#readme",
-  changelogUrl: "https://github.com/Dinuda/usejunction/releases",
+  githubUrl: "https://github.com/use-junction/usejunction",
+  docsUrl: "https://github.com/use-junction/usejunction#readme",
+  changelogUrl: "https://github.com/use-junction/usejunction/releases",
   signupUrl: "/signup",
   license: "UseJunction Community License",
   /**
@@ -48,9 +49,10 @@ export const twitterUrl = siteConfig.twitterHandle
 
 export const navAnchors = [{ id: "pricing", label: "Pricing" }] as const;
 
-/** Primary page links in the marketing header. Keep this short — brand + pricing only. */
+/** Primary page links in the marketing header. Keep this short — brand, pricing, blog. */
 export const navLinks: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/", label: "For coders" },
+  { href: "/blog", label: "Blog" },
 ];
 
 export const SUPPORTED_TOOLS = [
@@ -141,7 +143,7 @@ export const PROCESS_STEPS = [
   {
     title: "Install the admin app",
     description:
-      "Deploy the self-hostable UseJunction admin on your infrastructure — Docker Compose, a single VM, or your existing cluster.",
+      "Deploy the self-hostable UseJunction admin on your infrastructure — Postgres plus the Next.js control plane, the same loop as local development.",
   },
   {
     title: "Roll out the local agent",
@@ -260,6 +262,11 @@ export const FOOTER_COLUMNS = {
     { label: siteConfig.license, href: `${siteConfig.githubUrl}/blob/main/LICENSE` },
     { label: "Privacy", href: "/privacy" },
     { label: "Terms", href: "/terms" },
+    { label: "DPA", href: "/dpa" },
+    { label: "GDPR", href: "/gdpr" },
+    { label: "Subprocessors", href: "/subprocessors" },
+    { label: "Security", href: "/security" },
+    { label: "Cookies", href: "/cookies" },
     { label: "llms.txt", href: "/llms.txt" },
   ],
 } as const;

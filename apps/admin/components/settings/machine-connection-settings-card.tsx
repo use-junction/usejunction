@@ -123,6 +123,11 @@ export function MachineConnectionSettingsCard() {
         onOpenChange={(open) => {
           if (!open) setRepairDevice(null);
         }}
+        onRepaired={() => {
+          void invalidateAppData();
+          void devicesQuery.refetch();
+          router.refresh();
+        }}
       />
 
       <Dialog open={connectOpen} onOpenChange={setConnectOpen}>

@@ -11,6 +11,13 @@ const publicRoutes = [
   "/forgot-password",
   "/reset-password",
   "/contact",
+  "/privacy",
+  "/terms",
+  "/dpa",
+  "/subprocessors",
+  "/gdpr",
+  "/security",
+  "/cookies",
   "/i/invalid-token",
   "/join/invalid-token",
   "/join/company/missing-org",
@@ -106,11 +113,16 @@ test("login form rejects bad credentials and links to recovery", async ({ page }
 
 test("signup form validates password confirmation", async ({ page }) => {
   await page.goto("/signup");
+  const banner = page.getByRole("dialog", { name: "Cookie consent" });
+  if (await banner.isVisible().catch(() => false)) {
+    await banner.getByRole("button", { name: "Necessary only" }).click();
+  }
   await expect(page.getByLabel("Full name")).toBeVisible();
   await page.getByLabel("Full name").fill("E2E Signup");
   await page.getByLabel("Work email").fill("signup-e2e@example.com");
   await page.getByLabel("Password", { exact: true }).fill("long-enough-password");
   await page.getByLabel("Confirm password").fill("different-password");
+  await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(
     page.getByText(/matching password of at least 12 characters/i),

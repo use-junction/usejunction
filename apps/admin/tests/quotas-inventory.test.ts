@@ -213,8 +213,8 @@ test(
 
     const pruned = await pruneQuotaToolsMissingWindows({
       deviceId: device.id,
-      accountTools: ["claude", "codex"],
-      quotaTools: ["codex"],
+      accounts: [{ toolName: "claude" }, { toolName: "codex" }],
+      quotas: [{ toolName: "codex" }],
     });
     assert.equal(pruned, 1);
     const remaining = await prisma.quotaSnapshot.findMany({ where: { deviceId: device.id } });

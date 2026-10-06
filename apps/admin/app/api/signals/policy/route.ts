@@ -10,8 +10,9 @@ import {
   normalizeList,
   signalsPolicyInputSchema,
 } from "@/lib/signals/contracts";
-import { getOrgSignalsPolicy } from "@/lib/signals/service";
+import { signalsAllowed } from "@/lib/region";
 import { nextWorkExtractionStartedAt } from "@/lib/signals/collection-window";
+import { getOrgSignalsPolicy } from "@/lib/signals/service";
 
 export async function GET(req: NextRequest) {
   const auth = await requireOrgRole(req, rolesFor("settings_billing"));
@@ -32,10 +33,18 @@ export async function PATCH(req: NextRequest) {
 
   const existing = await prisma.signalsPolicy.findFirst({ where: { orgId: auth.orgId } });
   const wasWorkExtractionEnabled = existing?.workExtractionEnabled ?? false;
-  const workExtractionEnabled =
-    parsed.data.workExtractionEnabled ?? existing?.workExtractionEnabled ?? false;
-  const rawWorkTextEnabled =
-    parsed.data.rawWorkTextEnabled ?? existing?.rawWorkTextEnabled ?? false;
+  const workExtractionEnabled = signalsAllowed()
+    ? parsed.data.workExtractionEnabled ?? existing?.workExtractionEnabled ?? false
+    : false;
+  const rawWorkTextEnabled = signalsAllowed()
+    ? parsed.data.rawWorkTextEnabled ?? existing?.rawWorkTextEnabled ?? false
+    : false;
+  if (!signalsAllowed() && (parsed.data.workExtractionEnabled === true || parsed.data.rawWorkTextEnabled === true)) {
+    return NextResponse.json(
+      { error: "Signals work extraction is not available." },
+      { status: 403 },
+    );
+  }
   const workExtractionStartedAt = nextWorkExtractionStartedAt({
     wasEnabled: wasWorkExtractionEnabled,
     enabled: workExtractionEnabled,

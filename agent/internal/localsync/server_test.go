@@ -207,3 +207,45 @@ func TestFailedSyncKeepsErrorGeneric(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 }
+
+func TestAccountsRequiresTokenAndACompletePatch(t *testing.T) {
+	s := New(&config.Config{LocalSyncToken: "uj_local_secret"}, func(context.Context, bool, ProgressFunc) (int, int, int, int, []string, error) {
+		return 0, 0, 0, 0, nil, nil
+	})
+
+	denied := httptest.NewRequest(http.MethodGet, "/v1/accounts", nil)
+	deniedRes := httptest.NewRecorder()
+	s.handleAccounts(deniedRes, denied)
+	if deniedRes.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", deniedRes.Code)
+	}
+
+	page := httptest.NewRequest(http.MethodGet, "/v1/accounts?token=uj_local_secret", nil)
+	page.Header.Set("Accept", "text/html")
+	pageRes := httptest.NewRecorder()
+	s.handleAccounts(pageRes, page)
+	if pageRes.Code != http.StatusOK || !strings.Contains(pageRes.Body.String(), "UseJunction accounts") {
+		t.Fatalf("expected accounts page, got %d %s", pageRes.Code, pageRes.Body.String())
+	}
+
+	missing := httptest.NewRequest(http.MethodPatch, "/v1/accounts?token=uj_local_secret", strings.NewReader(`{"scope":"provider","enabled":true}`))
+	missingRes := httptest.NewRecorder()
+	s.handleAccounts(missingRes, missing)
+	if missingRes.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for missing toolName, got %d", missingRes.Code)
+	}
+
+	bad := httptest.NewRequest(http.MethodPatch, "/v1/accounts?token=uj_local_secret", strings.NewReader(`{`))
+	badRes := httptest.NewRecorder()
+	s.handleAccounts(badRes, bad)
+	if badRes.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid json, got %d", badRes.Code)
+	}
+
+	other := httptest.NewRequest(http.MethodPost, "/v1/accounts?token=uj_local_secret", nil)
+	otherRes := httptest.NewRecorder()
+	s.handleAccounts(otherRes, other)
+	if otherRes.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected 405, got %d", otherRes.Code)
+	}
+}

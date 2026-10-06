@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Rebuild the UseJunction agent from this checkout and reinstall it into ~/.usejunction-test.
+# Rebuild the UseJunction agent from this checkout and reinstall it.
+# Darwin app lives in ~/Applications; data stays under ~/.usejunction-test.
 # Dev-only: bypasses install.sh release/semver gates. Does not enroll or publish a release.
 set -euo pipefail
 
@@ -31,8 +32,10 @@ case "$AGENT_PROFILE" in
 esac
 
 INSTALL_DIR="${HOME_DIR}/bin"
-APP_DIR="${HOME_DIR}/${APP_NAME}.app"
-PREVIOUS_APP="${HOME_DIR}/${APP_NAME}.previous.app"
+APPS_DIR="${HOME}/Applications"
+APP_DIR="${APPS_DIR}/${APP_NAME}.app"
+PREVIOUS_APP="${APPS_DIR}/${APP_NAME}.previous.app"
+HIDDEN_APP_DIR="${HOME_DIR}/${APP_NAME}.app"
 LEGACY_APP_DIR="${HOME_DIR}/UseJunction Agent.app"
 CONFIG_PATH="${HOME_DIR}/config.json"
 PLIST="${HOME}/Library/LaunchAgents/${LAUNCHD_PLIST}"
@@ -343,13 +346,17 @@ install_macos() {
     echo "Missing packaging script: ${PACKAGE_SCRIPT}" >&2
     exit 1
   fi
-  local staged_app="${HOME_DIR}/${APP_NAME}.new.app"
+  mkdir -p "$APPS_DIR"
+  local staged_app="${APPS_DIR}/${APP_NAME}.new.app"
   rm -rf "$staged_app" "$PREVIOUS_APP"
   bash "$PACKAGE_SCRIPT" "$tmp_binary" "$staged_app" "$VERSION"
   if [[ -d "$LEGACY_APP_DIR" && ! -d "$APP_DIR" ]]; then
     mv "$LEGACY_APP_DIR" "$APP_DIR"
   elif [[ -d "$LEGACY_APP_DIR" ]]; then
     rm -rf "$LEGACY_APP_DIR"
+  fi
+  if [[ -d "$HIDDEN_APP_DIR" && ! -d "$APP_DIR" ]]; then
+    mv "$HIDDEN_APP_DIR" "$APP_DIR"
   fi
   if [[ -d "$APP_DIR" ]]; then
     mv "$APP_DIR" "$PREVIOUS_APP"
@@ -360,7 +367,11 @@ install_macos() {
     exit 1
   fi
   mkdir -p "$INSTALL_DIR"
-  ln -sf "../${APP_NAME}.app/Contents/MacOS/usejunction" "${INSTALL_DIR}/${CLI_NAME}"
+  ln -sfn "${APP_DIR}/Contents/MacOS/usejunction" "${INSTALL_DIR}/${CLI_NAME}"
+  rm -rf "$HIDDEN_APP_DIR" \
+    "${HOME_DIR}/${APP_NAME}.previous.app" \
+    "${HOME_DIR}/${APP_NAME}.app.previous" \
+    "$LEGACY_APP_DIR"
 }
 
 install_linux() {

@@ -93,7 +93,14 @@ if [[ "$RUN_E2E" -eq 1 ]]; then
     pnpm --filter @usejunction/admin verify:calcs
     pnpm --filter @usejunction/admin exec vitest run tests/calculation-verification.integration.test.ts
     pnpm --filter @usejunction/admin exec playwright install chromium
-    pnpm --filter @usejunction/admin test:e2e
+    echo "==> Playwright e2e (us)"
+    E2E_FORCE_WEB_SERVER=1 DEPLOYMENT_REGION=us NEXT_PUBLIC_DEPLOYMENT_REGION=us \
+      pnpm --filter @usejunction/admin test:e2e
+    echo "==> Playwright e2e (eu)"
+    DEPLOYMENT_REGION=eu NEXT_PUBLIC_DEPLOYMENT_REGION=eu \
+      pnpm --filter @usejunction/admin e2e:seed
+    E2E_FORCE_WEB_SERVER=1 DEPLOYMENT_REGION=eu NEXT_PUBLIC_DEPLOYMENT_REGION=eu \
+      pnpm --filter @usejunction/admin test:e2e
   )
 fi
 

@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   updateDirectiveForHeartbeat: vi.fn(),
   recordDeviceActivityEvent: vi.fn(),
   transaction: vi.fn(),
+  pendingRemoteSyncCount: vi.fn(),
+  githubAuthorIdentity: vi.fn(),
+  githubConnection: vi.fn(),
 }));
 
 vi.mock("@usejunction/db", () => ({
@@ -16,6 +19,15 @@ vi.mock("@usejunction/db", () => ({
     device: {
       update: vi.fn(),
       updateMany: vi.fn(),
+    },
+    deviceSyncRequestTarget: {
+      count: mocks.pendingRemoteSyncCount,
+    },
+    externalIdentity: {
+      findFirst: mocks.githubAuthorIdentity,
+    },
+    providerConnection: {
+      findFirst: mocks.githubConnection,
     },
   },
 }));
@@ -88,6 +100,9 @@ beforeEach(() => {
   mocks.updateDirectiveForHeartbeat.mockResolvedValue(null);
   mocks.recordDeviceActivityEvent.mockResolvedValue(undefined);
   mocks.getFullUsageRescanDay.mockResolvedValue("2026-07-21");
+  mocks.pendingRemoteSyncCount.mockResolvedValue(0);
+  mocks.githubAuthorIdentity.mockResolvedValue(null);
+  mocks.githubConnection.mockResolvedValue(null);
 });
 
 test("heartbeat surfaces fullUsageRescanDay from runtime settings", async () => {
@@ -119,4 +134,22 @@ test("heartbeat omits fullUsageRescanDay when unset", async () => {
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.fullUsageRescanDay, undefined);
+});
+
+test("heartbeat asks mapped GitHub-author daemons to claim Features usage syncs", async () => {
+  mocks.pendingRemoteSyncCount.mockResolvedValue(2);
+  mocks.githubAuthorIdentity.mockResolvedValue({ id: "ident-1" });
+  mocks.githubConnection.mockResolvedValue({ id: "conn-1" });
+  const { POST } = await import("@/app/api/devices/heartbeat/route");
+  const response = await POST(
+    new Request("http://localhost/api/devices/heartbeat", {
+      method: "POST",
+      headers: { authorization: "Bearer device-token" },
+    }) as never,
+  );
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.pendingRemoteSync, true);
+  assert.equal(body.featuresAuthorSync, true);
 });

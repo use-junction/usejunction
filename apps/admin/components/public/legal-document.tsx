@@ -6,8 +6,15 @@ import { cn } from "@/lib/utils";
 
 export function LegalDocument({ page }: { page: ContentPage }) {
   const jsonLd = buildContentJsonLd(page);
-  const siblingHref = page.slug === "privacy" ? "/terms" : "/privacy";
-  const siblingLabel = page.slug === "privacy" ? "Terms of Service" : "Privacy Policy";
+  const legalNav = [
+    { href: "/privacy", label: "Privacy", slug: "privacy" },
+    { href: "/terms", label: "Terms", slug: "terms" },
+    { href: "/dpa", label: "DPA", slug: "dpa" },
+    { href: "/subprocessors", label: "Subprocessors", slug: "subprocessors" },
+    { href: "/gdpr", label: "GDPR", slug: "gdpr" },
+    { href: "/security", label: "Security", slug: "security" },
+    { href: "/cookies", label: "Cookies", slug: "cookies" },
+  ] as const;
 
   return (
     <main className="bg-white">
@@ -22,19 +29,16 @@ export function LegalDocument({ page }: { page: ContentPage }) {
       <article className="mx-auto w-full max-w-3xl px-4 pb-20 pt-28 sm:px-6 lg:px-8 lg:pb-28 lg:pt-32">
         <nav aria-label="Legal documents" className="flex flex-wrap gap-2">
           {(
-            [
-              { href: "/privacy", label: "Privacy", active: page.slug === "privacy" },
-              { href: "/terms", label: "Terms", active: page.slug === "terms" },
-            ] as const
+            legalNav
           ).map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
                 "text-sm font-medium transition-colors",
-                item.active ? "text-[#08a8c4]" : "text-[#5c5e56] hover:text-[#08a8c4]",
+                item.slug === page.slug ? "text-[#08a8c4]" : "text-[#5c5e56] hover:text-[#08a8c4]",
               )}
-              aria-current={item.active ? "page" : undefined}
+              aria-current={item.slug === page.slug ? "page" : undefined}
             >
               {item.label}
             </Link>
@@ -78,8 +82,16 @@ export function LegalDocument({ page }: { page: ContentPage }) {
 
         <p className="mt-14 border-t border-border pt-8 text-sm text-muted-foreground">
           Also see{" "}
-          <Link href={siblingHref} className="font-medium text-[#08a8c4] hover:text-[#08758a]">
-            {siblingLabel}
+          <Link href="/privacy" className="font-medium text-[#08a8c4] hover:text-[#08758a]">
+            Privacy
+          </Link>
+          {", "}
+          <Link href="/dpa" className="font-medium text-[#08a8c4] hover:text-[#08758a]">
+            DPA
+          </Link>
+          {", and "}
+          <Link href="/gdpr" className="font-medium text-[#08a8c4] hover:text-[#08758a]">
+            GDPR
           </Link>
           .
         </p>

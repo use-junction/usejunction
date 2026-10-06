@@ -1,13 +1,13 @@
-import posthog from "posthog-js";
+import { analyticsConsentChangeEvent, hasAnalyticsConsent } from "@/lib/consent/analytics-consent";
+import { isPostHogConfigured, startPostHogIfConsented, stopPostHogCapturing } from "@/lib/posthog/client";
 
-const projectToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
-const apiHost = process.env.NEXT_PUBLIC_POSTHOG_HOST;
-
-// Keep analytics opt-in for self-hosted and local installs: PostHog is only
-// initialized when both public configuration values are provided.
-if (projectToken && apiHost) {
-  posthog.init(projectToken, {
-    api_host: apiHost,
-    defaults: "2026-05-30",
-  });
+if (isPostHogConfigured) {
+  startPostHogIfConsented();
+  if (typeof window !== "undefined") {
+    window.addEventListener(analyticsConsentChangeEvent, (event) => {
+      const analytics = Boolean((event as CustomEvent<{ analytics?: boolean }>).detail?.analytics) && hasAnalyticsConsent();
+      if (analytics) startPostHogIfConsented();
+      else stopPostHogCapturing();
+    });
+  }
 }

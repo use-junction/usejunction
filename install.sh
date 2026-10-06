@@ -12,7 +12,9 @@ RESUME_ONLY=false
 HOME_DIR=""
 INSTALL_DIR=""
 APP_NAME=""
+APPS_DIR=""
 APP_DIR=""
+HIDDEN_APP_DIR=""
 LEGACY_APP_DIR=""
 CLI_NAME=""
 LAUNCHD_LABEL=""
@@ -82,7 +84,9 @@ resolve_profile_paths() {
       ;;
   esac
   INSTALL_DIR="${HOME_DIR}/bin"
-  APP_DIR="${HOME_DIR}/${APP_NAME}.app"
+  APPS_DIR="${HOME}/Applications"
+  APP_DIR="${APPS_DIR}/${APP_NAME}.app"
+  HIDDEN_APP_DIR="${HOME_DIR}/${APP_NAME}.app"
   LEGACY_APP_DIR="${HOME_DIR}/UseJunction Agent.app"
   DEV_SOURCE_FILE="${HOME_DIR}/dev-source"
   CONFIG_PATH="${HOME_DIR}/config.json"
@@ -320,7 +324,8 @@ migrate_legacy_macos_app() {
 install_macos_app_bundle() {
   local binary="$1"
   local package_script=""
-  local staged_app="${HOME_DIR}/${APP_NAME}.new.app"
+  mkdir -p "$APPS_DIR"
+  local staged_app="${APPS_DIR}/${APP_NAME}.new.app"
   rm -rf "$staged_app"
   if package_script="$(find_package_script)"; then
     bash "$package_script" "$binary" "$staged_app" "$VERSION"
@@ -357,7 +362,8 @@ install_macos_app_bundle() {
 
 swap_macos_app() {
   local staged_app="$1"
-  local previous_app="${HOME_DIR}/${APP_NAME}.previous.app"
+  local previous_app="${APPS_DIR}/${APP_NAME}.previous.app"
+  mkdir -p "$APPS_DIR"
   migrate_legacy_macos_app
   rm -rf "$previous_app"
   if [[ -d "$APP_DIR" ]]; then
@@ -367,11 +373,96 @@ swap_macos_app() {
     [[ -d "$previous_app" ]] && mv "$previous_app" "$APP_DIR"
     return 1
   fi
+  remove_hidden_macos_app
 }
 
 link_macos_cli() {
   mkdir -p "$INSTALL_DIR"
-  ln -sf "../${APP_NAME}.app/Contents/MacOS/usejunction" "${INSTALL_DIR}/${CLI_NAME}"
+  ln -sfn "${APP_DIR}/Contents/MacOS/usejunction" "${INSTALL_DIR}/${CLI_NAME}"
+}
+
+remove_hidden_macos_app() {
+  [[ "$OS" == "darwin" ]] || return 0
+  rm -rf "$HIDDEN_APP_DIR" \
+    "${HOME_DIR}/${APP_NAME}.previous.app" \
+    "${HOME_DIR}/${APP_NAME}.app.previous" \
+    "$LEGACY_APP_DIR"
+}
+
+ensure_visible_macos_app() {
+  [[ "$OS" == "darwin" ]] || return 0
+  mkdir -p "$APPS_DIR"
+  if [[ -x "${APP_DIR}/Contents/MacOS/usejunction" ]]; then
+    BINARY="${APP_DIR}/Contents/MacOS/usejunction"
+    remove_hidden_macos_app
+    return 0
+  fi
+  if [[ -d "$HIDDEN_APP_DIR" ]]; then
+    if [[ -d "$APP_DIR" ]]; then
+      rm -rf "$HIDDEN_APP_DIR"
+    else
+      mv "$HIDDEN_APP_DIR" "$APP_DIR"
+    fi
+  fi
+  if [[ -x "${APP_DIR}/Contents/MacOS/usejunction" ]]; then
+    BINARY="${APP_DIR}/Contents/MacOS/usejunction"
+  fi
+}
+
+write_launchd_plist() {
+  PLIST="${HOME}/Library/LaunchAgents/${LAUNCHD_PLIST}"
+  mkdir -p "$(dirname "$PLIST")"
+  if [[ "$AGENT_PROFILE" == "test" ]]; then
+    cat > "$PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${LAUNCHD_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${BINARY}</string>
+    <string>--profile</string>
+    <string>test</string>
+    <string>daemon</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${AGENT_LOG}</string>
+  <key>StandardErrorPath</key>
+  <string>${AGENT_ERR}</string>
+</dict>
+</plist>
+EOF
+  else
+    cat > "$PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${LAUNCHD_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${BINARY}</string>
+    <string>daemon</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${AGENT_LOG}</string>
+  <key>StandardErrorPath</key>
+  <string>${AGENT_ERR}</string>
+</dict>
+</plist>
+EOF
+  fi
 }
 
 download_macos_agent() {
@@ -381,7 +472,8 @@ download_macos_agent() {
   local app_path
   if app_path="$(download_agent "$base" "$tmp_dir" "$app_archive")"; then
     local extracted="${tmp_dir}/extracted"
-    local staged_app="${HOME_DIR}/${APP_NAME}.new.app"
+    mkdir -p "$APPS_DIR"
+    local staged_app="${APPS_DIR}/${APP_NAME}.new.app"
     rm -rf "$extracted" "$staged_app"
     mkdir -p "$extracted"
     ditto -x -k "$app_path" "$extracted"
@@ -403,6 +495,10 @@ download_macos_agent() {
 installed_agent_binary() {
   if [[ "$OS" == "darwin" && -x "${APP_DIR}/Contents/MacOS/usejunction" ]]; then
     printf '%s\n' "${APP_DIR}/Contents/MacOS/usejunction"
+    return 0
+  fi
+  if [[ "$OS" == "darwin" && -x "${HIDDEN_APP_DIR}/Contents/MacOS/usejunction" ]]; then
+    printf '%s\n' "${HIDDEN_APP_DIR}/Contents/MacOS/usejunction"
     return 0
   fi
   if [[ -x "$BINARY" ]]; then
@@ -702,7 +798,9 @@ else
   install_agent
 fi
 if [[ "$OS" == "darwin" ]]; then
+  ensure_visible_macos_app
   BINARY="${APP_DIR}/Contents/MacOS/usejunction"
+  link_macos_cli
 else
   chmod +x "$BINARY"
 fi
@@ -711,11 +809,11 @@ ensure_cli_on_path
 if [[ "$UPGRADE_ONLY" == true ]]; then
   echo "Restarting existing background agent…"
   if [[ "$OS" == "darwin" ]]; then
-    launchctl kickstart -k "gui/$(id -u)/${LAUNCHD_LABEL}" 2>/dev/null || {
-      PLIST="${HOME}/Library/LaunchAgents/${LAUNCHD_PLIST}"
-      launchctl unload "$PLIST" 2>/dev/null || true
-      launchctl load "$PLIST"
-    }
+    write_launchd_plist
+    PLIST="${HOME}/Library/LaunchAgents/${LAUNCHD_PLIST}"
+    launchctl unload "$PLIST" 2>/dev/null || true
+    launchctl load "$PLIST"
+    launchctl kickstart -k "gui/$(id -u)/${LAUNCHD_LABEL}" 2>/dev/null || true
   elif [[ "$OS" == "linux" ]] && command -v systemctl >/dev/null 2>&1; then
     systemctl --user daemon-reload
     systemctl --user restart "${SYSTEMD_UNIT}"
@@ -747,7 +845,7 @@ if [[ "$RESUME_ONLY" == true ]]; then
   fi
 else
   # shellcheck disable=SC2046
-  if ! "$BINARY" $(agent_profile_args) onboard --token "$ENROLL_TOKEN" --url "$CONTROL_PLANE_URL"; then
+  if ! "$BINARY" $(agent_profile_args) onboard --token "$ENROLL_TOKEN" --url "$CONTROL_PLANE_URL" --accept-collection-notice; then
     if [[ ! -f "$CONFIG_PATH" ]]; then
       echo "Device onboarding failed before enrollment completed." >&2
       exit 1
@@ -757,68 +855,13 @@ else
   fi
 fi
 
-write_launchd_plist() {
-  PLIST="${HOME}/Library/LaunchAgents/${LAUNCHD_PLIST}"
-  if [[ "$AGENT_PROFILE" == "test" ]]; then
-    cat > "$PLIST" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>${LAUNCHD_LABEL}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>${BINARY}</string>
-    <string>--profile</string>
-    <string>test</string>
-    <string>daemon</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>${AGENT_LOG}</string>
-  <key>StandardErrorPath</key>
-  <string>${AGENT_ERR}</string>
-</dict>
-</plist>
-EOF
-  else
-    cat > "$PLIST" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>${LAUNCHD_LABEL}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>${BINARY}</string>
-    <string>daemon</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>${AGENT_LOG}</string>
-  <key>StandardErrorPath</key>
-  <string>${AGENT_ERR}</string>
-</dict>
-</plist>
-EOF
-  fi
-}
-
 # macOS launchd user agent
 if [[ "$OS" == "darwin" ]]; then
   write_launchd_plist
   PLIST="${HOME}/Library/LaunchAgents/${LAUNCHD_PLIST}"
   launchctl unload "$PLIST" 2>/dev/null || true
   launchctl load "$PLIST"
-  echo "Started background agent (launchd)."
+  echo "  ✓ Background agent  running (launchd)"
 fi
 
 # Linux systemd user service
@@ -845,7 +888,7 @@ WantedBy=default.target
 EOF
   systemctl --user daemon-reload
   systemctl --user enable --now "${SYSTEMD_UNIT}"
-  echo "Started background agent (systemd user)."
+  echo "  ✓ Background agent  running (systemd)"
 fi
 
 if [[ "$RESUME_ONLY" == true ]]; then

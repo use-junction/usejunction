@@ -5,6 +5,8 @@ import {
   developerSwitchBlocked,
   isGatedCollectionTool,
   loggingEffectivelyEnabled,
+  normalizeAccountKey,
+  usageAccountToken,
   usageEffectivelyEnabled,
   type AccountCollectionFlags,
 } from "@/lib/privacy/account-collection-policy";
@@ -19,6 +21,7 @@ export {
   loggingEffectivelyEnabled,
   normalizeAccountKey,
   pickExistingAccount,
+  usageAccountToken,
   usageEffectivelyEnabled,
 } from "@/lib/privacy/account-collection-policy";
 export type { AccountCollectionFlags, GatedCollectionTool } from "@/lib/privacy/account-collection-policy";
@@ -111,6 +114,43 @@ export async function listGatedAccounts(params: {
     orderBy: [{ toolName: "asc" }, { email: "asc" }, { updatedAt: "desc" }],
   });
   return rows.map(toPublicAccount);
+}
+
+export type PendingCollectionAccount = PublicCollectionAccount & {
+  /** True when no login for this provider has been decided yet: a newly found AI tool. */
+  newProvider: boolean;
+};
+
+/**
+ * Logins the developer has never decided on (no collection event recorded),
+ * so the workspace can ask "include this?" for new tools and new accounts.
+ * Fully admin-locked logins are excluded: the developer has nothing to decide.
+ */
+export async function listPendingCollectionDecisions(params: {
+  orgId: string;
+  userId: string;
+}): Promise<PendingCollectionAccount[]> {
+  const [rows, events] = await Promise.all([
+    prisma.toolAccount.findMany({
+      where: { orgId: params.orgId, userId: params.userId },
+      select: accountSelect,
+      orderBy: [{ toolName: "asc" }, { email: "asc" }],
+    }),
+    prisma.accountCollectionEvent.findMany({
+      where: { orgId: params.orgId, toolAccount: { userId: params.userId } },
+      select: { deviceId: true, toolName: true, accountKey: true },
+      distinct: ["deviceId", "toolName", "accountKey"],
+    }),
+  ]);
+  const decided = new Set(events.map((event) => `${event.deviceId}\0${event.toolName}\0${event.accountKey}`));
+  const decidedTools = new Set(events.map((event) => event.toolName));
+  return rows
+    .filter((row) => !decided.has(`${row.deviceId}\0${row.toolName}\0${row.accountKey}`))
+    .filter((row) => !(row.usageAdminLocked && row.loggingAdminLocked))
+    .filter((row) => !row.usageEnabled)
+    // A desktop login we cannot name yet is not a signed-in account to ask about.
+    .filter((row) => Boolean(row.email?.trim()))
+    .map((row) => ({ ...toPublicAccount(row), newProvider: !decidedTools.has(row.toolName) }));
 }
 
 export async function listCollectionEvents(params: {
@@ -319,6 +359,8 @@ export async function setDeveloperAccountOptIn(params: {
   toolName: string;
   accountKey: string;
   enabled: boolean;
+  /** Record the choice even when nothing changes, so "Not now" stops being asked. */
+  recordDecision?: boolean;
 }): Promise<PublicCollectionAccount | { error: string; status: number }> {
   if (!isGatedCollectionTool(params.toolName)) {
     return { error: "A provider is required.", status: 400 };
@@ -347,7 +389,7 @@ export async function setDeveloperAccountOptIn(params: {
     },
     select: accountSelect,
   });
-  if (!usageBlocked && account.usageEnabled !== params.enabled) {
+  if (!usageBlocked && (account.usageEnabled !== params.enabled || params.recordDecision)) {
     await recordCollectionChange({
       account: updated,
       stream: "usage",
@@ -381,7 +423,7 @@ export async function setDeveloperProviderCollection(params: {
     return { error: "A provider is required.", status: 400 };
   }
   if (params.enabled) {
-    return { error: "Opt in the signed-in account. Turning a provider on does not opt every account in.", status: 400 };
+    return { error: "Turn on usage for each account you want collected. Turning a provider on does not opt every login in.", status: 400 };
   }
   const rows = await prisma.toolAccount.findMany({
     where: { orgId: params.orgId, userId: params.userId, toolName: params.toolName },
@@ -449,15 +491,59 @@ export async function deviceActiveAccountAllowed(params: {
   return params.stream === "usage" ? usageEffectivelyEnabled(active) : loggingEffectivelyEnabled(active);
 }
 
+export async function deviceAccountStreamAllowed(params: {
+  deviceId: string;
+  toolName: string;
+  accountKey?: string | null;
+  stream: CollectionStream;
+}): Promise<boolean> {
+  const toolName = params.toolName.trim();
+  const accountKey = normalizeAccountKey(params.accountKey);
+  if (!isGatedCollectionTool(toolName) || !accountKey) return false;
+  const account = await prisma.toolAccount.findFirst({
+    where: { deviceId: params.deviceId, toolName, accountKey },
+    select: {
+      usageEnabled: true,
+      loggingEnabled: true,
+      usageAdminLocked: true,
+      loggingAdminLocked: true,
+    },
+  });
+  if (!account) return false;
+  return params.stream === "usage" ? usageEffectivelyEnabled(account) : loggingEffectivelyEnabled(account);
+}
+
+export async function deviceAllowedUsageAccounts(deviceId: string): Promise<Set<string>> {
+  const accounts = await prisma.toolAccount.findMany({
+    where: { deviceId },
+    select: {
+      toolName: true,
+      accountKey: true,
+      usageEnabled: true,
+      usageAdminLocked: true,
+    },
+  });
+  const allowed = new Set<string>();
+  for (const row of accounts) {
+    if (!usageEffectivelyEnabled(row)) continue;
+    const key = normalizeAccountKey(row.accountKey);
+    if (!row.toolName.trim() || !key) continue;
+    allowed.add(usageAccountToken(row.toolName, key));
+  }
+  return allowed;
+}
+
 export async function filterGatedUsageToolNames(
   deviceId: string,
   toolNames: string[],
 ): Promise<Set<string>> {
-  const names = [...new Set(toolNames.map((name) => name.trim()).filter(isGatedCollectionTool))];
+  const allowedAccounts = await deviceAllowedUsageAccounts(deviceId);
   const allowed = new Set<string>();
-  for (const toolName of names) {
-    if (await deviceActiveAccountAllowed({ deviceId, toolName, stream: "usage" })) {
-      allowed.add(toolName);
+  for (const toolName of toolNames) {
+    const name = toolName.trim();
+    if (!name) continue;
+    for (const token of allowedAccounts) {
+      if (token.startsWith(`${name}\0`)) allowed.add(name);
     }
   }
   return allowed;

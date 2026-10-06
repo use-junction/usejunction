@@ -1,4 +1,6 @@
 import { AI_CODING_OBSERVABILITY_VS_EI_POST } from "@/content/blog/ai-coding-observability-vs-engineering-intelligence";
+import { CODEXBAR_FOR_TEAMS_POST } from "@/content/blog/codexbar-for-teams";
+import { SEE_MY_TEAMS_AI_SPEND_POST } from "@/content/blog/see-my-teams-ai-spend";
 import { DINUDA_YAGGAHAVITA } from "@/content/authors";
 import type { BlogInline, BlogPost } from "@/content/types";
 
@@ -42,8 +44,14 @@ const images = {
     width: 1400,
     height: 842,
   },
+  cover: {
+    src: "/blog/what-is-ai-coding-observability/cover.webp",
+    alt: "Visibility before control: five observability layers — adoption, cost, model usage, reliability, plan utilization — before any control layer",
+    width: 1200,
+    height: 630,
+  },
   social: {
-    src: "/blog/what-is-ai-coding-observability/social-card.png",
+    src: "/blog/what-is-ai-coding-observability/social.png",
     alt: "What Is AI Coding Observability? Visibility Before Control",
     width: 1200,
     height: 630,
@@ -52,24 +60,54 @@ const images = {
 
 export const AI_CODING_OBSERVABILITY_POST: BlogPost = {
   slug: "what-is-ai-coding-observability",
+  category: "AI Observability",
   path: "/blog/what-is-ai-coding-observability",
   title: "What Is AI Coding Observability? Visibility Before Control",
   description:
     "AI coding observability measures adoption, cost, model usage, reliability, and plan utilization across the tools engineering teams already use—without developer surveillance.",
   answer:
     "AI coding observability is the practice of measuring how engineering teams use AI coding tools — including adoption, cost, model usage, reliability and plan utilization — without inspecting developers’ source code or work activity.",
+  takeaways: [
+    "AI coding observability measures adoption, cost, model usage, reliability, and plan utilization across AI coding tools.",
+    "It does not mean recording prompts, reading code, or ranking developers by token count.",
+    "Most teams adopted Cursor, Claude Code, Copilot, and Codex before anyone owned them as infrastructure.",
+    "A gateway is not always the right first step. Visibility comes before policy and control.",
+    "Start with the basic questions: what you pay for, who uses it, and what keeps failing.",
+  ],
+  secondaryKeywords: ["what is AI coding observability", "AI coding tool visibility", "AI coding infrastructure monitoring"],
   primaryKeyword: "AI coding observability",
-  topics: ["AI", "AI coding", "Cursor", "Observability", "Claude Code"],
+  topics: ["AI coding observability", "Cursor", "Claude Code", "AI coding", "Observability"],
   publishedAt: "2026-07-22",
   updatedAt: "2026-07-22",
   readingMinutes: 8,
   author: DINUDA_YAGGAHAVITA,
-  heroImage: images.hero,
+  heroImage: images.cover,
   socialImage: images.social,
   relatedPaths: ["/guides/see-team-ai-coding-usage", "/guides/see-plan-usage-and-waste", "/privacy"],
+  faq: [
+    {
+      question: "What is AI coding observability?",
+      answer:
+        "AI coding observability is measuring how an engineering team uses AI coding tools — adoption, cost, model usage, reliability, and plan utilization — across vendors such as Cursor, Claude Code, Codex, and Copilot, without inspecting source code or developer activity.",
+    },
+    {
+      question: "How is AI coding observability different from LLM observability?",
+      answer:
+        "LLM observability tools such as Helicone or Langfuse trace model calls inside your own applications. AI coding observability looks at the coding tools developers use on their laptops: which tools, which plans, what they cost, and how reliably they work.",
+    },
+    {
+      question: "Is AI coding observability the same as developer monitoring?",
+      answer:
+        "No. It measures tools and infrastructure, not people. It does not record prompts, read code, capture screens, or rank developers by token usage.",
+    },
+    {
+      question: "Do I need a gateway or proxy to get AI coding observability?",
+      answer:
+        "Not to start. A local agent can report usage signals from installed tools without intercepting traffic. A gateway can come later, once you know what you want to control.",
+    },
+  ],
   blocks: [
-    { type: "paragraph", content: [link("Github Repo", "https://github.com/Dinuda/usejunction")] },
-    { type: "image", image: images.hero },
+    { type: "paragraph", content: [link("Github Repo", "https://github.com/use-junction/usejunction")] },
     { type: "paragraph", content: [text("AI coding observability is the practice of measuring how engineering teams use AI coding tools — including adoption, cost, model usage, reliability and plan utilization — without inspecting developers’ source code or work activity.", true)] },
     { type: "paragraph", content: [text("That last part matters.")] },
     { type: "paragraph", content: [text("When I say observability, I do not mean recording every prompt, reading code or producing a leaderboard of which developer used the most tokens. I mean answering much more basic questions:")] },
@@ -88,7 +126,7 @@ export const AI_CODING_OBSERVABILITY_POST: BlogPost = {
     { type: "paragraph", content: [text("The organization is left assembling the wider picture manually.")] },
     { type: "paragraph", content: [text("This is the gap we are building "), link("UseJunction", "https://usejunction.dev", true), text(" to close: one observability layer across the AI coding tools an engineering team already uses.")] },
     { type: "image", image: images.visibility },
-    { type: "heading", text: "The problem is larger than seat waste" },
+    { type: "heading", text: "Is AI coding observability just about seat waste?" },
     { type: "paragraph", content: [text("Unused seats are the most obvious problem because they are easy to put into a spreadsheet.")] },
     { type: "paragraph", content: [text("If a company purchased 100 seats and only 43 are active, someone can cancel the rest before renewal. Useful — but not particularly deep.")] },
     { type: "paragraph", content: [text("The more interesting question is what is happening across those 43 active users.")] },
@@ -104,7 +142,7 @@ export const AI_CODING_OBSERVABILITY_POST: BlogPost = {
     ] },
     { type: "paragraph", content: [text("These measurements are related.")] },
     { type: "paragraph", content: [text("A drop in usage may be an adoption problem. It may also mean a tool became slow, a plan reached its limit or developers found a better model somewhere else. Looking at one metric — or one vendor — can give you the wrong explanation.")] },
-    { type: "heading", text: "A gateway is not always the right first move" },
+    { type: "heading", text: "Do you need an AI gateway first?" },
     { type: "image", image: images.control },
     { type: "paragraph", content: [text("The standard enterprise response to a fragmented stack is centralization.")] },
     { type: "paragraph", content: [text("Route every request through one gateway. Decide which models are allowed. Block everything else. Put policy in front of the problem.")] },
@@ -116,7 +154,7 @@ export const AI_CODING_OBSERVABILITY_POST: BlogPost = {
     { type: "paragraph", content: [text("Which workflows are important enough to protect? Which tools are redundant? Where is sensitive data actually going? What would break if we standardized too early?")] },
     { type: "paragraph", content: [text("You need evidence to answer those questions.")] },
     { type: "paragraph", content: [text("That is what I mean by visibility before control. It is not an argument against governance. It is an argument against governing an environment you have not yet mapped.")] },
-    { type: "heading", text: "Observe the infrastructure, not the developer" },
+    { type: "heading", text: "Does AI coding observability monitor developers?" },
     { type: "image", image: images.privacy },
     { type: "paragraph", content: [text("There is a dangerous version of this product category.")] },
     { type: "paragraph", content: [text("Take AI usage data, attach it to individuals and pretend it measures engineering productivity.")] },
@@ -138,7 +176,7 @@ export const AI_CODING_OBSERVABILITY_POST: BlogPost = {
     { type: "paragraph", content: [text("We are starting with observability because I do not think the first version should try to become the company’s AI police, universal router and procurement system at the same time.")] },
     { type: "paragraph", content: [text("The first job is simpler: show engineering and platform teams what is actually happening.")] },
     { type: "paragraph", content: [text("UseJunction is being built as an open-source, self-hostable system because some organizations will reasonably refuse to send this data to another external SaaS product. Even operational metadata can reveal meaningful information about engineering activity. Teams should be able to decide where that data lives.")] },
-    { type: "heading", text: "What UseJunction should tell you" },
+    { type: "heading", text: "What should AI coding observability tell you?" },
     { type: "quote", content: [text("Imagine renewal season is approaching.", true)] },
     { type: "paragraph", content: [text("You have Cursor, Copilot and Claude subscriptions spread across several teams. Some developers also use Codex, Cline, Continue or local models. Finance wants to know what can be cancelled. Engineering does not want a cost-cutting exercise to remove tools people genuinely depend on.")] },
     { type: "paragraph", content: [text("Today, this usually turns into a combination of vendor exports, surveys and guesswork.")] },
@@ -147,7 +185,7 @@ export const AI_CODING_OBSERVABILITY_POST: BlogPost = {
     { type: "paragraph", content: [text("The answer may be that the company should standardize.")] },
     { type: "paragraph", content: [text("It may also be that different teams genuinely need different tools.")] },
     { type: "paragraph", content: [text("Observability should not begin with a preferred conclusion. Its job is to make the trade-offs visible.")] },
-    { type: "heading", text: "Start with the boring questions" },
+    { type: "heading", text: "Where should a team start?" },
     { type: "paragraph", content: [text("A company does not need an elaborate AI governance programme to begin.")] },
     { type: "paragraph", content: [text("Start with the questions that should already have answers:")] },
     { type: "list", items: ["How many AI coding products are we paying for?", "Who has access?", "Which ones have been active recently?", "What portion of each plan is being consumed?", "Are API costs growing outside the subscription budget?", "Which services are regularly slow or unavailable?"].map((item) => [text(item)]) },
@@ -162,11 +200,11 @@ export const AI_CODING_OBSERVABILITY_POST: BlogPost = {
     { type: "paragraph", content: [text("The product begins with visibility. Over time, that visibility may support routing, configuration and policy controls. But those controls should be built on evidence from the real environment — not assumptions about how developers are supposed to work.")] },
     { type: "paragraph", content: [text("If your company already uses several AI coding tools, you already have an AI coding stack.")] },
     { type: "paragraph", content: [text("The only question is whether you can see it.")] },
-    { type: "paragraph", content: [text("P.S. You can self host it too: "), link("Github Repo", "https://github.com/Dinuda/usejunction")] },
+    { type: "paragraph", content: [text("P.S. You can self host it too: "), link("Github Repo", "https://github.com/use-junction/usejunction")] },
   ],
 };
 
-export const BLOG_POSTS: BlogPost[] = [AI_CODING_OBSERVABILITY_VS_EI_POST, AI_CODING_OBSERVABILITY_POST];
+export const BLOG_POSTS: BlogPost[] = [SEE_MY_TEAMS_AI_SPEND_POST, CODEXBAR_FOR_TEAMS_POST, AI_CODING_OBSERVABILITY_VS_EI_POST, AI_CODING_OBSERVABILITY_POST];
 
 export function getBlogPostBySlug(slug: string): BlogPost | undefined {
   return BLOG_POSTS.find((post) => post.slug === slug);

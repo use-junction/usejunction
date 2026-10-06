@@ -88,10 +88,16 @@ export type BlogBlock =
 
 export type BlogPost = {
   slug: string;
+  /** Primary category chip shown on cards and the article header. */
+  category: string;
+  /** Highlighted on the blog index when true; otherwise the newest post is featured. */
+  featured?: boolean;
   path: string;
   title: string;
   description: string;
   answer: string;
+  /** 3–6 one-sentence takeaways rendered under the answer — the block answer engines quote most. */
+  takeaways: string[];
   primaryKeyword: string;
   secondaryKeywords?: string[];
   topics: string[];

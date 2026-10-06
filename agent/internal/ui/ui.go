@@ -118,13 +118,16 @@ type Step struct {
 	mu     sync.Mutex
 	active bool
 	detail string
+	plain  *plainProgress
 }
 
 // StepStart begins a progress step. Call Done or Fail when finished.
 func StepStart(label string) *Step {
 	s := &Step{label: label}
 	if !Enabled() {
-		fmt.Fprintf(out, "%s...\n", label)
+		// Plain output has no spinner to overwrite: quick steps print once when they
+		// finish; slow ones announce themselves and keep a heartbeat going.
+		s.plain = startPlainProgress(label)
 		return s
 	}
 	s.stop = make(chan struct{})
@@ -147,8 +150,8 @@ func (s *Step) Update(detail string) {
 	}
 	s.detail = detail
 	s.mu.Unlock()
-	if !Enabled() {
-		fmt.Fprintf(out, "      · %s\n", detail)
+	if s.plain != nil {
+		s.plain.line("      · " + detail)
 	}
 }
 
@@ -214,9 +217,7 @@ func (s *Step) finish(ok bool, detail string) {
 		writeMu.Unlock()
 	}
 	if !Enabled() {
-		if detail != "" {
-			fmt.Fprintf(out, "%s: %s\n", s.label, detail)
-		}
+		fmt.Fprintln(out, plainResult(ok, s.label, s.plain.finish(detail)))
 		return
 	}
 	mark := styleOk().Render("✓")
@@ -240,6 +241,8 @@ const (
 	ToolScanning
 	ToolDone
 	ToolSkipped
+	// ToolAbsent: checked and not installed. Hidden, so only real tools are listed.
+	ToolAbsent
 )
 
 // ScanPanel is a live multi-line progress block: parent label + one row per tool.
@@ -253,6 +256,7 @@ type ScanPanel struct {
 	mu        sync.Mutex
 	active    bool
 	lines     int
+	plain     *plainProgress
 }
 
 // ScanPanelStart begins a multi-line scan panel. toolIDs are shown as pending rows.
@@ -278,10 +282,8 @@ func ScanPanelStart(label string, toolIDs []string) *ScanPanel {
 		status:    status,
 	}
 	if !Enabled() {
-		fmt.Fprintf(out, "%s...\n", label)
-		for _, id := range order {
-			fmt.Fprintf(out, "      ○ %s\n", id)
-		}
+		// Plain output is read top to bottom: the label, one line per tool, a summary.
+		p.plain = startPlainProgress(label)
 		return p
 	}
 	p.stop = make(chan struct{})
@@ -294,6 +296,11 @@ func ScanPanelStart(label string, toolIDs []string) *ScanPanel {
 // ToolStart marks a tool as actively scanning.
 func (p *ScanPanel) ToolStart(id string) {
 	p.setTool(id, ToolScanning)
+}
+
+// ToolAbsent marks a tool as checked but not installed on this machine.
+func (p *ScanPanel) ToolAbsent(id string) {
+	p.setTool(id, ToolAbsent)
 }
 
 // ToolFinish marks a tool as finished (or skipped on timeout).
@@ -314,20 +321,14 @@ func (p *ScanPanel) setTool(id string, st ToolScanStatus) {
 	if _, ok := p.status[id]; !ok {
 		p.toolOrder = append(p.toolOrder, id)
 	}
-	prev := p.status[id]
 	p.status[id] = st
 	p.mu.Unlock()
-	if !Enabled() {
-		if st == prev {
-			return
-		}
+	if p.plain != nil {
 		switch st {
-		case ToolScanning:
-			fmt.Fprintf(out, "      ⠋ %s\n", id)
 		case ToolDone:
-			fmt.Fprintf(out, "      ✓ %s\n", id)
+			p.plain.line(fmt.Sprintf("      ✓ %s", id))
 		case ToolSkipped:
-			fmt.Fprintf(out, "      – %s (skipped)\n", id)
+			p.plain.line(fmt.Sprintf("      – %s skipped", id))
 		}
 	}
 }
@@ -345,8 +346,8 @@ func (p *ScanPanel) Update(detail string) {
 	}
 	p.detail = detail
 	p.mu.Unlock()
-	if !Enabled() {
-		fmt.Fprintf(out, "      · %s\n", detail)
+	if p.plain != nil {
+		p.plain.line("      · " + detail)
 	}
 }
 
@@ -397,10 +398,19 @@ func (p *ScanPanel) renderLines(frame string) []string {
 	doneMark := styleOk().Render("✓")
 	skipMark := styleMuted().Render("–")
 
+	checked := 0
+	for _, id := range p.toolOrder {
+		if st := p.status[id]; st == ToolDone || st == ToolSkipped || st == ToolAbsent {
+			checked++
+		}
+	}
+	lines[0] += styleMuted().Render(fmt.Sprintf("  · checked %d of %d tools", checked, len(p.toolOrder)))
 	for _, id := range p.toolOrder {
 		var mark string
 		var name string
 		switch p.status[id] {
+		case ToolAbsent, ToolPending:
+			continue
 		case ToolScanning:
 			mark = frame
 			name = styleBody().Render(id)
@@ -461,9 +471,7 @@ func (p *ScanPanel) finish(ok bool, detail string) {
 		writeMu.Unlock()
 	}
 	if !Enabled() {
-		if detail != "" {
-			fmt.Fprintf(out, "%s: %s\n", p.label, detail)
-		}
+		fmt.Fprintln(out, plainResult(ok, p.label, p.plain.finish(detail)))
 		return
 	}
 	mark := styleOk().Render("✓")
@@ -479,10 +487,127 @@ func (p *ScanPanel) finish(ok bool, detail string) {
 	writeMu.Unlock()
 }
 
+// plainResult is the single uncoloured line a finished step prints, e.g. "  ✓ Enrolling device  MacBook-Pro".
+func plainResult(ok bool, label, detail string) string {
+	mark := "✓"
+	if !ok {
+		mark = "✗"
+	}
+	line := fmt.Sprintf("  %s %s", mark, label)
+	if detail != "" {
+		line += "  " + detail
+	}
+	return line
+}
+
+// Plain-mode pacing: announce a step that runs longer than plainAnnounceAfter,
+// then print a heartbeat every plainHeartbeat so piped installs never go silent.
+var (
+	plainAnnounceAfter = 1200 * time.Millisecond
+	plainHeartbeat     = 15 * time.Second
+)
+
+type plainProgress struct {
+	label     string
+	started   time.Time
+	after     time.Duration
+	beat      time.Duration
+	stop      chan struct{}
+	mu        sync.Mutex
+	announced bool
+	finished  bool
+}
+
+func startPlainProgress(label string) *plainProgress {
+	p := &plainProgress{label: label, started: time.Now(), after: plainAnnounceAfter, beat: plainHeartbeat, stop: make(chan struct{})}
+	go p.run()
+	return p
+}
+
+func (p *plainProgress) run() {
+	timer := time.NewTimer(p.after)
+	defer timer.Stop()
+	select {
+	case <-p.stop:
+		return
+	case <-timer.C:
+	}
+	p.announce()
+	ticker := time.NewTicker(p.beat)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-p.stop:
+			return
+		case <-ticker.C:
+			p.mu.Lock()
+			finished := p.finished
+			p.mu.Unlock()
+			if finished {
+				return
+			}
+			writeMu.Lock()
+			fmt.Fprintf(out, "      … still working · %s\n", elapsedLabel(time.Since(p.started)))
+			writeMu.Unlock()
+		}
+	}
+}
+
+// announce prints the "working on it" line once, before any detail lines.
+func (p *plainProgress) announce() {
+	p.mu.Lock()
+	if p.announced || p.finished {
+		p.mu.Unlock()
+		return
+	}
+	p.announced = true
+	p.mu.Unlock()
+	writeMu.Lock()
+	fmt.Fprintf(out, "  … %s\n", p.label)
+	writeMu.Unlock()
+}
+
+func (p *plainProgress) line(text string) {
+	p.announce()
+	writeMu.Lock()
+	fmt.Fprintln(out, text)
+	writeMu.Unlock()
+}
+
+// finish stops the heartbeat and returns the detail for the result line, with
+// the elapsed time added when the step was slow enough to be announced.
+func (p *plainProgress) finish(detail string) string {
+	if p == nil {
+		return detail
+	}
+	p.mu.Lock()
+	announced := p.announced
+	if !p.finished {
+		p.finished = true
+		close(p.stop)
+	}
+	p.mu.Unlock()
+	if !announced {
+		return detail
+	}
+	took := elapsedLabel(time.Since(p.started))
+	if detail == "" {
+		return took
+	}
+	return detail + " · " + took
+}
+
+func elapsedLabel(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Round(time.Second).Seconds()))
+	}
+	return fmt.Sprintf("%dm %02ds", int(d.Minutes()), int(d.Seconds())%60)
+}
+
 // QuietLine prints a muted secondary line under a step.
 func QuietLine(msg string) {
 	if !Enabled() {
-		fmt.Fprintln(out, msg)
+		fmt.Fprintf(out, "      %s\n", msg)
 		return
 	}
 	fmt.Fprintf(out, "      %s\n", styleMuted().Render(msg))
@@ -504,7 +629,7 @@ func ToolLine(name string, ready bool) {
 		tag = " [ready]"
 	}
 	if !Enabled() {
-		fmt.Fprintf(out, "  • %s%s\n", name, tag)
+		fmt.Fprintf(out, "      • %s%s\n", name, strings.Replace(tag, " [ready]", "  ready", 1))
 		return
 	}
 	mark := styleOk().Render("✓")
@@ -613,18 +738,26 @@ func DoctorTable(detected []types.ToolStatus) {
 func SuccessBox(adminURL, cliPath string) {
 	fmt.Fprintln(out)
 	if !Enabled() {
-		fmt.Fprintf(out, "UseJunction installed.\n")
-		fmt.Fprintf(out, "Admin:  %s\n", adminURL)
-		fmt.Fprintf(out, "CLI:    %s\n", cliPath)
-		fmt.Fprintf(out, "Next:   open a new terminal (or export PATH=\"%s:$PATH\"), then: usejunction status\n", dirOf(cliPath))
+		fmt.Fprintf(out, "  ✓ UseJunction is set up\n")
+		fmt.Fprintf(out, "      Dashboard  %s\n", adminURL)
+		fmt.Fprintf(out, "      Check      usejunction status   (in a new terminal)\n")
+		fmt.Fprintf(out, "      Installed  %s\n\n", tildePath(cliPath))
 		return
 	}
 
-	fmt.Fprintf(out, "  %s  %s\n", styleYellow().Render("◆"), styleTeal().Render("You're set"))
-	fmt.Fprintf(out, "  %s  %s\n", styleMuted().Render(padRight("Admin", 7)), styleBody().Render(adminURL))
-	fmt.Fprintf(out, "  %s  %s\n", styleMuted().Render(padRight("CLI", 7)), styleMuted().Render(cliPath))
-	fmt.Fprintf(out, "  %s  %s\n\n", styleMuted().Render(padRight("Next", 7)),
-		styleBody().Render("open a new terminal, then: usejunction status"))
+	fmt.Fprintf(out, "  %s  %s\n", styleYellow().Render("◆"), styleTeal().Render("UseJunction is set up"))
+	fmt.Fprintf(out, "      %s  %s\n", styleMuted().Render(padRight("Dashboard", 9)), styleBody().Render(adminURL))
+	fmt.Fprintf(out, "      %s  %s%s\n", styleMuted().Render(padRight("Check", 9)), styleBody().Render("usejunction status"), styleMuted().Render("   (in a new terminal)"))
+	fmt.Fprintf(out, "      %s  %s\n\n", styleMuted().Render(padRight("Installed", 9)), styleMuted().Render(tildePath(cliPath)))
+}
+
+// tildePath shortens a path under the home directory to ~/…
+func tildePath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" || !strings.HasPrefix(path, home) {
+		return path
+	}
+	return "~" + strings.TrimPrefix(path, home)
 }
 
 func padRight(s string, n int) string {

@@ -4,6 +4,7 @@ const routes = [
   "/dashboard",
   "/activity",
   "/settings",
+  "/me/data",
   "/team",
   "/team/e2e-developer",
   "/team/e2e-developer/work",
@@ -11,9 +12,7 @@ const routes = [
   "/team/e2e-developer/fleet",
   "/tools",
   "/tools/cursor",
-  "/signals",
-  "/signals/activity?days=30",
-  "/signals/settings",
+  "/work-spend",
   "/onboarding?resume=1",
 ];
 
@@ -97,18 +96,17 @@ test("mobile dashboard uses the compact header, period picker, and KPI grid", as
 });
 
 test("mobile data views expose readable cards and controls", async ({ page }) => {
-  await page.goto("/tools");
-  await page.getByRole("tab", { name: "Activity" }).click();
+  await page.goto("/tools/cursor");
   await expect(page.locator("[data-slot='mobile-data-card']").first()).toBeVisible();
 
-  await page.goto("/team/e2e-developer/work");
+  await page.goto("/team/e2e-developer/coding");
   const cards = page.locator("[data-slot='mobile-data-card']");
   if (await cards.count()) await expect(cards.first()).toBeVisible();
 });
 
 test("critical workspace routes fit at 320px", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 700 });
-  for (const route of ["/dashboard", "/activity", "/team", "/tools", "/signals", "/settings"]) {
+  for (const route of ["/dashboard", "/activity", "/team", "/tools", "/settings"]) {
     await page.goto(route);
     await expectNoPageOverflow(page);
   }

@@ -20,6 +20,7 @@ import { Panel } from "@/components/panel";
 import { SignalsMark } from "@/components/signals/signals-mark";
 import { cn } from "@/lib/utils";
 import { userFacingError } from "@/lib/errors/user-facing";
+import { signalsAllowed } from "@/lib/region";
 
 export function SignalsSettingsCard({
   initialPolicy,
@@ -79,8 +80,9 @@ export function SignalsSettingsCard({
             Signals
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Structured work from local AI coding tools (Cursor, Claude, Codex). Fine-tune retention
-            and exclusions under{" "}
+            {signalsAllowed()
+              ? "Structured work from local AI coding tools (Cursor, Claude, Codex). Fine-tune retention and exclusions under "
+              : "Not available in the EU hosted region. Usage, cost, seats, and device health remain available. Fine-tune unrelated retention under "}
             <Link href="/signals/settings" className="underline underline-offset-2 hover:text-foreground">
               Signals boundaries
               <ArrowUpRight className="ml-0.5 inline size-3.5 align-text-top" />
@@ -131,7 +133,7 @@ export function SignalsSettingsCard({
                 type="button"
                 variant="outline"
                 className="rounded-none gap-2"
-                disabled={pending}
+                disabled={pending || !signalsAllowed()}
                 onClick={() => save({ workExtractionEnabled: false })}
               >
                 {pending ? <Loader2 className="size-4 animate-spin" /> : null}
@@ -141,10 +143,10 @@ export function SignalsSettingsCard({
               <Button
                 type="button"
                 className="rounded-none"
-                disabled={pending}
+                disabled={pending || !signalsAllowed()}
                 onClick={() => setWorkConfirmOpen(true)}
               >
-                Turn on
+                {signalsAllowed() ? "Turn on" : "Not available in EU region"}
               </Button>
             )}
           </div>

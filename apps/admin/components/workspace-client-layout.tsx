@@ -6,11 +6,14 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { AppPageError, isBlockingAppQueryError } from "@/components/app-data-state";
+import { LegalAcceptanceGate } from "@/components/legal/legal-acceptance-gate";
 import { TimezoneReporter } from "@/components/timezone-reporter";
+import { NewCollectionBanner } from "@/components/new-collection-banner";
 import { activateWorkspace, AppApiError, useAppQuery } from "@/lib/api/client";
 import { workspaceContextKey } from "@/lib/app-pages/query-keys";
 import type { OrgBillingStatus } from "@/lib/saas-billing/status";
 import { canSeeOrgOverview, type OrganizationRole } from "@/lib/rbac/permissions";
+import { signalsProductEnabled } from "@/lib/region";
 
 type WorkspaceSyncState = {
   deviceCount: number;
@@ -89,17 +92,33 @@ function WorkspaceClientLayoutInner({ children }: { children: React.ReactNode })
   }, [contextQuery.data, router]);
 
   useEffect(() => {
+    if (sessionStatus === "unauthenticated") return;
+    if (!signalsProductEnabled()) {
+      if (pathname === "/signals" || pathname.startsWith("/signals/")) {
+        router.replace("/dashboard");
+        return;
+      }
+      const workMatch = pathname.match(/^\/team\/([^/]+)\/work\/?$/);
+      if (workMatch) {
+        router.replace(`/team/${workMatch[1]}`);
+        return;
+      }
+    }
     const current = contextQuery.data?.current;
     if (!current || canSeeOrgOverview(current.role)) return;
     if (
       pathname === "/team" ||
       pathname.startsWith("/team/") ||
       pathname === "/signals" ||
-      pathname.startsWith("/signals/")
+      pathname.startsWith("/signals/") ||
+      pathname === "/features" ||
+      pathname.startsWith("/features/") ||
+      pathname === "/work-spend" ||
+      pathname.startsWith("/work-spend/")
     ) {
       router.replace("/dashboard");
     }
-  }, [contextQuery.data?.current, pathname, router]);
+  }, [contextQuery.data?.current, pathname, router, sessionStatus]);
 
   useEffect(() => {
     const context = contextQuery.data;
@@ -195,6 +214,7 @@ function WorkspaceClientLayoutInner({ children }: { children: React.ReactNode })
       loading={shellLoading}
     >
       <TimezoneReporter />
+      <LegalAcceptanceGate>
       {shellLoading ? null : blockingContextError ? (
         <AppPageError
           error={contextError}
@@ -205,8 +225,12 @@ function WorkspaceClientLayoutInner({ children }: { children: React.ReactNode })
           }}
         />
       ) : (
-        children
+        <>
+          {context?.sync?.deviceCount ? <NewCollectionBanner refreshKey={context.sync.dataWatermark} /> : null}
+          {children}
+        </>
       )}
+      </LegalAcceptanceGate>
     </WorkspaceShell>
   );
 }

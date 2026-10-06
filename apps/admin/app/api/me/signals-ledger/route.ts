@@ -18,6 +18,21 @@ export async function GET(req: NextRequest) {
     take: 100,
     include: { device: { select: { hostname: true, os: true } } },
   });
+  const workSessions = await prisma.localWorkSession.findMany({
+    where: { orgId: auth.orgId, developerId: developer.id },
+    orderBy: { observedAt: "desc" },
+    take: 100,
+    select: {
+      id: true,
+      title: true,
+      tldr: true,
+      overview: true,
+      toolName: true,
+      model: true,
+      observedAt: true,
+      source: true,
+    },
+  });
 
   return NextResponse.json({
     sessions: sessions.map((session) => ({
@@ -36,6 +51,10 @@ export async function GET(req: NextRequest) {
       collectionMode: session.collectionMode,
       steps: session.steps,
       device: session.device,
+    })),
+    workSessions: workSessions.map((session) => ({
+      ...session,
+      observedAt: session.observedAt.toISOString(),
     })),
   });
 }

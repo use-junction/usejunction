@@ -78,6 +78,10 @@ func ScanOpenCode(forceFull bool) ([]types.DailyUsage, error) {
 		result = append(result, *b)
 	}
 	result = PruneAggregatesLookback(result, time.Now().UTC())
+	usageOnly = stampSourceActivity("opencode", opencodeUsageSource, usageOnly)
+	localOnly = stampSourceActivity("opencode", opencodeLocalSource, localOnly)
+	result = append([]types.DailyUsage{}, usageOnly...)
+	result = append(result, localOnly...)
 	_ = saveCache(cacheFile, result)
 
 	_ = CommitScanSnapshotUpdate(func(snap *ScanSnapshot) {

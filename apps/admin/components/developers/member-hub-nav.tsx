@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { HubNav } from "@/components/hub-nav";
+import { signalsProductEnabled } from "@/lib/region";
 
 const tabs = [
   { suffix: "", label: "Overview" },
@@ -21,8 +22,9 @@ export function MemberHubNav({
   const query = searchParams.toString();
   const querySuffix = query ? `?${query}` : "";
   const base = `/team/${developerId}`;
+  const visibleTabs = signalsProductEnabled() ? tabs : tabs.filter((tab) => tab.suffix !== "/work");
 
-  const items = tabs.map(({ suffix, label }) => {
+  const items = visibleTabs.map(({ suffix, label }) => {
     const matchHref = `${base}${suffix}`;
     return {
       href: `${matchHref}${querySuffix}`,

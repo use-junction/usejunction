@@ -12,7 +12,7 @@ import (
 
 // Version is replaced by release builds through -ldflags. The fallback keeps
 // local source builds and the first updater bootstrap identifiable.
-var Version = "0.3.4"
+var Version = "0.3.5"
 
 // LocalSyncProtocol identifies the background-job localhost sync contract.
 const LocalSyncProtocol = 2
@@ -40,6 +40,7 @@ type Config struct {
 	SignalsLastUploadAt     string `json:"signalsLastUploadAt,omitempty"`
 	WorkExtractionStartedAt string `json:"workExtractionStartedAt,omitempty"`
 	WorkExtractionLastAt    string `json:"workExtractionLastAt,omitempty"`
+	CollectionNoticeVersion string `json:"collectionNoticeVersion,omitempty"`
 	BlockedUpdateVersion    string `json:"blockedUpdateVersion,omitempty"`
 	// LastFullUsageRescanDay is the UTC YYYY-MM-DD of the last control-plane
 	// sealed full usage rescan this agent completed.

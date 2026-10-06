@@ -8,6 +8,7 @@ import { getMeOverview } from "@/lib/queries/me/overview";
 import { getDashboardTools } from "@/lib/queries/dashboard/tools";
 import { listSubscriptions } from "@/lib/tools/subscriptions";
 import { reportNow } from "@/lib/report-now";
+import { getCostOverview } from "@/lib/queries/tools/cost-overview";
 
 export type ToolsSearch = {
   view?: string | null;
@@ -45,11 +46,12 @@ export async function loadToolsPage(principal: AppPrincipal, search: ToolsSearch
   const now = reportNow();
   const reportWindow = reportWindowForCycleView(cycleView, rollingPeriod, subscriptions, now);
   const cycleWindows = cycleViewWindows(subscriptions, now);
-  const [result, syncContext] = await Promise.all([
+  const [result, syncContext, costOverview] = await Promise.all([
     getDashboardTools(principal.orgId, reportWindow)
       .then((data) => ({ data, error: null as string | null }))
       .catch(() => ({ data: null, error: "Failed to load tools." })),
     syncPromise,
+    getCostOverview(principal.orgId, subscriptions, now).catch(() => null),
   ]);
   return jsonSafe({
     kind: "organization" as const,
@@ -60,6 +62,6 @@ export async function loadToolsPage(principal: AppPrincipal, search: ToolsSearch
     subscriptions,
     error: result.error,
     syncContext,
-    defaultTab: Object.values(raw).some((value) => value != null) ? ("activity" as const) : ("subscriptions" as const),
+    costOverview,
   });
 }

@@ -234,6 +234,7 @@ export const workTraceSchema = z.object({
 export const workSessionSchema = z.object({
   localId: z.string().trim().min(1).max(160),
   toolName: z.string().trim().min(1).max(64),
+  accountKey: z.string().trim().min(1).max(256).optional(),
   model: z.string().trim().min(1).max(128).nullable().optional(),
   mode: z.string().trim().min(1).max(64).nullable().optional(),
   title: z.string().trim().min(1).max(240).nullable().optional(),

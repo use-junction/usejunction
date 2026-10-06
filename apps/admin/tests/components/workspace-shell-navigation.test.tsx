@@ -58,6 +58,7 @@ vi.mock("@/components/ui/sidebar", () => {
     SidebarFooter: Container,
     SidebarGroup: Container,
     SidebarGroupContent: Container,
+    SidebarGroupLabel: Container,
     SidebarHeader: Container,
     SidebarInset: Container,
     SidebarMenu: ({
@@ -128,9 +129,9 @@ test("loading shell shows nav skeletons and page skeleton without role-specific 
   );
 
   expect(screen.getByLabelText("Loading navigation")).toBeTruthy();
-  expect(screen.getAllByTestId("sidebar-menu-skeleton")).toHaveLength(6);
+  expect(screen.getAllByTestId("sidebar-menu-skeleton")).toHaveLength(8);
   expect(screen.getByLabelText("Loading page")).toBeTruthy();
   expect(screen.queryByText("Current page")).toBeNull();
-  expect(screen.queryByRole("link", { name: "My tools" })).toBeNull();
+  expect(screen.queryByRole("link", { name: "Cost" })).toBeNull();
   expect(screen.queryByRole("link", { name: "Team" })).toBeNull();
 });

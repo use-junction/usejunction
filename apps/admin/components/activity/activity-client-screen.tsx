@@ -19,6 +19,7 @@ import { Panel } from "@/components/panel";
 import { DeviceActivityFeed } from "@/components/activity/device-activity-feed";
 import { SentReportsSection } from "@/components/activity/sent-reports-section";
 import { UsageBreakdownList } from "@/components/activity/usage-breakdown-list";
+import { TeamAdoptionView } from "@/components/activity/team-adoption-view";
 import { LocalSyncPanel } from "@/components/dashboard/local-sync-panel";
 import { ConnectionRepairBanner } from "@/components/dashboard/connection-repair-banner";
 import { CycleViewPicker } from "@/components/dashboard/cycle-view-picker";
@@ -26,8 +27,9 @@ import { FlowPath, SignalsKpi, SignalsSectionHeader } from "@/components/signals
 import { type CycleView, type CycleViewWindows } from "@/lib/dashboard/cycle-view";
 import { type RollingPeriod } from "@/lib/dashboard/period-prefs";
 import type { AudienceScope } from "@/lib/audience-scope";
+import { signalsProductEnabled } from "@/lib/region";
 import type { getDeviceActivityFeed } from "@/lib/queries/activity/device-activity";
-import type { getDashboardUsage } from "@/lib/queries/dashboard/usage";
+import type { TeamAdoption } from "@/lib/queries/activity/adoption";
 import type { getMeOverview } from "@/lib/queries/me/overview";
 import { formatCompactNumber } from "@/lib/format";
 import type { getPersonalSignalsLedger } from "@/lib/signals/read";
@@ -39,7 +41,6 @@ import { DashboardSetupPanel } from "@/components/dashboard/setup-panel";
 
 type DeviceFeed = Awaited<ReturnType<typeof getDeviceActivityFeed>>;
 type MeOverview = Awaited<ReturnType<typeof getMeOverview>>;
-type OrgUsage = Awaited<ReturnType<typeof getDashboardUsage>>;
 type SignalsLedger = Awaited<ReturnType<typeof getPersonalSignalsLedger>>;
 
 type BreakdownRow = {
@@ -184,42 +185,6 @@ function fromPersonal(
   };
 }
 
-function fromOrganization(usage: OrgUsage, deviceFeed: DeviceFeed, periodLabel: string): ActivityViewModel {
-  const tools = [...usage.byTool].sort((a, b) => b.requests - a.requests || b.tokens - a.tokens);
-  const models = [...usage.byModel].sort(
-    (a, b) => b.requests - a.requests || b.tokens - a.tokens || (a.model ?? "").localeCompare(b.model ?? ""),
-  );
-  return {
-    scope: "team",
-    periodLabel,
-    kpis: {
-      requests: usage.kpis.modelCalls,
-      sessions: usage.kpis.sessions,
-      tokens: usage.kpis.inputTokens + usage.kpis.outputTokens,
-      tools: tools.length,
-      toolsSub: "with traffic this period",
-    },
-    tools: tools.map((row) => ({
-      key: row.toolName ?? "unknown",
-      toolName: row.toolName,
-      requests: row.requests,
-      cost: row.cost,
-      metaExtra: row.tokens > 0 ? `${formatCompactNumber(row.tokens)} tokens` : null,
-    })),
-    models: models.map((row) => ({
-      key: `${row.toolName}-${row.model}-${row.source}`,
-      toolName: row.toolName,
-      model: row.model,
-      requests: row.requests,
-      cost: row.cost,
-      metaExtra: row.tokens > 0 ? `${formatCompactNumber(row.tokens)} tokens` : null,
-    })),
-    deviceFeed,
-    showDeveloperOnFeed: true,
-    showDeviceFeed: true,
-  };
-}
-
 function SharedActivityView({ view }: { view: ActivityViewModel }) {
   const isYou = view.scope === "you";
 
@@ -303,7 +268,7 @@ function SharedActivityView({ view }: { view: ActivityViewModel }) {
         </Panel>
       </div>
 
-      {isYou && view.signalsLedger ? (
+      {isYou && signalsProductEnabled() && view.signalsLedger ? (
         <Panel as="section" className="mt-10">
           <SignalsSectionHeader
             title="Your Signals ledger."
@@ -358,7 +323,7 @@ type ActivityPayload =
       rollingPeriod: RollingPeriod;
       periodLabel: string;
       cycleWindows?: CycleViewWindows;
-      usage: OrgUsage;
+      adoption: TeamAdoption;
       deviceFeed: DeviceFeed;
     };
 
@@ -384,7 +349,7 @@ export default function ActivityClientScreen() {
         payload.periodLabel,
       );
     }
-    return fromOrganization(payload.usage, payload.deviceFeed, payload.periodLabel);
+    return null;
   }, [payload]);
 
   useAppQueryErrorToast(query.error && query.data ? query.error : null, { retry: () => void query.refetch() });
@@ -405,12 +370,8 @@ export default function ActivityClientScreen() {
         <ConnectionRepairBanner scope="you" recoveryDevices={view.sync?.recoveryDevices} />
       ) : null}
       <ActivityPageHeader
-        title={isYou ? "Your activity." : "Activity."}
-        description={
-          isYou
-            ? `Your request volume, tools, models, and reports for ${periodLabel}.`
-            : `Team request volume, tools, models, and reports for ${periodLabel}.`
-        }
+        title={isYou ? "How are you using it?" : "Adoption."}
+        description={isYou ? undefined : "Who has made AI part of how they work, who hasn't started, and who needs help getting set up."}
         actions={
           allowDeveloperPeriodControls ? (
             <CycleViewPicker
@@ -426,6 +387,11 @@ export default function ActivityClientScreen() {
 
       {payload.kind === "personal" && (payload.youUnlinked || !payload.personal) ? (
         <DashboardSetupPanel canInvite={false} />
+      ) : payload.kind === "organization" ? (
+        <TeamAdoptionView data={payload.adoption} periodLabel={periodLabel}>
+          <DeviceActivityFeed feed={payload.deviceFeed} showDeveloper />
+          <SentReportsSection audience="team" />
+        </TeamAdoptionView>
       ) : view ? (
         <SharedActivityView view={view} />
       ) : null}

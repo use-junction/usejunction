@@ -8,6 +8,7 @@ import type { SignalsActivityInput } from "@/lib/signals/contracts/activity.v1";
 import { resolveSignalsWindows } from "@/lib/signals/queries/windows";
 import { readLocalWorkSessions } from "@/lib/signals/readers/work-sessions";
 import { getOrgSignalsPolicy } from "@/lib/signals/service";
+import { sanitizeWorkTraceForViewer } from "@/lib/privacy/sanitize-work-trace";
 import { rolesFor } from "@/lib/rbac/permissions";
 import type { WorkTrace } from "@/lib/signals/work-trace";
 
@@ -93,7 +94,7 @@ export async function getWorkActivity(
         observedAt: session.observedAt.toISOString(),
         source: session.source,
         toolCallCounts: asCounts(session.toolCallCounts),
-        trace: session.trace,
+        trace: sanitizeWorkTraceForViewer(session.trace, false),
       })),
     },
   });

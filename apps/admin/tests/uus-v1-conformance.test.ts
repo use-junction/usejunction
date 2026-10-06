@@ -90,10 +90,27 @@ describe("UUS v1 conformance", () => {
     expect(uusPartitionKey({
       date: row!.date,
       tool: row!.tool,
+      accountKey: row!.accountKey,
       model: row!.model ?? "",
       source: row!.source,
       repository: row!.repository,
-    })).toBe("2026-07-21|cursor|gpt-4.1|local_scan|github.com/acme/app");
+    })).toBe("2026-07-21|cursor||gpt-4.1|local_scan|github.com/acme/app");
     expect(uusContentFingerprint(row!).startsWith("in:5,")).toBe(true);
+
+    const scoped = normalizeUusWireRecord({
+      date: "2026-07-21",
+      tool: "cursor",
+      accountKey: "work@acme.com",
+      model: "gpt-4.1",
+      source: "local_scan",
+    });
+    expect(uusPartitionKey({
+      date: scoped!.date,
+      tool: scoped!.tool,
+      accountKey: scoped!.accountKey,
+      model: scoped!.model ?? "",
+      source: scoped!.source,
+      repository: scoped!.repository,
+    })).toBe("2026-07-21|cursor|work@acme.com|gpt-4.1|local_scan|");
   });
 });

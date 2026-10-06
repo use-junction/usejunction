@@ -76,6 +76,7 @@ func ScanCursorLocal(forceFull bool) ([]types.DailyUsage, error) {
 		result = append(result, *b)
 	}
 	result = PruneAggregatesLookback(result, time.Now().UTC())
+	result = stampSourceActivity("cursor", cursorLocalSource, result)
 	_ = saveCache(cacheFile, result)
 	_ = CommitScanSnapshotUpdate(func(snap *ScanSnapshot) {
 		snap.Aggregates = ReplaceSourceAggregates(snap.Aggregates, "cursor", cursorLocalSource, result)
@@ -328,12 +329,12 @@ func MergeCursorUsage(local, events []types.DailyUsage) []types.DailyUsage {
 	out := make([]types.DailyUsage, 0, len(local)+len(events))
 	seen := map[string]bool{}
 	for _, e := range events {
-		key := e.Date + "|" + e.Model + "|" + e.Source
+		key := e.Date + "|" + e.Model + "|" + e.Source + "|" + e.AccountKey
 		seen[key] = true
 		out = append(out, e)
 	}
 	for _, l := range local {
-		key := l.Date + "|" + l.Model + "|" + l.Source
+		key := l.Date + "|" + l.Model + "|" + l.Source + "|" + l.AccountKey
 		if seen[key] {
 			continue
 		}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findDeviceByBearerToken } from "@/lib/auth";
+import { remapGitHubAuthorAfterUsageSync } from "@/lib/features/pipeline";
 import { reportDeviceSyncTargets } from "@/lib/sync/remote-sync";
 import { limitedJson } from "@/lib/security/http";
 import { logServerError } from "@/lib/errors/public";
@@ -45,6 +46,15 @@ export async function POST(req: NextRequest) {
         : undefined,
       errorMessage: typeof body.errorMessage === "string" ? body.errorMessage : null,
     });
+    if (status === "succeeded") {
+      void remapGitHubAuthorAfterUsageSync(device.orgId, device.userId).catch((error) => {
+        logServerError("features/remap-after-usage-sync", error, {
+          orgId: device.orgId,
+          developerId: device.userId,
+          deviceId: device.id,
+        });
+      });
+    }
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
     logServerError("devices/sync/report", error);

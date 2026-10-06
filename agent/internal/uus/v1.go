@@ -34,6 +34,7 @@ type Record struct {
 	GenAISystem        string         `json:"gen_ai.system,omitempty"`
 	Tool               string         `json:"tool"`
 	ToolName           string         `json:"toolName,omitempty"` // legacy
+	AccountKey         string         `json:"accountKey,omitempty"`
 	Model              string         `json:"model"`
 	GenAIModel         string         `json:"gen_ai.request.model,omitempty"`
 	Source             string         `json:"source"`
@@ -62,7 +63,7 @@ type Record struct {
 }
 
 // PartitionKey returns the UUS grain key for manifests / fingerprints.
-func PartitionKey(date, tool, model, source string, repo *Repository) string {
+func PartitionKey(date, tool, accountKey, model, source string, repo *Repository) string {
 	repoKey := ""
 	if repo != nil {
 		repoKey = fmt.Sprintf("%s/%s/%s",
@@ -71,7 +72,7 @@ func PartitionKey(date, tool, model, source string, repo *Repository) string {
 			strings.TrimSpace(repo.Name),
 		)
 	}
-	return fmt.Sprintf("%s|%s|%s|%s|%s", date, tool, model, source, repoKey)
+	return fmt.Sprintf("%s|%s|%s|%s|%s|%s", date, tool, strings.TrimSpace(accountKey), model, source, repoKey)
 }
 
 // ContentFingerprint hashes absolute totals for delta detection.
@@ -152,6 +153,7 @@ func FromDailyUsage(row types.DailyUsage) Record {
 		Date:               row.Date,
 		Tool:               tool,
 		ToolName:           tool,
+		AccountKey:         row.AccountKey,
 		Model:              row.Model,
 		GenAIModel:         row.Model,
 		Source:             source,
@@ -199,7 +201,7 @@ func BuildManifest(rows []types.DailyUsage) []ManifestEntry {
 	for _, row := range rows {
 		rec := FromDailyUsage(row)
 		source := rec.Source
-		key := PartitionKey(rec.Date, rec.Tool, rec.Model, source, rec.Repository)
+		key := PartitionKey(rec.Date, rec.Tool, rec.AccountKey, rec.Model, source, rec.Repository)
 		fp := ContentFingerprint(rec)
 		if existing, ok := byKey[key]; ok {
 			existing.ContentHash = fp

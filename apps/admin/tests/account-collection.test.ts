@@ -11,12 +11,12 @@ import {
   usageEffectivelyEnabled,
 } from "@/lib/privacy/account-collection-policy";
 
-test("every provider stays off until that account is opted in", () => {
+test("usage collection is on by default and activity logging stays off", () => {
   assert.equal(isGatedCollectionTool("cursor"), true);
   assert.equal(isGatedCollectionTool("codex"), true);
   assert.equal(isGatedCollectionTool("claude"), true);
   assert.equal(isGatedCollectionTool("  "), false);
-  assert.equal(defaultCollectionFlags("cursor").usageEnabled, false);
+  assert.equal(defaultCollectionFlags("cursor").usageEnabled, true);
   assert.equal(defaultCollectionFlags("claude").loggingEnabled, false);
 });
 
@@ -66,10 +66,18 @@ test("admin lock is a separate switch from person opt-in", () => {
   );
 });
 
-test("ingest drops a provider that is not opted in", () => {
-  const allowed = new Set(["cursor"]);
-  assert.equal(keepUsageRow("claude", allowed), false);
-  assert.equal(keepUsageRow("cursor", allowed), true);
-  assert.equal(keepUsageRow("codex", allowed), false);
-  assert.equal(keepUsageRow("", allowed), false);
+test("ingest drops a provider account that is not opted in", () => {
+  const allowed = new Set(["cursor\0user-1"]);
+  assert.equal(keepUsageRow("claude", "user-1", allowed), false);
+  assert.equal(keepUsageRow("cursor", "user-1", allowed), true);
+  assert.equal(keepUsageRow("cursor", "user-2", allowed), false);
+  assert.equal(keepUsageRow("cursor", "", allowed), false);
+  assert.equal(keepUsageRow("", "user-1", allowed), false);
+});
+
+test("any number of logins can be opted in independently", () => {
+  const allowed = new Set(["cursor\0personal", "cursor\0contractor"]);
+  assert.equal(keepUsageRow("cursor", "personal", allowed), true);
+  assert.equal(keepUsageRow("cursor", "work", allowed), false);
+  assert.equal(keepUsageRow("cursor", "contractor", allowed), true);
 });

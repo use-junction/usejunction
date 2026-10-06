@@ -17,11 +17,15 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/usejunction/agent/internal/accountpolicy"
 	"github.com/usejunction/agent/internal/client"
+	"github.com/usejunction/agent/internal/probe"
+	"github.com/usejunction/agent/internal/scan"
 )
 
 // MinAgentVersion is the first agent release that enforces forward-only work
@@ -63,7 +67,48 @@ func Collect(opts Options) []client.WorkSession {
 	if len(out) > maxSessionsIncremental {
 		out = sortByObservedDesc(out)[:maxSessionsIncremental]
 	}
+	stampWorkSessionAccounts(out)
 	return out
+}
+
+func stampWorkSessionAccounts(sessions []client.WorkSession) {
+	keys := map[string]string{}
+	load := func(tool string) string {
+		tool = strings.ToLower(strings.TrimSpace(tool))
+		if tool == "codex-work" {
+			tool = "codex"
+		}
+		if v, ok := keys[tool]; ok {
+			return v
+		}
+		key := strings.TrimSpace(scan.SignedInAccount(tool))
+		if key == "" {
+			switch tool {
+			case "cursor":
+				if acc, err := probe.CursorAccountFromLocal(); err == nil && acc != nil {
+					key = accountpolicy.NormalizeKey(acc.AccountKey, acc.Email)
+				}
+			case "codex":
+				home := os.Getenv("CODEX_HOME")
+				if home == "" {
+					if h, err := os.UserHomeDir(); err == nil {
+						home = filepath.Join(h, ".codex")
+					}
+				}
+				if acc, err := probe.CodexAccountFromAuth(home); err == nil && acc != nil {
+					key = accountpolicy.NormalizeKey(acc.AccountKey, acc.Email)
+				}
+			}
+		}
+		keys[tool] = key
+		return key
+	}
+	for i := range sessions {
+		if strings.TrimSpace(sessions[i].AccountKey) != "" {
+			continue
+		}
+		sessions[i].AccountKey = load(sessions[i].ToolName)
+	}
 }
 
 // FilterAtOrAfter enforces the inclusive server-authoritative collection

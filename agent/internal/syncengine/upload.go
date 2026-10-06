@@ -123,7 +123,7 @@ func UploadUsageSession(ctx context.Context, api *client.APIClient, rows []types
 	pending := make([]types.DailyUsage, 0, len(rows))
 	for _, row := range rows {
 		rec := uus.FromDailyUsage(row)
-		key := uus.PartitionKey(rec.Date, rec.Tool, rec.Model, rec.Source, rec.Repository)
+		key := uus.PartitionKey(rec.Date, rec.Tool, rec.AccountKey, rec.Model, rec.Source, rec.Repository)
 		if _, ok := deltaSet[key]; ok {
 			pending = append(pending, row)
 		}
@@ -205,6 +205,7 @@ func usageToAggregate(row types.DailyUsage) client.UsageAggregate {
 	return client.UsageAggregate{
 		Date:               row.Date,
 		ToolName:           row.ToolName,
+		AccountKey:         row.AccountKey,
 		Model:              row.Model,
 		InputTokens:        row.InputTokens,
 		OutputTokens:       row.OutputTokens,

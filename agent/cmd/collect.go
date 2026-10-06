@@ -109,7 +109,7 @@ func collectAndReportWithTools(
 		progress = func(string, string) {}
 	}
 
-	progress("heartbeat", "Registering local agent")
+	progress("heartbeat", "Connecting to UseJunction")
 	hb, err := heartbeat(api)
 	if err != nil {
 		return 0, 0, 0, 0, nil, warnings, fmt.Errorf("heartbeat: %w", err)
@@ -133,6 +133,7 @@ func collectAndReportWithTools(
 	if policyErr != nil && verbose {
 		fmt.Printf("[collect] account policy: %v\n", policyErr)
 	}
+	linkClaudeLogins(accountPolicy)
 
 	var toolReports []client.ToolReport
 	var accountReports []client.AccountReport
@@ -168,6 +169,11 @@ func collectAndReportWithTools(
 			outcomes[idx] = providerOutcome{id: id, result: result, timedOut: timedOut}
 			if timedOut {
 				progress("scan-tool-skip", id)
+				return
+			}
+			if len(result.toolReports) == 0 {
+				// Checked, not installed: never shown as found.
+				progress("scan-tool-absent", id)
 				return
 			}
 			progress("scan-tool-done", id)
@@ -369,40 +375,57 @@ func collectProvider(ctx context.Context, p providers.Provider, refresh bool, po
 	})
 
 	acc, _ := p.AccountIdentity(ctx)
-	allowUsage := accountpolicy.UsageAllowed(policy, p.ID(), accountKeyOf(acc), emailOf(acc))
+	signedIn := accountpolicy.NormalizeKey(accountKeyOf(acc), emailOf(acc))
+	scan.SetSignedInAccount(p.ID(), signedIn)
+	if p.ID() == "codex" {
+		scan.SetSignedInAccount("codex-work", signedIn)
+	}
 
-	if allowUsage {
-		if daily, scanErr := p.ScanLocalUsage(ctx, refresh); scanErr == nil {
-			for _, row := range daily {
-				result.usageReports = append(result.usageReports, usageToAggregate(row))
+	if daily, scanErr := p.ScanLocalUsage(ctx, refresh); scanErr == nil {
+		for _, row := range daily {
+			if strings.TrimSpace(row.AccountKey) == "" && guessSignedInAccount(row) {
+				row.AccountKey = signedIn
 			}
+			if !accountpolicy.UsageAllowed(policy, row.ToolName, row.AccountKey, "") {
+				continue
+			}
+			result.usageReports = append(result.usageReports, usageToAggregate(row))
 		}
 	}
+
+	allowUsage := accountpolicy.UsageAllowed(policy, p.ID(), signedIn, emailOf(acc))
 
 	var quotaSnaps []types.QuotaSnapshot
 	if allowUsage {
 		switch p.ID() {
 		case "cursor":
-			if snaps, probeAcc, err := probe.ProbeCursorQuota(ctx); err == nil {
+			snaps, probeAcc, err := probe.ProbeCursorQuota(ctx)
+			if err == nil {
 				quotaSnaps = snaps
 				acc = mergeToolAccounts(acc, probeAcc)
 			}
+			logQuotaProbe(p.ID(), err)
 		case "codex":
-			if snaps, probeAcc, err := probe.ProbeCodexQuota(ctx, codexHomeForProbe()); err == nil {
+			snaps, probeAcc, err := probe.ProbeCodexQuota(ctx, codexHomeForProbe())
+			if err == nil {
 				quotaSnaps = snaps
 				acc = mergeToolAccounts(acc, probeAcc)
 			}
+			logQuotaProbe(p.ID(), err)
 		case "claude":
 			snaps, probeAcc, err := probe.ProbeClaudeQuota(ctx, claudeConfigDirForProbe())
 			acc = mergeToolAccounts(acc, probeAcc)
 			if err == nil {
 				quotaSnaps = snaps
 			}
+			logQuotaProbe(p.ID(), err)
 		default:
-			quotaSnaps, _ = p.ProbeQuota(ctx)
+			snaps, err := p.ProbeQuota(ctx)
+			quotaSnaps = snaps
+			logQuotaProbe(p.ID(), err)
 		}
-	} else if acc != nil {
-		fmt.Printf("[collect] %s: skipping usage until this account is turned on\n", p.ID())
+	} else if acc != nil && verbose {
+		fmt.Printf("[collect] %s: skipping quota until this account is turned on\n", p.ID())
 	}
 
 	plan := ""
@@ -422,14 +445,16 @@ func collectProvider(ctx context.Context, p providers.Provider, refresh bool, po
 			LoginMethod: acc.LoginMethod,
 			AuthPresent: acc.AuthPresent || plan != "",
 		})
-		if plan == "" && len(quotaSnaps) > 0 {
+		if plan == "" && len(quotaSnaps) > 0 && verbose {
 			fmt.Printf("[collect] %s: auth/quota present but plan empty — seat sync will use catalog default when available\n", toolName)
 		}
 	}
+	result.accountReports = append(result.accountReports, otherAccountReports(ctx, p)...)
 
 	for _, snap := range quotaSnaps {
 		result.quotaReports = append(result.quotaReports, client.QuotaReport{
 			ToolName:         snap.ToolName,
+			AccountKey:       signedIn,
 			WindowType:       snap.WindowType,
 			UsedPercent:      snap.UsedPercent,
 			ResetAt:          snap.ResetAt,
@@ -473,6 +498,14 @@ func shouldForceFullUsageRescan(refresh bool, sealedDay, lastFullDay string) boo
 	return sealedDay != "" && sealedDay > lastFullDay
 }
 
+// logQuotaProbe records why a tool reported no plan windows, so "no quota" is
+// never silent in the agent log (e.g. "claude credentials not found").
+func logQuotaProbe(toolID string, err error) {
+	if err != nil && verbose {
+		fmt.Printf("[collect] %s: no quota windows: %v\n", toolID, err)
+	}
+}
+
 func accountKeyOf(acc *types.ToolAccount) string {
 	if acc == nil {
 		return ""
@@ -485,4 +518,43 @@ func emailOf(acc *types.ToolAccount) string {
 		return ""
 	}
 	return acc.Email
+}
+
+func guessSignedInAccount(row types.DailyUsage) bool {
+	switch strings.TrimSpace(row.Source) {
+	case "cursor_local", "opencode_local", "opencode_usage", "antigravity_local", "antigravity_usage", "copilot_traces":
+		return false
+	default:
+		return true
+	}
+}
+
+// otherAccountReports lists the provider's non-active logins on this device so
+// each gets its own collection switch.
+func otherAccountReports(ctx context.Context, p providers.Provider) []client.AccountReport {
+	multi, ok := p.(providers.MultiAccountProvider)
+	if !ok {
+		return nil
+	}
+	var reports []client.AccountReport
+	for _, other := range multi.OtherAccounts(ctx) {
+		// A login with no email is not a signed-in account yet. Claude desktop
+		// sessions can exist before we learn the address; ask once it is known.
+		if strings.TrimSpace(other.Email) == "" {
+			continue
+		}
+		toolName := strings.TrimSpace(other.ToolName)
+		if toolName == "" {
+			toolName = p.ID()
+		}
+		reports = append(reports, client.AccountReport{
+			ToolName:    toolName,
+			AccountKey:  other.AccountKey,
+			Email:       other.Email,
+			Plan:        strings.TrimSpace(other.Plan),
+			LoginMethod: other.LoginMethod,
+			AuthPresent: other.AuthPresent,
+		})
+	}
+	return reports
 }

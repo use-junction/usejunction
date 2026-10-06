@@ -307,6 +307,180 @@ async function createAutomaticDeviceSyncRequest(device: {
   return true;
 }
 
+export type FeaturesGitHubAuthorSyncResult = {
+  skipped: boolean;
+  reason?: string;
+  developers: number;
+  devices: number;
+  requestsCreated: number;
+};
+
+/**
+ * Queues a durable remote usage sync for each mapped GitHub author's devices
+ * and publishes an Ably wake on that developer's channel. Deduped by the
+ * caller-supplied automation key (Features uses a 15-minute bucket).
+ */
+export async function createFeaturesGitHubAuthorSyncRequest(input: {
+  orgId: string;
+  developerIds: string[];
+  now: Date;
+  automationKeyFor: (developerId: string) => string;
+}): Promise<FeaturesGitHubAuthorSyncResult> {
+  if (input.developerIds.length === 0) {
+    return { skipped: true, reason: "no_mapped_authors", developers: 0, devices: 0, requestsCreated: 0 };
+  }
+
+  const devices = await prisma.device.findMany({
+    where: {
+      orgId: input.orgId,
+      ...activeDeviceWhere,
+      userId: { in: input.developerIds },
+      remoteSyncProtocol: { gte: REMOTE_SYNC_PROTOCOL },
+    },
+    select: { id: true, userId: true },
+  });
+  if (devices.length === 0) {
+    return {
+      skipped: true,
+      reason: "no_remote_capable_devices",
+      developers: input.developerIds.length,
+      devices: 0,
+      requestsCreated: 0,
+    };
+  }
+
+  const devicesByDeveloper = new Map<string, string[]>();
+  for (const device of devices) {
+    const current = devicesByDeveloper.get(device.userId) ?? [];
+    current.push(device.id);
+    devicesByDeveloper.set(device.userId, current);
+  }
+
+  let requestsCreated = 0;
+  for (const [developerId, deviceIds] of devicesByDeveloper) {
+    if (await createFeaturesAuthorDeviceSyncRequest({
+      orgId: input.orgId,
+      developerId,
+      deviceIds,
+      automationKey: input.automationKeyFor(developerId),
+      now: input.now,
+    })) {
+      requestsCreated += 1;
+    }
+  }
+
+  return {
+    skipped: requestsCreated === 0,
+    reason: requestsCreated === 0 ? "already_queued" : undefined,
+    developers: devicesByDeveloper.size,
+    devices: devices.length,
+    requestsCreated,
+  };
+}
+
+async function createFeaturesAuthorDeviceSyncRequest(input: {
+  orgId: string;
+  developerId: string;
+  deviceIds: string[];
+  automationKey: string;
+  now: Date;
+}) {
+  const existing = await prisma.syncRequest.findUnique({
+    where: { automationKey: input.automationKey },
+    select: { id: true },
+  });
+  if (existing) return false;
+
+  const expiresAt = new Date(input.now.getTime() + REQUEST_TTL_MS);
+  let request: { id: string };
+  try {
+    request = await prisma.$transaction(async (tx) => {
+      const created = await tx.syncRequest.create({
+        data: {
+          orgId: input.orgId,
+          requesterUserId: null,
+          scope: "you",
+          trigger: "features_github",
+          automationKey: input.automationKey,
+          developerId: input.developerId,
+          realtimeChannel: channelForScope("you", input.orgId, input.developerId),
+          dispatchStatus: "pending",
+          expiresAt,
+          targets: {
+            createMany: {
+              data: input.deviceIds.map((deviceId) => ({
+                orgId: input.orgId,
+                deviceId,
+                status: "queued",
+              })),
+            },
+          },
+        },
+        select: { id: true },
+      });
+      await tx.auditLog.create({
+        data: {
+          orgId: input.orgId,
+          actorType: "system",
+          actorId: null,
+          action: "sync_request.features_github",
+          targetType: "sync_request",
+          targetId: created.id,
+          metadata: {
+            developerId: input.developerId,
+            automationKey: input.automationKey,
+            deviceIds: input.deviceIds,
+            expiresAt: expiresAt.toISOString(),
+          },
+        },
+      });
+      return created;
+    });
+  } catch (error) {
+    if (typeof error === "object" && error && "code" in error && error.code === "P2002") return false;
+    throw error;
+  }
+
+  try {
+    const dispatch = await publishWake({
+      id: request.id,
+      orgId: input.orgId,
+      scope: "you",
+      developerId: input.developerId,
+      realtimeChannel: `device-sync:developer:${input.developerId}`,
+    });
+    await prisma.syncRequest.update({
+      where: { id: request.id },
+      data: dispatch.ok
+        ? { dispatchStatus: "published", publishedAt: new Date(), dispatchError: null }
+        : { dispatchStatus: dispatch.status, dispatchError: dispatch.error },
+    });
+    if (!dispatch.ok) {
+      notifyServerIssue({
+        severity: "warning",
+        scope: "features-github/ably",
+        error: dispatch.error,
+        details: { requestId: request.id, developerId: input.developerId },
+      });
+    }
+  } catch (error) {
+    await prisma.syncRequest.update({
+      where: { id: request.id },
+      data: {
+        dispatchStatus: "degraded",
+        dispatchError: (error instanceof Error ? error.message : "Ably publish failed").slice(0, 2000),
+      },
+    });
+    notifyServerIssue({
+      severity: "warning",
+      scope: "features-github/ably",
+      error,
+      details: { requestId: request.id, developerId: input.developerId },
+    });
+  }
+  return true;
+}
+
 /**
  * Reconciles liveness without requiring a signed-in browser. Page visits call
  * this with notifications disabled as a fast fallback; the cron enables the

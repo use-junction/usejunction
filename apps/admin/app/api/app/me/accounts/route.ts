@@ -6,6 +6,7 @@ import { resolveLinkedDeveloperId } from "@/lib/queries/me/resolve-developer";
 import {
   listCollectionEvents,
   listGatedAccounts,
+  listPendingCollectionDecisions,
   setDeveloperAccountOptIn,
   setDeveloperCollectionSwitch,
   setDeveloperProviderCollection,
@@ -20,12 +21,13 @@ export async function GET(req: NextRequest) {
   const principal = await requireAppPrincipal(req, rolesFor("self_view"));
   if (principal instanceof NextResponse) return principal;
   const developerId = await resolveLinkedDeveloperId(principal.orgId, principal.userId);
-  if (!developerId) return NextResponse.json({ accounts: [], events: [] });
-  const [accounts, events] = await Promise.all([
+  if (!developerId) return NextResponse.json({ accounts: [], events: [], pending: [] });
+  const [accounts, events, pending] = await Promise.all([
     listGatedAccounts({ orgId: principal.orgId, userId: developerId }),
     listCollectionEvents({ orgId: principal.orgId, userId: developerId }),
+    listPendingCollectionDecisions({ orgId: principal.orgId, userId: developerId }),
   ]);
-  return NextResponse.json({ accounts, events });
+  return NextResponse.json({ accounts, events, pending });
 }
 
 export async function PATCH(req: NextRequest) {
@@ -69,6 +71,7 @@ export async function PATCH(req: NextRequest) {
       toolName,
       accountKey,
       enabled: body.enabled,
+      recordDecision: body.decision === true,
     });
     if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
     return NextResponse.json({ account: result });

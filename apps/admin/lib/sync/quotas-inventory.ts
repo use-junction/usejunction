@@ -11,6 +11,7 @@ import {
 
 export type QuotaInventoryItem = {
   toolName: string;
+  accountKey?: string | null;
   windowType: string;
   usedPercent?: number | null;
   resetAt?: string | null;
@@ -49,7 +50,7 @@ export async function recordQuotaObservations(params: {
         : null;
     if (!toolName || !windowType || !resetAt || Number.isNaN(resetAt.getTime()) || usedPercent == null) continue;
     const existing = await prisma.quotaObservation.findFirst({
-      where: { deviceId: params.deviceId, toolName, windowType, resetAt, sampleBucket },
+      where: { deviceId: params.deviceId, toolName, accountKey: String(item.accountKey ?? "").trim(), windowType, resetAt, sampleBucket },
       select: { id: true },
     });
     if (existing) {
@@ -63,6 +64,7 @@ export async function recordQuotaObservations(params: {
           orgId: device.orgId,
           deviceId: params.deviceId,
           toolName,
+          accountKey: String(item.accountKey ?? "").trim(),
           windowType,
           resetAt,
           usedPercent,
@@ -92,7 +94,10 @@ export function quotasInventoryCanonicalLine(item: QuotaInventoryItem): string {
       ? String(item.creditsRemaining)
       : "";
   const source = String(item.source ?? "").trim();
-  return `${toolName}|${windowType}|${used}|${resetAt}|${credits}|${source}`;
+  const accountKey = String(item.accountKey ?? "").trim();
+  return accountKey
+    ? `${toolName}|${windowType}|${used}|${resetAt}|${credits}|${source}|${accountKey}`
+    : `${toolName}|${windowType}|${used}|${resetAt}|${credits}|${source}`;
 }
 
 export function quotasInventoryContentHash(items: QuotaInventoryItem[]): string {
@@ -119,19 +124,20 @@ export async function applyDeviceQuotaInventory(params: {
     usedPercent: number | null;
     creditsRemaining: number | null;
   }> = [];
-  const windowsByTool = new Map<string, Set<string>>();
+  const windowsByAccount = new Map<string, { toolName: string; accountKey: string; windows: Set<string> }>();
 
   for (const snap of params.items) {
     const toolName = String(snap.toolName ?? "").trim();
     const windowType = String(snap.windowType ?? "").trim();
     if (!toolName || !windowType) continue;
-
-    const windows = windowsByTool.get(toolName) ?? new Set<string>();
-    windows.add(windowType);
-    windowsByTool.set(toolName, windows);
+    const accountKey = String(snap.accountKey ?? "").trim();
+    const groupKey = `${toolName}\0${accountKey}`;
+    const group = windowsByAccount.get(groupKey) ?? { toolName, accountKey, windows: new Set<string>() };
+    group.windows.add(windowType);
+    windowsByAccount.set(groupKey, group);
 
     const existing = await prisma.quotaSnapshot.findFirst({
-      where: { deviceId: params.deviceId, toolName, windowType },
+      where: { deviceId: params.deviceId, toolName, accountKey, windowType },
     });
 
     const usedPercent =
@@ -160,6 +166,7 @@ export async function applyDeviceQuotaInventory(params: {
           orgId: params.orgId,
           deviceId: params.deviceId,
           toolName,
+          accountKey,
           windowType,
           usedPercent,
           resetAt,
@@ -181,12 +188,13 @@ export async function applyDeviceQuotaInventory(params: {
     });
     pruned += result.count;
   } else {
-    for (const [toolName, windowTypes] of windowsByTool) {
+    for (const group of windowsByAccount.values()) {
       const result = await prisma.quotaSnapshot.deleteMany({
         where: {
           deviceId: params.deviceId,
-          toolName,
-          windowType: { notIn: [...windowTypes] },
+          toolName: group.toolName,
+          accountKey: group.accountKey,
+          windowType: { notIn: [...group.windows] },
         },
       });
       pruned += result.count;
@@ -221,25 +229,34 @@ export async function applyDeviceQuotaInventory(params: {
   return { upserted, pruned };
 }
 
-/** Drop snapshots for tools that reported an account but no quota windows. */
+/** Drop snapshots for accounts that reported identity but no quota windows. */
 export async function pruneQuotaToolsMissingWindows(params: {
   deviceId: string;
-  accountTools: string[];
-  quotaTools: string[];
+  accounts: Array<{ toolName: string; accountKey?: string | null }>;
+  quotas: Array<{ toolName: string; accountKey?: string | null }>;
 }): Promise<number> {
   const withWindows = new Set(
-    params.quotaTools.map((tool) => tool.trim()).filter(Boolean),
+    params.quotas
+      .map((row) => `${String(row.toolName ?? "").trim()}\0${String(row.accountKey ?? "").trim()}`)
+      .filter((token) => !token.startsWith("\0")),
   );
   const missing = [
     ...new Set(
-      params.accountTools
-        .map((tool) => tool.trim())
-        .filter((tool) => tool && !withWindows.has(tool)),
+      params.accounts
+        .map((row) => ({
+          toolName: String(row.toolName ?? "").trim(),
+          accountKey: String(row.accountKey ?? "").trim(),
+        }))
+        .filter((row) => row.toolName && !withWindows.has(`${row.toolName}\0${row.accountKey}`)),
     ),
   ];
   if (!missing.length) return 0;
-  const result = await prisma.quotaSnapshot.deleteMany({
-    where: { deviceId: params.deviceId, toolName: { in: missing } },
-  });
-  return result.count;
+  let pruned = 0;
+  for (const row of missing) {
+    const result = await prisma.quotaSnapshot.deleteMany({
+      where: { deviceId: params.deviceId, toolName: row.toolName, accountKey: row.accountKey },
+    });
+    pruned += result.count;
+  }
+  return pruned;
 }

@@ -37,7 +37,7 @@ export function HomeTeamProfiles() {
             <ArrowRight className="size-4" />
           </Link>
           <p className="mt-4 text-xs leading-5 text-muted-foreground/80">
-            Work summaries and person-level detail can be turned off — per person or for the whole team.
+            Usage collection can be turned off per login.
           </p>
         </div>
       </div>

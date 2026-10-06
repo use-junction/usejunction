@@ -59,14 +59,7 @@ export default function SignalsOverviewClientScreen() {
 
   return (
     <>
-      <SignalsPageHeader
-        title="Signals"
-        description={
-          isYou
-            ? "Your coding-tool work sessions when Signals extraction is on."
-            : "See what your team does well—and help more people do it."
-        }
-      >
+      <SignalsPageHeader title="Where is the work?">
         <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-end sm:gap-6">
           {work.enabled ? (
             <CycleViewPicker

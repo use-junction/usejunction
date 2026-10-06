@@ -19,6 +19,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { canonicalToolKey } from "@/lib/tools/catalog";
 import { userFacingError } from "@/lib/errors/user-facing";
+import { browserMutationInit } from "@/lib/api/client";
+import type { CollectionNoticeCopy } from "@/lib/privacy/collection-notice";
 import { cn } from "@/lib/utils";
 
 const POLL_INTERVAL_MS = 2500;
@@ -89,6 +91,10 @@ export const DeviceConnectCard = forwardRef<DeviceConnectCardHandle, Props>(func
   const [controlPlaneUrl, setControlPlaneUrl] = useState("");
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<CollectionNoticeCopy | null>(null);
+  const [noticeAcked, setNoticeAcked] = useState(false);
+  const [noticeChecked, setNoticeChecked] = useState(false);
+  const [noticeBusy, setNoticeBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [waitingForTools, setWaitingForTools] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
@@ -269,6 +275,20 @@ export const DeviceConnectCard = forwardRef<DeviceConnectCardHandle, Props>(func
     [deviceEnrolled, ensureFreshEnrollment],
   );
 
+  const acknowledgeNotice = useCallback(async () => {
+    setNoticeBusy(true);
+    setError(null);
+    const response = await fetch("/api/me/collection-notice", browserMutationInit("POST", { accept: true }));
+    const body = (await response.json().catch(() => ({}))) as { acknowledged?: boolean; error?: string };
+    setNoticeBusy(false);
+    if (!response.ok || !body.acknowledged) {
+      setError(userFacingError(body.error, "Could not record the collection notice."));
+      return false;
+    }
+    setNoticeAcked(true);
+    return true;
+  }, []);
+
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
@@ -288,6 +308,15 @@ export const DeviceConnectCard = forwardRef<DeviceConnectCardHandle, Props>(func
         setKnownIds(new Set(devices.map((item) => item.id)));
       }
 
+      const noticeResponse = await fetch("/api/me/collection-notice", { credentials: "same-origin" });
+      const noticeBody = (await noticeResponse.json().catch(() => ({}))) as {
+        acknowledged?: boolean;
+        notice?: CollectionNoticeCopy;
+      };
+      if (noticeBody.notice) setNotice(noticeBody.notice);
+      const acked = noticeBody.acknowledged === true;
+      setNoticeAcked(acked);
+
       if (initialCredentials) {
         setToken(initialCredentials.token);
         setExpiresAt(initialCredentials.expiresAt);
@@ -300,7 +329,7 @@ export const DeviceConnectCard = forwardRef<DeviceConnectCardHandle, Props>(func
         if (shouldEnterSyncWait(existing)) {
           beginSyncWait(existing);
         }
-      } else if (!initialCredentials) {
+      } else if (!initialCredentials && acked) {
         await generateToken();
       }
 
@@ -495,6 +524,58 @@ export const DeviceConnectCard = forwardRef<DeviceConnectCardHandle, Props>(func
               Check again
             </Button>
           ) : null}
+        </div>
+      ) : !noticeAcked && notice ? (
+        <div className="space-y-4 border border-border bg-white p-4">
+          <div>
+            <p className="text-sm font-medium">{notice.title}</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">{notice.summary}</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Collected</p>
+              <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted-foreground">
+                {notice.collects.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Never</p>
+              <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted-foreground">
+                {notice.neverCollects.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          <p className="text-sm leading-6 text-muted-foreground">{notice.whoSees}</p>
+          <p className="text-sm leading-6 text-muted-foreground">{notice.retention}</p>
+          <label className="flex items-start gap-2 text-sm leading-6">
+            <input
+              type="checkbox"
+              className="mt-1 size-4 accent-[#08a8c4]"
+              checked={noticeChecked}
+              onChange={(event) => setNoticeChecked(event.target.checked)}
+            />
+            <span>I understand what this agent will upload about this device.</span>
+          </label>
+          {error ? (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+          <Button
+            type="button"
+            disabled={!noticeChecked || noticeBusy}
+            onClick={() => {
+              void acknowledgeNotice().then((ok) => {
+                if (ok) void generateToken();
+              });
+            }}
+          >
+            {noticeBusy ? "Saving…" : "Continue to connect command"}
+          </Button>
         </div>
       ) : (
         <>

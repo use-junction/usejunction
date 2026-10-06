@@ -17,6 +17,28 @@ const TOOL_LOGO_FILES: Record<string, string> = {
 };
 
 function DecorativeToolIcon({ name }: { name: string }) {
+  if (name === "Continue") {
+    return (
+      <svg
+        width={28}
+        height={28}
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden="true"
+        focusable="false"
+        className="shrink-0 text-[#1D4ED8]"
+      >
+        <path
+          d="m9 7-5 5 5 5m6-10 5 5-5 5"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    );
+  }
+
   const logoFile = TOOL_LOGO_FILES[name];
   if (logoFile) {
     return (

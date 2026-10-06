@@ -252,8 +252,15 @@ func claudePlanFromOAuthAccount(oa claudeJSONOAuthAccount) string {
 		return normalizeClaudePlan(st)
 	}
 	orgType := strings.ToLower(strings.TrimSpace(oa.OrganizationType))
-	if strings.Contains(orgType, "team") {
+	switch {
+	case strings.Contains(orgType, "team"):
 		return "team-standard"
+	case strings.Contains(orgType, "enterprise"):
+		return "enterprise"
+	case orgType == "claude_max":
+		return "max"
+	case orgType == "claude_pro":
+		return "pro"
 	}
 	return ""
 }

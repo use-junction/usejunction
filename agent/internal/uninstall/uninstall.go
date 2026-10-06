@@ -31,6 +31,7 @@ func Run(verbose bool) error {
 	}
 
 	stopServices()
+	removeDarwinAppBundles()
 	fmt.Printf("Removing %s…\n", config.ConfigDir())
 	_ = os.RemoveAll(config.ConfigDir())
 
@@ -52,5 +53,23 @@ func stopServices() {
 		_ = exec.Command("systemctl", "--user", "disable", "--now", id.SystemdUnit).Run()
 		_ = os.Remove(unitFile)
 		fmt.Println("Removed systemd user service.")
+	}
+}
+
+func removeDarwinAppBundles() {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+	id := config.CurrentServiceIdentity()
+	configDir := config.ConfigDir()
+	for _, p := range []string{
+		id.AppBundlePath(),
+		id.PreviousAppBundlePath(),
+		id.LegacyAppBundlePath(configDir),
+		filepath.Join(configDir, id.AppName+".previous.app"),
+		filepath.Join(configDir, id.AppName+".app.previous"),
+		filepath.Join(configDir, "UseJunction Agent.app"),
+	} {
+		_ = os.RemoveAll(p)
 	}
 }

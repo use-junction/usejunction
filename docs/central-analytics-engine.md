@@ -195,5 +195,4 @@ pnpm --filter @usejunction/admin test
 pnpm --filter @usejunction/admin build
 pnpm --filter @usejunction/db prisma validate
 pnpm --filter @usejunction/db prisma generate
-./scripts/full-stack-e2e.sh
 ```

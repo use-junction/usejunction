@@ -31,10 +31,11 @@ type SourceWatermark struct {
 // ScanSnapshot persists the last computed daily aggregates and source watermarks
 // so incremental syncs can skip unchanged tools.
 type ScanSnapshot struct {
-	Version    int                         `json:"version"`
-	SavedAt    string                      `json:"savedAt"`
-	Aggregates []types.DailyUsage          `json:"aggregates"`
-	Sources    map[string]SourceWatermark  `json:"sources"`
+	Version      int                        `json:"version"`
+	SavedAt      string                     `json:"savedAt"`
+	Aggregates   []types.DailyUsage         `json:"aggregates"`
+	Sources      map[string]SourceWatermark `json:"sources"`
+	AccountFiles map[string]string          `json:"accountFiles,omitempty"`
 }
 
 func scanSnapshotPath() string {
@@ -134,7 +135,7 @@ func aggregateKey(row types.DailyUsage) string {
 	if source == "" {
 		source = "local_scan"
 	}
-	return fmt.Sprintf("%s|%s|%s|%s", row.ToolName, row.Date, row.Model, source)
+	return fmt.Sprintf("%s|%s|%s|%s|%s", row.ToolName, row.AccountKey, row.Date, row.Model, source)
 }
 
 // PruneAggregatesLookback drops rows older than UsageLookbackDays.
@@ -160,6 +161,19 @@ func ReplaceSourceAggregates(existing []types.DailyUsage, toolName, source strin
 	out := make([]types.DailyUsage, 0, len(existing)+len(next))
 	for _, row := range existing {
 		if row.ToolName == toolName && row.Source == source {
+			continue
+		}
+		out = append(out, row)
+	}
+	out = append(out, next...)
+	return out
+}
+
+// ReplaceAccountSourceAggregates drops rows for one tool+source+account then appends next.
+func ReplaceAccountSourceAggregates(existing []types.DailyUsage, toolName, source, accountKey string, next []types.DailyUsage) []types.DailyUsage {
+	out := make([]types.DailyUsage, 0, len(existing)+len(next))
+	for _, row := range existing {
+		if row.ToolName == toolName && row.Source == source && strings.TrimSpace(row.AccountKey) == strings.TrimSpace(accountKey) {
 			continue
 		}
 		out = append(out, row)

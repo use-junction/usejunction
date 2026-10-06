@@ -1,3 +1,5 @@
+import { isEuDeployment } from "@/lib/region";
+
 type SlackBlock = {
   type: string;
   text?: { type: string; text: string; emoji?: boolean };
@@ -52,6 +54,16 @@ export function isRecentSignup(createdAt: Date, now = Date.now()) {
 }
 
 export function notifyUserSignedUp(input: { email: string; name?: string | null; method: string }) {
+  if (isEuDeployment()) {
+    notifySlackBestEffort({
+      text: `New signup via ${input.method}`,
+      blocks: [
+        header("New signup"),
+        section(`A user signed up via *${input.method}* on the EU deployment.`),
+      ],
+    });
+    return;
+  }
   const name = input.name?.trim() || "—";
   notifySlackBestEffort({
     text: `New signup: ${input.email}`,
@@ -68,6 +80,16 @@ export function notifyUserLoggedIn(input: {
   name?: string | null;
   provider: string;
 }) {
+  if (isEuDeployment()) {
+    notifySlackBestEffort({
+      text: `User login via ${input.provider}`,
+      blocks: [
+        header("User login"),
+        section(`A user logged in via *${input.provider}* on the EU deployment.`),
+      ],
+    });
+    return;
+  }
   const name = input.name?.trim() || "—";
   notifySlackBestEffort({
     text: `User login: ${input.email}`,

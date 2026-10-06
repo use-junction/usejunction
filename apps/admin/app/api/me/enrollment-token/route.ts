@@ -5,7 +5,8 @@ import { audit, rolesFor } from "@/lib/rbac";
 import { getPublicAppUrl } from "@/lib/public-url";
 import { assertCanEnrollDevice } from "@/lib/saas-billing/status";
 import { issueEnrollmentToken } from "@/lib/enrollment-token";
-import { limitedJson, browserMutationGuard } from "@/lib/security/http";
+import { COLLECTION_NOTICE_VERSION } from "@/lib/legal/versions";
+import { browserMutationGuard, limitedJson } from "@/lib/security/http";
 
 export async function POST(req: NextRequest) {
   const rejected = browserMutationGuard(req);
@@ -18,6 +19,20 @@ export async function POST(req: NextRequest) {
     where: { orgId: principal.orgId, authUserId: principal.userId },
   });
   if (!developer) return NextResponse.json({ error: "developer profile required" }, { status: 409 });
+
+  const membership = await prisma.organizationMembership.findUnique({
+    where: { userId_orgId: { userId: principal.userId, orgId: principal.orgId } },
+    select: { collectionNoticeAckAt: true, collectionNoticeVersion: true },
+  });
+  if (
+    !membership?.collectionNoticeAckAt ||
+    membership.collectionNoticeVersion !== COLLECTION_NOTICE_VERSION
+  ) {
+    return NextResponse.json(
+      { error: "Acknowledge the collection notice before connecting a device." },
+      { status: 403 },
+    );
+  }
 
   const enrollGate = await assertCanEnrollDevice(principal.orgId, developer.id);
   if (!enrollGate.allowed) {

@@ -17,8 +17,9 @@ import {
   isObservedAtEligible,
 } from "@/lib/signals/collection-window";
 import { enforceSignalsRetention, getEffectiveSignalsPolicy } from "@/lib/signals/service";
+import { signalsAllowed } from "@/lib/region";
+import { deviceAccountStreamAllowed } from "@/lib/privacy/account-collection";
 import { logServerError } from "@/lib/errors/public";
-import { deviceActiveAccountAllowed } from "@/lib/privacy/account-collection";
 
 export const maxDuration = 60;
 
@@ -380,6 +381,7 @@ function cleanSession(row: WorkSessionInput, allowRawWorkText: boolean) {
 
   return {
     localId: row.localId.slice(0, 160),
+    accountKey: cleanText(row.accountKey, 256) ?? "",
     toolName: cleanText(row.toolName, 64) ?? "unknown",
     model: cleanText(row.model, 128),
     mode: cleanText(row.mode, 64),
@@ -406,8 +408,11 @@ export async function POST(req: NextRequest) {
     if (device instanceof NextResponse) return device;
 
     const policy = await getEffectiveSignalsPolicy(device.orgId);
-    if (!policy.workExtractionEnabled) {
-      return NextResponse.json({ error: "work extraction disabled" }, { status: 403 });
+    if (!signalsAllowed() || !policy.workExtractionEnabled) {
+      return NextResponse.json(
+        { error: signalsAllowed() ? "work extraction disabled" : "Signals work extraction is not available." },
+        { status: 403 },
+      );
     }
     if (!isAgentCompatibleForWorkExtraction(device.agentVersion)) {
       return NextResponse.json({ error: "agent update required" }, { status: 409 });
@@ -447,9 +452,10 @@ export async function POST(req: NextRequest) {
         beforeCollectionStartSkipped += 1;
         continue;
       }
-      if (!(await deviceActiveAccountAllowed({
+      if (!(await deviceAccountStreamAllowed({
         deviceId: device.id,
         toolName: session.toolName,
+        accountKey: session.accountKey,
         stream: "logging",
       }))) {
         skipped += 1;
@@ -457,7 +463,7 @@ export async function POST(req: NextRequest) {
       }
 
       await prisma.localWorkSession.upsert({
-        where: { deviceId_localId: { deviceId: device.id, localId: session.localId } },
+        where: { deviceId_localId_accountKey: { deviceId: device.id, localId: session.localId, accountKey: session.accountKey } },
         update: {
           toolName: session.toolName,
           model: session.model,
@@ -479,6 +485,7 @@ export async function POST(req: NextRequest) {
           developerId: device.userId,
           deviceId: device.id,
           localId: session.localId,
+          accountKey: session.accountKey,
           toolName: session.toolName,
           model: session.model,
           mode: session.mode,

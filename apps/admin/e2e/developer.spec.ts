@@ -6,18 +6,18 @@ const developerEmail = process.env.E2E_DEVELOPER_EMAIL ?? "developer@example.com
 test("developer calculation views use personal usage totals", async ({ page }) => {
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/dashboard/);
-  await expect(page.getByRole("heading", { name: "Spend, traffic, coverage." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What's reporting?" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Current cycles." })).toBeVisible();
   await expect(page.getByRole("row", { name: /Cursor gpt-4\.1 10 .*\$6\.00 Verified/i })).toBeVisible();
   await expect(page.getByRole("row", { name: /OpenCode opencode-go\/kimi-k2\.7-code/i })).toBeVisible();
 
   await page.goto("/activity");
-  await expect(page.getByRole("heading", { level: 1, name: "Your activity." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "How are you using it?" })).toBeVisible();
   await expect(page.getByText("Requests").first()).toBeVisible();
   await expect(page.getByText("10").first()).toBeVisible();
 
   await page.goto("/tools");
-  await expect(page.getByRole("heading", { level: 1, name: "Your tools, usage, spend." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "What are you paying for?" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Your tools." })).toBeVisible();
   await expect(page.getByText("Active tools")).toBeVisible();
   await expect(page.getByText("Total tokens")).toBeVisible();
@@ -28,9 +28,9 @@ test("developer calculation views use personal usage totals", async ({ page }) =
 
 test("developer chrome hides owner-only navigation", async ({ page }) => {
   await page.goto("/dashboard");
-  await expect(page.getByRole("link", { name: "Home" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /My tools|Tools/i }).first()).toBeVisible();
-  await expect(page.getByRole("link", { name: /My activity|Activity/i }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Coverage" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Cost", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Adoption", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Team" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Signals" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Settings", exact: true })).toBeVisible();
@@ -42,7 +42,7 @@ test("developer chrome hides owner-only navigation", async ({ page }) => {
   await expect(page.getByRole("tablist", { name: "Audience" })).toHaveCount(0);
 
   await page.goto("/settings");
-  await expect(page.getByRole("heading", { level: 1, name: "Settings." })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "How is this set up?" })).toBeVisible();
   await expect(page.getByRole("tablist", { name: "Audience" })).toHaveCount(0);
 
   await page.goto("/reports/daily");

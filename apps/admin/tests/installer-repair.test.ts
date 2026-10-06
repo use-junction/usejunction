@@ -15,3 +15,12 @@ test("resume repair preserves enrollment while refreshing outdated binaries", ()
   assert.match(windows, /\$repairInstall/);
   assert.match(windows, /Resuming UseJunction setup from the existing enrollment/);
 });
+
+test("macOS installer installs the app bundle into ~/Applications", () => {
+  const unix = readFileSync(path.join(repoRoot, "install.sh"), "utf8");
+  assert.match(unix, /APPS_DIR="\$\{HOME\}\/Applications"/);
+  assert.match(unix, /APP_DIR="\$\{APPS_DIR\}\/\$\{APP_NAME\}\.app"/);
+  assert.match(unix, /HIDDEN_APP_DIR="\$\{HOME_DIR\}\/\$\{APP_NAME\}\.app"/);
+  assert.match(unix, /ln -sfn "\$\{APP_DIR\}\/Contents\/MacOS\/usejunction"/);
+  assert.match(unix, /remove_hidden_macos_app/);
+});

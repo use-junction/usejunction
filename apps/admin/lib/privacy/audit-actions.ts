@@ -1,0 +1,16 @@
+export const PRIVACY_AUDIT_ACTIONS = {
+  exportCompleted: "privacy.export_completed",
+  erasureRequested: "privacy.erasure_requested",
+  erasureCompleted: "privacy.erasure_completed",
+  erasureCancelled: "privacy.erasure_cancelled",
+  analyticsGranted: "consent.analytics_granted",
+  analyticsWithdrawn: "consent.analytics_withdrawn",
+  collectionNoticeAcknowledged: "collection_notice.acknowledged",
+  accountUsageEnabled: "account_collection.usage_enabled",
+  accountUsageDisabled: "account_collection.usage_disabled",
+  accountLoggingEnabled: "account_collection.logging_enabled",
+  accountLoggingDisabled: "account_collection.logging_disabled",
+  usagePurged: "retention.usage_purged",
+  legalAccepted: "legal.accepted",
+  retentionUpdated: "privacy.retention_updated",
+} as const;

@@ -28,6 +28,10 @@ test("seo registry includes priority guides and compare pages", () => {
   assert.ok(paths.has("/for/claude-code"));
   assert.ok(paths.has("/privacy"));
   assert.ok(paths.has("/terms"));
+  assert.ok(paths.has("/gdpr"));
+  assert.ok(paths.has("/security"));
+  assert.ok(paths.has("/subprocessors"));
+  assert.ok(paths.has("/dpa"));
 });
 
 test("homepage keeps brand messaging while CodexBar for Windows stays in SEO surfaces", () => {
@@ -135,7 +139,7 @@ test("llms-full.txt includes page summaries", () => {
 });
 
 test("native blog exposes canonical founder-authored posts", () => {
-  assert.equal(BLOG_POSTS.length, 2);
+  assert.equal(BLOG_POSTS.length, 4);
   const flagship = BLOG_POSTS.find((post) => post.path === "/blog/ai-coding-observability-vs-jellyfish-dx-linearb");
   assert.ok(flagship);
   assert.equal(flagship!.author.name, "Dinuda Yaggahavita");
@@ -152,6 +156,25 @@ test("native blog exposes canonical founder-authored posts", () => {
 
   const original = BLOG_POSTS.find((post) => post.path === "/blog/what-is-ai-coding-observability");
   assert.ok(original);
+
+  const codexbar = BLOG_POSTS.find((post) => post.path === "/blog/codexbar-for-teams");
+  assert.ok(codexbar);
+  assert.equal(codexbar!.primaryKeyword, "CodexBar for teams");
+  assert.ok(buildSitemapEntries().some((entry) => entry.path === "/blog/codexbar-for-teams"));
+});
+
+test("every blog post ships answer-engine essentials", () => {
+  for (const post of BLOG_POSTS) {
+    assert.ok(post.category, `${post.slug} needs a category`);
+    assert.ok(post.takeaways.length >= 3, `${post.slug} needs at least 3 takeaways`);
+    assert.ok(post.faq && post.faq.length >= 3, `${post.slug} needs at least 3 FAQs`);
+    assert.equal(post.socialImage.width, 1200, `${post.slug} social image must be 1200x630`);
+    assert.equal(post.socialImage.height, 630, `${post.slug} social image must be 1200x630`);
+    assert.ok(post.heroImage.alt.length > 40, `${post.slug} cover needs descriptive alt text`);
+    const article = buildBlogPostJsonLd(post).find((node) => node["@type"] === "BlogPosting");
+    assert.equal(article?.articleSection, post.category);
+    assert.ok(Number(article?.wordCount) > 300);
+  }
 });
 
 test("home JSON-LD includes FAQPage and unambiguous brand identity", () => {
@@ -165,7 +188,7 @@ test("home JSON-LD includes FAQPage and unambiguous brand identity", () => {
   assert.ok(types.includes("Organization"));
   assert.ok(types.includes("SoftwareApplication"));
   assert.deepEqual(website?.alternateName, ["usejunction", "Use Junction", "usejunction.dev"]);
-  assert.deepEqual(organization?.sameAs, ["https://github.com/Dinuda/usejunction"]);
+  assert.deepEqual(organization?.sameAs, ["https://github.com/use-junction/usejunction"]);
   assert.match(String(website?.description), /Not Junction Panel/i);
   assert.match(String(software?.description), /usejunction\.dev/);
   assert.match(String(organization?.description), /not Junction Panel/i);

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -73,11 +74,12 @@ func TestPlainFallbacks(t *testing.T) {
 	got := buf.String()
 	for _, want := range []string{
 		"UseJunction",
-		"Enrolling device",
-		"• cursor [ready]",
-		"UseJunction installed.",
-		"Admin:  http://localhost:3001",
-		"CLI:    /tmp/.usejunction/bin/usejunction",
+		"  ✓ Enrolling device  ok",
+		"• cursor  ready",
+		"✓ UseJunction is set up",
+		"Dashboard  http://localhost:3001",
+		"Check      usejunction status",
+		"Installed  /tmp/.usejunction/bin/usejunction",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("plain output missing %q\n%s", want, got)
@@ -108,10 +110,10 @@ func TestStepUpdatePlainMode(t *testing.T) {
 
 	got := buf.String()
 	for _, want := range []string{
-		"Uploading initial usage...",
+		"  … Uploading initial usage\n",
 		"· Scanning cursor",
 		"· Syncing usage (934 rows)",
-		"Uploading initial usage: 6 tools · 934 usage rows",
+		"  ✓ Uploading initial usage  6 tools · 934 usage rows · 0s",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("plain progress missing %q\n%s", want, got)
@@ -144,24 +146,13 @@ func TestScanPanelPlainMode(t *testing.T) {
 	panel.Done("3 tools · 12 usage rows")
 
 	got := buf.String()
-	for _, want := range []string{
-		"Uploading initial usage...",
-		"○ cursor",
-		"○ claude",
-		"○ codex",
-		"⠋ cursor",
-		"✓ cursor",
-		"⠋ claude",
-		"– claude (skipped)",
-		"· Syncing usage (12 rows)",
-		"Uploading initial usage: 3 tools · 12 usage rows",
-	} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("plain scan panel missing %q\n%s", want, got)
-		}
-	}
-	if strings.Count(got, "· Syncing usage (12 rows)") != 1 {
-		t.Fatalf("duplicate detail lines should be suppressed:\n%s", got)
+	want := "  … Uploading initial usage\n" +
+		"      ✓ cursor\n" +
+		"      – claude skipped\n" +
+		"      · Syncing usage (12 rows)\n" +
+		"  ✓ Uploading initial usage  3 tools · 12 usage rows · 0s\n"
+	if got != want {
+		t.Fatalf("plain scan panel should show the label, each tool, progress, and a summary:\n%s", got)
 	}
 }
 
@@ -236,5 +227,90 @@ func TestScanPanelDoneDoesNotDeadlock(t *testing.T) {
 	case <-finished:
 	case <-time.After(2 * time.Second):
 		t.Fatal("ScanPanel.Done() deadlocked with spinner goroutine")
+	}
+}
+
+func TestPlainQuickStepPrintsOneLine(t *testing.T) {
+	origNoColor, origOut := forceNoColor, out
+	t.Cleanup(func() { forceNoColor, out = origNoColor, origOut })
+	var buf bytes.Buffer
+	SetNoColor(true)
+	SetWriter(&buf)
+
+	StepStart("Enrolling device").Done("MacBook-Pro · cms22foy")
+	if got := buf.String(); got != "  ✓ Enrolling device  MacBook-Pro · cms22foy\n" {
+		t.Fatalf("quick plain step should be one line, got:\n%s", got)
+	}
+}
+
+func TestPlainSlowStepAnnouncesAndKeepsAHeartbeat(t *testing.T) {
+	origNoColor, origOut := forceNoColor, out
+	origAnnounce, origBeat := plainAnnounceAfter, plainHeartbeat
+	t.Cleanup(func() {
+		forceNoColor, out = origNoColor, origOut
+		plainAnnounceAfter, plainHeartbeat = origAnnounce, origBeat
+	})
+	var buf syncBuffer
+	SetNoColor(true)
+	SetWriter(&buf)
+	plainAnnounceAfter, plainHeartbeat = 10*time.Millisecond, 20*time.Millisecond
+
+	step := StepStart("Uploading initial usage")
+	time.Sleep(70 * time.Millisecond)
+	step.Done("6 tools")
+	got := buf.String()
+	for _, want := range []string{"  … Uploading initial usage\n", "… still working · ", "  ✓ Uploading initial usage  6 tools · "} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("slow plain step missing %q:\n%s", want, got)
+		}
+	}
+	after := buf.String()
+	time.Sleep(50 * time.Millisecond)
+	if buf.String() != after {
+		t.Fatalf("heartbeat kept printing after the step finished:\n%s", buf.String())
+	}
+}
+
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+func TestScanPanelHidesToolsThatAreNotInstalled(t *testing.T) {
+	origNoColor, origOut := forceNoColor, out
+	t.Cleanup(func() { forceNoColor, out = origNoColor, origOut })
+	var buf bytes.Buffer
+	SetNoColor(true)
+	SetWriter(&buf)
+
+	panel := ScanPanelStart("Uploading initial usage", []string{"cursor", "roo", "ollama"})
+	panel.ToolFinish("cursor", false)
+	panel.ToolAbsent("roo")
+	panel.ToolAbsent("ollama")
+	panel.Done("1 tool")
+	got := buf.String()
+	if strings.Contains(got, "roo") || strings.Contains(got, "ollama") {
+		t.Fatalf("tools that are not installed must not be listed:\n%s", got)
+	}
+	if !strings.Contains(got, "✓ cursor") {
+		t.Fatalf("installed tool missing:\n%s", got)
+	}
+
+	p := &ScanPanel{label: "Uploading", toolOrder: []string{"cursor", "roo"}, status: map[string]ToolScanStatus{"cursor": ToolDone, "roo": ToolAbsent}}
+	lines := strings.Join(p.renderLines("·"), "\n")
+	if strings.Contains(lines, "roo") || !strings.Contains(lines, "checked 2 of 2 tools") {
+		t.Fatalf("live panel should hide absent tools and count checks:\n%s", lines)
 	}
 }

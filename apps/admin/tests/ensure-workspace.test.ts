@@ -83,6 +83,7 @@ test("createWorkspaceForUser does not create a Team row", async () => {
   assert.equal(developerData.orgId, "org_1");
   assert.equal(developerData.authUserId, "user_1");
   assert.equal("teamId" in developerData, false);
+  assert.equal(mocks.organizationCreate.mock.calls[0][0].data.dataRegion, "us");
 });
 
 test("provisionWorkspaceOnCreateUser creates a personal workspace for OAuth signup", async () => {

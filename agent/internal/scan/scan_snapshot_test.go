@@ -95,7 +95,7 @@ func TestScanSnapshotRoundTrip(t *testing.T) {
 	}
 
 	snap := ScanSnapshot{
-		Aggregates: []types.DailyUsage{{ToolName: "codex", Date: "2026-07-20", Model: "x", Source: "local_scan"}},
+		Aggregates: []types.DailyUsage{{ToolName: "codex", Date: time.Now().UTC().Format("2006-01-02"), Model: "x", Source: "local_scan"}},
 		Sources: map[string]SourceWatermark{
 			"jsonl:/x": {Path: "/x", Size: 1, ModTime: 2},
 		},

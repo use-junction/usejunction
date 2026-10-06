@@ -6,6 +6,7 @@ import { ensureOwnerWorkspace } from "@/lib/ensure-workspace";
 import { notifyUserSignedUp } from "@/lib/notifications/slack";
 import { limitedJson } from "@/lib/security/http";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
+import { recordLegalAcceptance } from "@/lib/legal/acceptance";
 import { logServerError } from "@/lib/errors/public";
 
 const MAX_PASSWORD_BYTES = 256;
@@ -26,6 +27,12 @@ export async function POST(request: NextRequest) {
     const password = String(body.password ?? "");
     const intent = body.intent === "team" ? "team" : null;
     const from = safeAuthNextPath(typeof body.from === "string" ? body.from : null, "/dashboard");
+    if (body.acceptTerms !== true) {
+      return NextResponse.json(
+        { error: "Accept the Terms of Service and Privacy Policy to create an account." },
+        { status: 400 },
+      );
+    }
     if (!name || !/^\S+@\S+\.\S+$/.test(email) || password.length < 12 || Buffer.byteLength(password, "utf8") > MAX_PASSWORD_BYTES || password !== body.confirmPassword) {
       return NextResponse.json(
         { error: "Enter a valid name, work email, and matching password of at least 12 characters." },
@@ -37,6 +44,7 @@ export async function POST(request: NextRequest) {
     let user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
       user = await prisma.user.create({ data: { name, email, passwordHash: await hash(password, 12) } });
+      await recordLegalAcceptance(user.id);
       notifyUserSignedUp({ email, name, method: "email" });
       if (intent) await prisma.planInterest.create({ data: { plan: intent, email, name, userId: user.id } });
       // Invitees join an existing org on redeem — don't create a personal workspace first.

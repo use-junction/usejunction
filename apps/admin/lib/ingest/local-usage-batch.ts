@@ -19,6 +19,7 @@ export {
 export type LocalUsageInputRow = {
   date: string;
   toolName: string;
+  accountKey?: string;
   model?: string;
   inputTokens?: number;
   outputTokens?: number;
@@ -48,6 +49,7 @@ export type NormalizedLocalUsageRow = {
   date: Date;
   dateKey: string;
   toolName: string;
+  accountKey: string;
   model: string;
   source: string;
   canonicalSource: string;
@@ -86,11 +88,12 @@ export function buildUsageDedupeKey(params: {
   deviceId: string;
   dateKey: string;
   toolName: string;
+  accountKey?: string | null;
   model: string;
   source: string;
   repositoryId: string | null;
 }): string {
-  return `device:${params.deviceId}:${params.dateKey}:${params.toolName}:${params.model}:${params.source}:${params.repositoryId ?? ""}`;
+  return `device:${params.deviceId}:${params.dateKey}:${params.toolName}:${String(params.accountKey ?? "").trim()}:${params.model}:${params.source}:${params.repositoryId ?? ""}`;
 }
 
 function normalizeRepository(input: LocalUsageInputRow["repository"]): RepositoryRef | null {
@@ -142,6 +145,7 @@ export function normalizeLocalUsageRows(
         ? 0
         : Math.max(0, Number(row.requests ?? 0));
     const dateKey = date.toISOString().slice(0, 10);
+    const accountKey = String(row.accountKey ?? "").trim();
     const repository = normalizeRepository(row.repository);
     const metadata: Prisma.InputJsonValue = {
       cacheWriteTokens,
@@ -155,6 +159,7 @@ export function normalizeLocalUsageRows(
       date,
       dateKey,
       toolName: row.toolName,
+      accountKey,
       model,
       source,
       canonicalSource,
@@ -184,6 +189,7 @@ export function normalizeLocalUsageRows(
         deviceId: ctx.deviceId,
         dateKey,
         toolName: row.toolName,
+        accountKey,
         model,
         source,
         repositoryId: null,
@@ -207,6 +213,7 @@ export function attachRepositoryIds(
         deviceId,
         dateKey: row.dateKey,
         toolName: row.toolName,
+        accountKey: row.accountKey,
         model: row.model,
         source: row.source,
         repositoryId,
@@ -219,7 +226,7 @@ function localAggregateKey(row: NormalizedLocalUsageRow): string {
   const repoKey = row.repository
     ? `${row.repository.host}/${row.repository.owner}/${row.repository.name}`
     : row.repositoryId ?? "";
-  return `${row.dateKey}|${row.toolName}|${row.model}|${row.source}|${repoKey}`;
+  return `${row.dateKey}|${row.toolName}|${row.accountKey}|${row.model}|${row.source}|${repoKey}`;
 }
 
 /**
@@ -303,6 +310,7 @@ async function bulkUpsertUsageDaily(
         ${row.provider},
         ${row.toolName},
         ${row.toolName},
+        ${row.accountKey},
         ${row.model},
         ${row.canonicalSource},
         ${row.dedupeKey},
@@ -335,7 +343,7 @@ async function bulkUpsertUsageDaily(
     const returned = await tx.$queryRaw<Array<{ date_key: string }>>`
       INSERT INTO usage_daily (
         id, org_id, developer_id, device_id, repository_id, date,
-        provider, product, tool_name, model, source, source_ref, verified,
+        provider, product, tool_name, account_key, model, source, source_ref, verified,
         requests, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, reasoning_tokens,
         suggested_lines, accepted_lines, added_lines, deleted_lines, commits, cost_micros,
         metric_kind, cost_kind, calculation_version, dedupe_key, observed_at, metadata
@@ -343,6 +351,7 @@ async function bulkUpsertUsageDaily(
       VALUES ${Prisma.join(values)}
       ON CONFLICT (org_id, dedupe_key) DO UPDATE SET
         repository_id = EXCLUDED.repository_id,
+        account_key = EXCLUDED.account_key,
         requests = EXCLUDED.requests,
         input_tokens = EXCLUDED.input_tokens,
         output_tokens = EXCLUDED.output_tokens,

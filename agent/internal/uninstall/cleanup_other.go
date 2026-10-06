@@ -32,11 +32,15 @@ func schedulePlatformCleanup() (bool, error) {
 	switch runtime.GOOS {
 	case "darwin":
 		plist := id.LaunchdPlistPath(home)
+		appDir := id.AppBundlePath()
+		previousApp := id.PreviousAppBundlePath()
 		script = `#!/bin/sh
 set -eu
 parent_pid="$1"
 root_dir="$2"
 plist="$3"
+app_dir="$4"
+previous_app="$5"
 i=0
 while [ "$i" -lt 120 ]; do
   if ! kill -0 "$parent_pid" 2>/dev/null; then
@@ -48,9 +52,11 @@ done
 launchctl unload "$plist" 2>/dev/null || true
 rm -f "$plist"
 rm -rf "$root_dir"
+rm -rf "$app_dir"
+rm -rf "$previous_app"
 rm -f "$0"
 `
-		args = []string{scriptPath, strconv.Itoa(os.Getpid()), rootDir, plist}
+		args = []string{scriptPath, strconv.Itoa(os.Getpid()), rootDir, plist, appDir, previousApp}
 	case "linux":
 		unit := id.SystemdUnit
 		unitFile := filepath.Join(home, ".config", "systemd", "user", unit)

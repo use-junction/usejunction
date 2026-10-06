@@ -63,7 +63,7 @@ test("usage sync session start/chunk/commit is idempotent", { skip: !runDb }, as
       deviceId: device.id,
       partitions: [
         {
-          partitionKey: "2026-07-21|codex|gpt-5|local_scan|",
+          partitionKey: "2026-07-21|codex|codex|gpt-5|local_scan|",
           date: "2026-07-21",
           tool: "codex",
           model: "gpt-5",
@@ -74,7 +74,7 @@ test("usage sync session start/chunk/commit is idempotent", { skip: !runDb }, as
       ],
     });
     assert.ok(start.syncRunId);
-    assert.deepEqual(start.deltaPartitions, ["2026-07-21|codex|gpt-5|local_scan|"]);
+    assert.deepEqual(start.deltaPartitions, ["2026-07-21|codex|codex|gpt-5|local_scan|"]);
 
     const chunk = await ingestUsageSyncChunk({
       orgId: org.id,
@@ -86,6 +86,7 @@ test("usage sync session start/chunk/commit is idempotent", { skip: !runDb }, as
         {
           date: "2026-07-21",
           toolName: "codex",
+          accountKey: "codex",
           model: "gpt-5",
           source: "local_scan",
           inputTokens: 10,
@@ -149,7 +150,7 @@ test("legacy Cursor cost fingerprints produce zero delta on an unchanged second 
     },
   });
   await enableGatedUsage(org.id, user.id, device.id);
-  const partitionKey = "2026-07-21|cursor|composer|cursor_usage_events|";
+  const partitionKey = "2026-07-21|cursor|cursor|composer|cursor_usage_events|";
   const legacyHash = "in:0,out:0,cr:0,cw:0,r:0,req:0,cost:100,sug:0,acc:0,add:0,del:0,com:0,ai:,v:0,mk:usage";
   const roundedHash = legacyHash.replace("cost:100", "cost:101");
   const partition = {
@@ -180,6 +181,7 @@ test("legacy Cursor cost fingerprints produce zero delta on an unchanged second 
       rows: [{
         date: "2026-07-21",
         toolName: "cursor",
+        accountKey: "cursor",
         model: "composer",
         source: "cursor_usage_events",
         estimatedCost: 0.0001006,
@@ -259,7 +261,7 @@ test("usage sync chunks defer rematerialize; commit settles projections", { skip
       deviceId: device.id,
       partitions: [
         {
-          partitionKey: "2026-07-21|cursor|gpt-4.1|local_scan|",
+          partitionKey: "2026-07-21|cursor|cursor|gpt-4.1|local_scan|",
           date: "2026-07-21",
           tool: "cursor",
           model: "gpt-4.1",
@@ -281,6 +283,7 @@ test("usage sync chunks defer rematerialize; commit settles projections", { skip
         {
           date: "2026-07-21",
           toolName: "cursor",
+          accountKey: "cursor",
           model: "gpt-4.1",
           source: "local_scan",
           inputTokens: 100,
@@ -364,7 +367,7 @@ test("usage sync commit deferHeavyWork schedules reconcile+settle", { skip: !run
       deviceId: device.id,
       partitions: [
         {
-          partitionKey: "2026-07-21|codex|gpt-5|local_scan|",
+          partitionKey: "2026-07-21|codex|codex|gpt-5|local_scan|",
           date: "2026-07-21",
           tool: "codex",
           model: "gpt-5",
@@ -384,6 +387,7 @@ test("usage sync commit deferHeavyWork schedules reconcile+settle", { skip: !run
         {
           date: "2026-07-21",
           toolName: "codex",
+          accountKey: "codex",
           model: "gpt-5",
           source: "local_scan",
           inputTokens: 1,
@@ -451,7 +455,7 @@ test("usage sync commit skips settle when remainingPartitions > 0", { skip: !run
       deviceId: device.id,
       partitions: [
         {
-          partitionKey: "2026-07-21|codex|gpt-5|local_scan|",
+          partitionKey: "2026-07-21|codex|codex|gpt-5|local_scan|",
           date: "2026-07-21",
           tool: "codex",
           model: "gpt-5",
@@ -471,6 +475,7 @@ test("usage sync commit skips settle when remainingPartitions > 0", { skip: !run
         {
           date: "2026-07-21",
           toolName: "codex",
+          accountKey: "codex",
           model: "gpt-5",
           source: "local_scan",
           requests: 1,
@@ -669,7 +674,7 @@ test("usage sync start keeps usage delta when tools apply would fail", { skip: !
       deviceId: device.id,
       partitions: [
         {
-          partitionKey: "2026-07-21|codex|gpt-5|local_scan|",
+          partitionKey: "2026-07-21|codex|codex|gpt-5|local_scan|",
           date: "2026-07-21",
           tool: "codex",
           model: "gpt-5",
@@ -683,7 +688,7 @@ test("usage sync start keeps usage delta when tools apply would fail", { skip: !
         items: [{ toolName: "", detected: true }],
       },
     });
-    assert.ok(start.deltaPartitions.includes("2026-07-21|codex|gpt-5|local_scan|"));
+    assert.ok(start.deltaPartitions.includes("2026-07-21|codex|codex|gpt-5|local_scan|"));
     assert.equal(start.toolsApplied, "updated");
   } finally {
     await prisma.organization.delete({ where: { id: org.id } });
@@ -744,6 +749,7 @@ test("usage sync start applies accounts+quotas and creates billing templates", {
   const quotasItems = [
     {
       toolName: "cursor",
+      accountKey: "dev@example.com",
       windowType: "plan",
       usedPercent: 12.5,
       source: "api",
@@ -906,7 +912,7 @@ test("usage sync start keeps usage delta when accounts apply fails", { skip: !ru
       deviceId: device.id,
       partitions: [
         {
-          partitionKey: "2026-07-21|codex|gpt-5|local_scan|",
+          partitionKey: "2026-07-21|codex|codex|gpt-5|local_scan|",
           date: "2026-07-21",
           tool: "codex",
           model: "gpt-5",
@@ -920,7 +926,7 @@ test("usage sync start keeps usage delta when accounts apply fails", { skip: !ru
         items: [{ toolName: "", plan: "pro", authPresent: true }],
       },
     });
-    assert.ok(start.deltaPartitions.includes("2026-07-21|codex|gpt-5|local_scan|"));
+    assert.ok(start.deltaPartitions.includes("2026-07-21|codex|codex|gpt-5|local_scan|"));
     assert.equal(start.accountsApplied, "updated");
   } finally {
     await prisma.organization.delete({ where: { id: org.id } });
@@ -955,7 +961,7 @@ test("reconcileDeviceDayPartitions removes many orphan partitions in one pass", 
 
   const day = "2026-07-21";
   const dayDate = new Date(`${day}T00:00:00.000Z`);
-  const keepKey = `${day}|codex|keep|local_scan|`;
+  const keepKey = `${day}|codex|codex|keep|local_scan|`;
   const orphanCount = 150;
 
   try {
@@ -971,7 +977,7 @@ test("reconcileDeviceDayPartitions removes many orphan partitions in one pass", 
 
     const orphanKeys: string[] = [];
     for (let i = 0; i < orphanCount; i++) {
-      const partitionKey = `${day}|codex|model-${i}|local_scan|`;
+      const partitionKey = `${day}|codex|codex|model-${i}|local_scan|`;
       orphanKeys.push(partitionKey);
       await prisma.deviceUsageFingerprint.create({
         data: {
@@ -991,6 +997,7 @@ test("reconcileDeviceDayPartitions removes many orphan partitions in one pass", 
           provider: "openai",
           product: "codex",
           toolName: "codex",
+          accountKey: "codex",
           model: `model-${i}`,
           source: "local_scan",
           requests: 1,
@@ -1001,6 +1008,7 @@ test("reconcileDeviceDayPartitions removes many orphan partitions in one pass", 
             deviceId: device.id,
             dateKey: day,
             toolName: "codex",
+            accountKey: "codex",
             model: `model-${i}`,
             source: "local_scan",
             repositoryId: null,

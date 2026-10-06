@@ -46,6 +46,7 @@ export type UusV1Record = {
   model?: string;
   source: string;
   repository?: UusRepository | null;
+  accountKey?: string;
   "gen_ai.usage.input_tokens"?: number;
   "gen_ai.usage.output_tokens"?: number;
   "gen_ai.usage.cache_read_tokens"?: number;
@@ -81,6 +82,7 @@ export type UusV1Record = {
 export function uusPartitionKey(row: {
   date: string;
   tool: string;
+  accountKey?: string;
   model: string;
   source: string;
   repository?: UusRepository | null;
@@ -88,7 +90,7 @@ export function uusPartitionKey(row: {
   const repo = row.repository
     ? `${row.repository.host}/${row.repository.owner}/${row.repository.name}`
     : "";
-  return `${row.date}|${row.tool}|${row.model}|${row.source}|${repo}`;
+  return `${row.date}|${row.tool}|${String(row.accountKey ?? "").trim()}|${row.model}|${row.source}|${repo}`;
 }
 
 /** Normalize wire aliases into a consistent UUS v1 shape. */
@@ -132,6 +134,7 @@ export function normalizeUusWireRecord(input: Record<string, unknown>): UusV1Rec
     model,
     source,
     repository,
+    accountKey: typeof input.accountKey === "string" ? input.accountKey.trim() : "",
     "gen_ai.usage.input_tokens": num(input["gen_ai.usage.input_tokens"] ?? input.inputTokens),
     "gen_ai.usage.output_tokens": num(input["gen_ai.usage.output_tokens"] ?? input.outputTokens),
     "gen_ai.usage.cache_read_tokens": num(input["gen_ai.usage.cache_read_tokens"] ?? input.cacheReadTokens),

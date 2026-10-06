@@ -9,6 +9,7 @@ import {
 } from "@/lib/ensure-auth-user";
 import { logServerError } from "@/lib/errors/public";
 import { hasPendingWorkspaceInvite } from "@/lib/onboarding-status";
+import { deploymentRegion } from "@/lib/region";
 
 function slugify(value: string) {
   return (
@@ -108,7 +109,7 @@ export async function createWorkspaceForUser(
   try {
     organization = await prisma.$transaction(async (tx) => {
       const org = await tx.organization.create({
-        data: { name, slug, color, plan: "community" },
+        data: { name, slug, color, plan: "community", dataRegion: deploymentRegion() },
       });
       await tx.organizationMembership.create({
         data: { userId: authUser.id, orgId: org.id, role: "owner" },

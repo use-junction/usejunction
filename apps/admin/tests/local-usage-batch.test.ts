@@ -79,6 +79,7 @@ describe("local-usage-batch normalize", () => {
         deviceId: "device-1",
         dateKey: "2026-07-21",
         toolName: "codex",
+        accountKey: "",
         model: "gpt",
         source: "local_scan",
         repositoryId: null,
@@ -142,6 +143,22 @@ describe("local-usage-batch normalize", () => {
     expect(gpt?.inputTokens).toBe(99);
     expect(gpt?.outputTokens).toBe(9);
     expect(gpt?.requests).toBe(4);
+  });
+
+  it("keeps every login's usage on the same day as its own row", () => {
+    const collapsed = collapseLocalUsageRows(
+      normalizeLocalUsageRows(
+        [
+          { date: "2026-07-21", toolName: "codex", accountKey: "personal", model: "gpt", inputTokens: 10, requests: 1 },
+          { date: "2026-07-21", toolName: "codex", accountKey: "work", model: "gpt", inputTokens: 20, requests: 2 },
+          { date: "2026-07-21", toolName: "codex", accountKey: "contractor", model: "gpt", inputTokens: 5, requests: 1 },
+        ],
+        { deviceId: "device-1" },
+      ),
+    );
+    expect(collapsed).toHaveLength(3);
+    expect(collapsed.map((row) => row.accountKey).sort()).toEqual(["contractor", "personal", "work"]);
+    expect(new Set(collapsed.map((row) => row.dedupeKey)).size).toBe(3);
   });
 
   it("keeps distinct sources for the same device/date/tool/model", () => {

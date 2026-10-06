@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@usejunction/db";
 import { audit, requireOrgRole, rolesFor } from "@/lib/rbac";
 import { decommissionDevices } from "@/lib/devices/decommission";
+import { ERASURE_GRACE_DAYS } from "@/lib/legal/versions";
+import { PRIVACY_AUDIT_ACTIONS } from "@/lib/privacy/audit-actions";
 import { syncTeamSeatQuantityBestEffort } from "@/lib/saas-billing/lemonsqueezy";
 
 type Params = { params: Promise<{ id: string }> };
@@ -93,6 +95,29 @@ export async function DELETE(req: NextRequest, { params }: Params) {
       role: developer.role,
       devicesDecommissioned: deviceIds.length,
     },
+  });
+
+  const scheduledFor = new Date(Date.now() + ERASURE_GRACE_DAYS * 24 * 60 * 60 * 1000);
+  const erasure = await prisma.privacyRequest.create({
+    data: {
+      orgId: auth.orgId,
+      subjectDeveloperId: developer.id,
+      subjectUserId: developer.authUserId,
+      type: "erasure",
+      status: "pending",
+      requestedByUserId: auth.userId,
+      scheduledFor,
+      metadata: { reason: "member.removed" },
+    },
+  });
+  await audit({
+    orgId: auth.orgId,
+    actorType: "user",
+    actorId: auth.userId,
+    action: PRIVACY_AUDIT_ACTIONS.erasureRequested,
+    targetType: "developer",
+    targetId: developer.id,
+    metadata: { requestId: erasure.id, scheduledFor: scheduledFor.toISOString(), reason: "member.removed" },
   });
 
   await syncTeamSeatQuantityBestEffort(auth.orgId, "member.removed");

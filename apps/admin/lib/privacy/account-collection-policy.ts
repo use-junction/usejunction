@@ -22,18 +22,18 @@ export function normalizeAccountKey(accountKey?: string | null, email?: string |
 
 export function defaultCollectionFlags(_toolName?: string): AccountCollectionFlags {
   return {
-    usageEnabled: false,
+    usageEnabled: true,
     loggingEnabled: false,
     usageAdminLocked: false,
     loggingAdminLocked: false,
   };
 }
 
-export function usageEffectivelyEnabled(account: AccountCollectionFlags): boolean {
+export function usageEffectivelyEnabled(account: Pick<AccountCollectionFlags, "usageEnabled" | "usageAdminLocked">): boolean {
   return account.usageEnabled && !account.usageAdminLocked;
 }
 
-export function loggingEffectivelyEnabled(account: AccountCollectionFlags): boolean {
+export function loggingEffectivelyEnabled(account: Pick<AccountCollectionFlags, "loggingEnabled" | "loggingAdminLocked">): boolean {
   return account.loggingEnabled && !account.loggingAdminLocked;
 }
 
@@ -64,8 +64,13 @@ export function pickExistingAccount<T extends { accountKey: string; email: strin
   return null;
 }
 
-export function keepUsageRow(toolName: string, allowedTools: Set<string>): boolean {
+export function usageAccountToken(toolName: string, accountKey?: string | null): string {
+  return `${toolName.trim()}\0${normalizeAccountKey(accountKey)}`;
+}
+
+export function keepUsageRow(toolName: string, accountKey: string | undefined | null, allowed: Set<string>): boolean {
   const name = toolName.trim();
-  if (!name) return false;
-  return allowedTools.has(name);
+  const key = normalizeAccountKey(accountKey);
+  if (!name || !key) return false;
+  return allowed.has(usageAccountToken(name, key));
 }

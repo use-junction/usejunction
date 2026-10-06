@@ -14,6 +14,11 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/contact" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
+    pathname === "/dpa" ||
+    pathname === "/subprocessors" ||
+    pathname === "/gdpr" ||
+    pathname === "/security" ||
+    pathname === "/cookies" ||
     pathname === "/install.sh" ||
     pathname === "/install.ps1" ||
     pathname === "/robots.txt" ||
@@ -55,7 +60,10 @@ export function isPublicPath(pathname: string): boolean {
     pathname.startsWith("/api/otel") ||
     pathname.startsWith("/api/cron") ||
     pathname.startsWith("/api/webhooks") ||
-    pathname.startsWith("/api/indexnow")
+    pathname.startsWith("/api/indexnow") ||
+    // GitHub App Setup URL: a cross-site GET. Auth.js must not strip
+    // installation_id by bouncing to /login?callbackUrl= before the route runs.
+    pathname === "/api/integrations/github/callback"
   ) {
     return true;
   }

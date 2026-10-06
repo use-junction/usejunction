@@ -12,7 +12,7 @@ func TestFilterUsageLookback(t *testing.T) {
 	now := time.Date(2026, 7, 21, 12, 0, 0, 0, time.UTC)
 	rows := []types.DailyUsage{
 		{Date: "2026-07-21", ToolName: "cursor"},
-		{Date: "2026-05-22", ToolName: "codex"}, // exactly 60 days back inclusive
+		{Date: "2026-05-22", ToolName: "codex"},  // exactly 60 days back inclusive
 		{Date: "2026-05-21", ToolName: "claude"}, // outside
 	}
 	got := FilterUsageLookback(rows, now)

@@ -348,10 +348,10 @@ Legacy aliases normalized at ingest: `local_scan` → `device_observed`, `cursor
 | Provider `nextSyncAt` | +15 min after sync | Next cloud pull |
 | `usage-daily-refresh` | `15 0 * * *` UTC | Seal UTC day, trigger agent full rescan |
 | `materialize-org-day-snapshots` | `45 0 * * *` UTC | Dashboard rollups |
-| `provider-sync` | **Not scheduled by default** | Poll due provider connections |
+| `provider-sync` | `*/15 * * * *` (GitHub Actions) | Poll due provider connections (Copilot + GitHub commits) |
 | `billing-seat-sync` | **Not scheduled by default** | Lemon seat reconciliation |
 
-To enable automatic provider pulls, schedule `POST /api/cron/provider-sync` externally. See [Production deployment](production-deployment.md).
+Automatic provider pulls run from `.github/workflows/provider-sync.yml`. See [Production deployment](production-deployment.md).
 
 ---
 

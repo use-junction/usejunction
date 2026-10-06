@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { beforeEach, test, vi } from "vitest";
+import { beforeEach, afterEach, test, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
@@ -88,6 +88,7 @@ function session(localId: string) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("NEXT_PUBLIC_SIGNALS_PRODUCT_ENABLED", "true");
   mocks.deviceFindUnique.mockResolvedValue({
     id: "device_1",
     orgId: "org_1",
@@ -113,6 +114,10 @@ beforeEach(() => {
   mocks.deviceUpdate.mockResolvedValue({});
   mocks.enforceSignalsRetention.mockResolvedValue(undefined);
   mocks.recordDeviceActivityEvent.mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 test("signals ingest upserts sessions but writes zero signalsActivityEvent rows even when storeEvents is true", async () => {

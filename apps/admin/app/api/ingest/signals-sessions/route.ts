@@ -13,6 +13,7 @@ import {
   type SignalsSessionInput,
 } from "@/lib/signals/contracts";
 import { enforceSignalsRetention, getEffectiveSignalsPolicy } from "@/lib/signals/service";
+import { signalsAllowed } from "@/lib/region";
 import { logServerError } from "@/lib/errors/public";
 
 export const maxDuration = 60;
@@ -85,7 +86,12 @@ export async function POST(req: NextRequest) {
     if (device instanceof NextResponse) return device;
 
     const policy = await getEffectiveSignalsPolicy(device.orgId);
-    if (!policy.enabled) return NextResponse.json({ error: "signals disabled" }, { status: 403 });
+    if (!signalsAllowed() || !policy.enabled) {
+      return NextResponse.json(
+        { error: signalsAllowed() ? "signals disabled" : "Signals collection is not available." },
+        { status: 403 },
+      );
+    }
 
     const parsedBody = await limitedJson(req, 128 * 1024);
     if (!parsedBody.ok) return parsedBody.response;

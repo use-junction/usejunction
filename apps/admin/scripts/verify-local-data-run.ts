@@ -6,7 +6,7 @@ import { loadEnvConfig } from "@next/env";
 import path from "node:path";
 import { readFileSync, writeFileSync } from "node:fs";
 
-// Prefer admin .env (real local DB on :5432) over root .env (:5433 e2e).
+// Prefer admin .env (local app DB) over root .env.
 loadEnvConfig(path.join(__dirname, ".."));
 loadEnvConfig(path.join(__dirname, "../.."));
 

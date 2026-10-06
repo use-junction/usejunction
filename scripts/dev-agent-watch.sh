@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Watch agent sources and rebuild/reinstall into ~/.usejunction-test on change.
+# Watch agent sources and rebuild/reinstall (macOS app in ~/Applications; data in ~/.usejunction-test).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

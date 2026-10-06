@@ -281,7 +281,7 @@ if ($Resume) {
 }
 
 $onboardFailed = $false
-& $Binary @($ProfileArgs + @("onboard", "--token", $Token, "--url", $Url))
+& $Binary @($ProfileArgs + @("onboard", "--token", $Token, "--url", $Url, "--accept-collection-notice"))
 if ($LASTEXITCODE -ne 0) {
   if (-not (Test-Path $ConfigPath)) { throw "Device onboarding failed before enrollment completed." }
   $onboardFailed = $true
@@ -291,6 +291,8 @@ if ($LASTEXITCODE -ne 0) {
 Register-AgentTask
 Start-ScheduledTask -TaskName $TaskName
 Start-Sleep -Seconds 2
+# Match the agent's step lines; [char] keeps the check mark intact in Windows PowerShell 5.
+Write-Host ("  {0} Background agent  running (scheduled task, starts at sign-in)" -f [char]0x2713)
 if ($onboardFailed) {
   throw "UseJunction was installed, but setup is incomplete. Re-run this installer with -Resume -Url '$Url'."
 }
