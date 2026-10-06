@@ -92,6 +92,7 @@ jobs:
       E2E_OWNER_PASSWORD: e2e-password
       RUN_CALC_VERIFICATION_TESTS: "1"
       E2E_AS_OF: "2026-07-16T12:00:00.000Z"
+      NEXT_PUBLIC_SIGNALS_PRODUCT_ENABLED: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

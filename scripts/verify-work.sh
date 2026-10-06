@@ -95,11 +95,13 @@ if [[ "$RUN_E2E" -eq 1 ]]; then
     pnpm --filter @usejunction/admin exec playwright install chromium
     echo "==> Playwright e2e (us)"
     E2E_FORCE_WEB_SERVER=1 DEPLOYMENT_REGION=us NEXT_PUBLIC_DEPLOYMENT_REGION=us \
+      NEXT_PUBLIC_SIGNALS_PRODUCT_ENABLED=false \
       pnpm --filter @usejunction/admin test:e2e
     echo "==> Playwright e2e (eu)"
     DEPLOYMENT_REGION=eu NEXT_PUBLIC_DEPLOYMENT_REGION=eu \
       pnpm --filter @usejunction/admin e2e:seed
     E2E_FORCE_WEB_SERVER=1 DEPLOYMENT_REGION=eu NEXT_PUBLIC_DEPLOYMENT_REGION=eu \
+      NEXT_PUBLIC_SIGNALS_PRODUCT_ENABLED=false \
       pnpm --filter @usejunction/admin test:e2e
   )
 fi

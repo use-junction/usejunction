@@ -38,6 +38,12 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      ...(process.env.NEXT_PUBLIC_SIGNALS_PRODUCT_ENABLED === "true"
+        ? []
+        : [
+            { source: "/signals", destination: "/dashboard", permanent: false },
+            { source: "/signals/:path*", destination: "/dashboard", permanent: false },
+          ]),
       {
         source: "/blog/visibility-before-control",
         destination: "/blog/what-is-ai-coding-observability",

@@ -31,7 +31,9 @@ const webServerEnv = definedEnv({
   E2E_DEVELOPER_EMAIL: process.env.E2E_DEVELOPER_EMAIL,
   DEPLOYMENT_REGION: process.env.DEPLOYMENT_REGION ?? "us",
   NEXT_PUBLIC_DEPLOYMENT_REGION: process.env.NEXT_PUBLIC_DEPLOYMENT_REGION ?? process.env.DEPLOYMENT_REGION ?? "us",
-  NEXT_PUBLIC_SIGNALS_PRODUCT_ENABLED: process.env.NEXT_PUBLIC_SIGNALS_PRODUCT_ENABLED ?? "false",
+  // Workspace e2e asserts the shipped product: Signals routes stay hidden.
+  // Do not inherit a host/CI `true` or `/signals` will render instead of redirecting.
+  NEXT_PUBLIC_SIGNALS_PRODUCT_ENABLED: "false",
   PORT: e2ePort,
   ...(forceDedicatedServer ? { NEXT_DIST_DIR: ".next-e2e" } : {}),
 });
