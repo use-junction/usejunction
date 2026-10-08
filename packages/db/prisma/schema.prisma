@@ -152,6 +152,11 @@ model Device {
   decommissionedAt            DateTime? @map("decommissioned_at")
   collectionNoticeAckAt       DateTime? @map("collection_notice_ack_at")
   collectionNoticeVersion     String?   @map("collection_notice_version")
+  // Where the macOS agent binary runs from, reported each heartbeat:
+  // "visible" (~/Applications) or "legacyHidden" (~/.usejunction — a pre-unhide
+  // install that should be repaired to clear EDR false positives). Null on
+  // non-macOS devices and agents too old to report it.
+  appLocation                 String?   @map("app_location")
   createdAt                   DateTime  @default(now()) @map("created_at")
 
   organization            Organization              @relation(fields: [orgId], references: [id], onDelete: Cascade)

@@ -99,6 +99,11 @@ type HeartbeatPayload struct {
 	RemoteSyncProtocol int    `json:"remoteSyncProtocol,omitempty"`
 	// TimeZone is the machine IANA timezone when known (e.g. Asia/Colombo).
 	TimeZone string `json:"timeZone,omitempty"`
+	// AppLocation reports where the macOS agent binary runs from: "visible"
+	// (~/Applications) or "legacyHidden" (~/.usejunction — a pre-unhide install
+	// that should be repaired to clear macOS EDR false positives). Empty on
+	// non-macOS platforms.
+	AppLocation string `json:"appLocation,omitempty"`
 	// LastCollect carries the outcome of the most recent scheduled collect so the
 	// control plane can alert (Slack) on failures/timeouts without a separate
 	// endpoint. Sent at most once per collect (report-once on the agent side).

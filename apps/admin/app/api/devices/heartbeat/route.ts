@@ -97,6 +97,12 @@ export async function POST(req: NextRequest) {
       typeof body.remoteSyncProtocol === "number" && Number.isFinite(body.remoteSyncProtocol)
         ? Math.max(0, Math.min(REMOTE_SYNC_PROTOCOL, Math.floor(body.remoteSyncProtocol)))
         : 0;
+    // Where the macOS agent runs from, so the dashboard can flag pre-unhide
+    // (hidden-dir) installs for repair. Only trust the known values.
+    const appLocation =
+      body.appLocation === "visible" || body.appLocation === "legacyHidden"
+        ? body.appLocation
+        : undefined;
 
     await prisma.$transaction(async (tx) => {
       // Only one agent can own a loopback sync port — drop stale claims so the
@@ -124,6 +130,7 @@ export async function POST(req: NextRequest) {
           ...(body.os ? { os: String(body.os).slice(0, 64) } : {}),
           ...(body.architecture ? { architecture: String(body.architecture).slice(0, 64) } : {}),
           ...(body.hostname ? { hostname: String(body.hostname).slice(0, 255) } : {}),
+          ...(appLocation ? { appLocation } : {}),
           ...(localEndpoint ? { localEndpoint } : {}),
           ...(localSyncToken
             ? {
