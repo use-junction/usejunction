@@ -199,7 +199,7 @@ export function OnboardingExperience({
       const role = next.role as OrganizationRole | null;
       const canLeave = Boolean(next.onboardingCompletedAt);
       if (canLeave) {
-        window.location.href = "/dashboard";
+        window.location.href = "/auth/continue?from=%2Fdashboard";
         return;
       }
       setStatus(next);
@@ -240,7 +240,7 @@ export function OnboardingExperience({
         setFinishError("Unable to finish onboarding. Check your connection and try again.");
         return;
       }
-      window.location.href = "/dashboard";
+      window.location.href = "/auth/continue?from=%2Fdashboard";
     } catch {
       setFinishError("Unable to finish onboarding. Check your connection and try again.");
     } finally {

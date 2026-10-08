@@ -37,6 +37,7 @@ import {
   type CycleViewWindows,
 } from "@/lib/dashboard/cycle-view";
 import { usageCostBreakdownSub } from "@/lib/dashboard/usage-cost-breakdown";
+import { isIdlePaidCycle } from "@/lib/dashboard/idle-cycles";
 import { personalPlanCardsToCycles } from "@/lib/dashboard/personal-cycles";
 import { buildMemberPlanBoard } from "@/lib/quotas/plan-board";
 import { usageWindowFamily } from "@/lib/quotas/usage-window";
@@ -60,6 +61,7 @@ import {
 } from "@/components/dashboard/dashboard-period-refreshing";
 import { SubscriptionUpgradedBanner } from "@/components/saas-billing/subscription-upgraded-banner";
 import { ProviderAnalyticsPanel } from "@/components/dashboard/provider-analytics-panel";
+import { ExportCsvButton } from "@/components/export-csv-button";
 
 const AiCodingPanel = dynamic(() => import("@/components/dashboard/ai-coding-panel").then((mod) => mod.AiCodingPanel), { ssr: false });
 const OverviewChart = dynamic(() => import("@/components/dashboard/overview-chart").then((mod) => mod.OverviewChart), { ssr: false });
@@ -221,7 +223,8 @@ function orgCycleSummary(cycles: OrgOverviewV1["subscriptionCycles"]) {
   const withinAllowance = cycles.filter(
     (row) => row.verdictCode === "LIGHT_USE" || row.verdictCode === "HEALTHY",
   ).length;
-  return { avgUtilization, nearLimit, overQuota, withinAllowance, withSignal: withSignal.length };
+  const idle = cycles.filter(isIdlePaidCycle).length;
+  return { avgUtilization, nearLimit, overQuota, withinAllowance, idle, withSignal: withSignal.length };
 }
 
 function fleetVerdictCode(cycles: OrgOverviewV1["subscriptionCycles"]): PlanVerdictCode | null {
@@ -234,7 +237,14 @@ function fleetVerdictCode(cycles: OrgOverviewV1["subscriptionCycles"]): PlanVerd
 }
 
 function fleetStatusBadge(cycles: OrgOverviewV1["subscriptionCycles"]) {
-  const { nearLimit, overQuota, withinAllowance, withSignal } = orgCycleSummary(cycles);
+  const { nearLimit, overQuota, withinAllowance, idle, withSignal } = orgCycleSummary(cycles);
+  if (idle > 0 && overQuota === 0 && nearLimit === 0) {
+    return (
+      <Badge variant="outline" className="border-warning/40 bg-warning/10 font-normal text-warning">
+        {idle === cycles.length ? "No use this period" : `${idle} paid ${idle === 1 ? "plan" : "plans"} unused`}
+      </Badge>
+    );
+  }
   if (withSignal === 0) return null;
   if (overQuota > 0) {
     return (
@@ -385,11 +395,10 @@ function PersonalHome({
   return (
     <>
       <ConnectionRepairBanner scope="you" recoveryDevices={data.sync.recoveryDevices} />
-      <ConnectMachineBanner show={empty} />
       <PageHeader
-        title={empty ? "Nothing reporting yet." : "What's reporting?"}
+        title={empty ? "Nothing reporting yet." : "Usage."}
         description={
-          empty ? "Connect a machine to see your plans, usage, and traffic." : undefined
+          empty ? "Connect a machine to see your plans, usage, and traffic." : "What's reporting, what it costs, and which models run."
         }
         actions={
           !empty && allowPeriodControls ? (
@@ -689,7 +698,6 @@ export default function DashboardPage() {
       return (
         <>
           <ConnectionRepairBanner scope="you" recoveryDevices={query.data.syncContext?.recoveryDevices} />
-          <ConnectMachineBanner show={query.data.needsPersonalConnect ?? true} />
           <PageHeader
             title="Your numbers."
             description="Link a developer profile and connect a machine to see personal usage here."
@@ -774,17 +782,29 @@ export default function DashboardPage() {
     <>
       <ConnectionRepairBanner scope="team" recoveryDevices={syncPanel?.recoveryDevices} />
       <SubscriptionUpgradedBanner isTeam={isTeamPlan} />
-      <ConnectMachineBanner show={needsPersonalConnect} />
+      {/* The setup panel already asks to connect when nothing reports; don't ask twice. */}
+      <ConnectMachineBanner show={needsPersonalConnect && !empty} />
       <PageHeader
-        title={empty ? "Nothing reporting yet." : "What's reporting?"}
+        title={empty ? "Nothing reporting yet." : "Usage."}
         description={
           empty
             ? "Connect a machine, then invite people. Metrics show up as soon as the first request lands."
-            : undefined
+            : "What's reporting, what it costs, and which models run."
         }
         actions={
           syncPanel || (!empty && (data || metricsRefreshing)) ? (
             <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+              {!empty && data ? (
+                <ExportCsvButton
+                  name="usage"
+                  header={["Breakdown", "Name", "Requests", "Cost (USD)", "People"]}
+                  rows={() => [
+                    ...data.tools.map((tool) => ["Tool", toolDisplayName(tool.name), tool.requests, tool.cost.toFixed(2), tool.activeDevelopers]),
+                    ...(data.teams ?? []).map((team) => ["Team", team.name, team.requests, team.cost.toFixed(2), team.people]),
+                    ...data.people.map((person) => ["Person (top 8)", person.name, person.requests, person.cost.toFixed(2), 1]),
+                  ]}
+                />
+              ) : null}
               {!empty && (data || metricsRefreshing) ? (
                 <CycleViewPicker
                   view={cycleView}
@@ -1044,6 +1064,51 @@ export default function DashboardPage() {
               )}
             </Panel>
           </div>
+
+          {data.teams?.length ? (
+            <Panel as="section" className="mt-10">
+              <SignalsSectionHeader
+                title="Spend by team."
+                description={`Usage at API prices · ${periodLabel}`}
+                bordered={false}
+                action={
+                  <Link href="/team?tab=teams" className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
+                    Manage teams
+                  </Link>
+                }
+              />
+              <ul>
+                {data.teams.map((team) => {
+                  const maxCost = data.teams?.[0]?.cost ?? 0;
+                  const pct = maxCost > 0 ? Math.min(100, (team.cost / maxCost) * 100) : 0;
+                  return (
+                    <li key={team.id}>
+                      <Link
+                        href={team.id === "none" ? "/overview?team=none" : `/overview?team=${encodeURIComponent(team.id)}`}
+                        prefetch={false}
+                        className="flex items-center gap-3 py-4 transition-colors hover:bg-muted/30"
+                      >
+                        <span className="size-2.5 shrink-0" style={{ background: team.color ?? "var(--muted-foreground)" }} aria-hidden />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="truncate text-sm font-medium">{team.name}</p>
+                            <p className="shrink-0 text-sm font-medium tabular-nums">{formatUsd(team.cost)}</p>
+                          </div>
+                          <div className="mt-2 h-1.5 overflow-hidden bg-muted">
+                            <div className="h-full bg-primary" style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="mt-1.5 text-xs text-muted-foreground">
+                            {team.people} active {team.people === 1 ? "person" : "people"} · {formatCompactNumber(team.requests)} requests
+                          </p>
+                        </div>
+                        <ArrowUpRight className="size-4 shrink-0 text-muted-foreground" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Panel>
+          ) : null}
 
           {data.failures.length > 0 && (
             <Panel as="section" className="mt-10">

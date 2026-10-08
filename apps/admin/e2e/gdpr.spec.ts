@@ -36,7 +36,7 @@ test.describe("developer data subject view", () => {
     });
 
     await page.goto("/me/data");
-    await expect(page.getByRole("heading", { name: "What do we hold?" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "My data." })).toBeVisible();
     await expect(page.getByRole("region", { name: "At a glance" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Tool logins" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Your rights" })).toBeVisible();
@@ -75,7 +75,7 @@ test.describe("developer data subject view", () => {
 
 test("Settings hides the Signals product card", async ({ page }) => {
   await page.goto("/settings");
-  await expect(page.getByRole("heading", { name: "How is this set up?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Settings." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Signals", level: 2 })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Work extraction" })).toHaveCount(0);
 });

@@ -12,6 +12,7 @@ import {
   canAutoCreateDetectedSeat,
   hasReportedVendorPlan,
   mapVendorPlanToCatalog,
+  strongerVendorPlan,
 } from "./detected-plan";
 import { logServerError } from "@/lib/errors/public";
 
@@ -19,6 +20,7 @@ export type DetectedAccount = {
   toolName: string;
   plan?: string | null;
   email?: string | null;
+  vendorOrgId?: string | null;
   authPresent?: boolean;
 };
 
@@ -30,6 +32,29 @@ export {
 
 function utcDateOnly(date = new Date()) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+/**
+ * Map each (toolKey, vendorOrgId) in an org to the strongest plan any login has
+ * reported for that vendor org. Lets a login with no plan of its own inherit
+ * the plan of a teammate on the same vendor org.
+ */
+async function buildOrgPlanMap(orgId: string): Promise<Map<string, string>> {
+  const rows = await prisma.toolAccount.findMany({
+    where: { orgId, vendorOrgId: { not: null }, plan: { not: null } },
+    select: { toolName: true, vendorOrgId: true, plan: true },
+  });
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    const org = row.vendorOrgId?.trim();
+    const plan = row.plan?.trim();
+    if (!org || !plan) continue;
+    const toolKey = canonicalToolKey(row.toolName);
+    const key = `${toolKey}\u0000${org}`;
+    const current = map.get(key);
+    map.set(key, current ? strongerVendorPlan(toolKey, plan, current) : plan);
+  }
+  return map;
 }
 
 async function loadQuotaRowsForTool(orgId: string, toolKey: string): Promise<QuotaResetRow[]> {
@@ -291,22 +316,41 @@ export async function syncDetectedPlansForDevice(input: {
     }
   }
 
+  // A login that carries no plan (e.g. a desktop-only Team account whose plan
+  // we never read on this device) is resolved from its vendor org: any login in
+  // this org that did report a plan for the same vendor org establishes it.
+  const orgPlanMap = await buildOrgPlanMap(input.orgId);
+
   for (const account of input.accounts ?? []) {
     const toolKey = canonicalToolKey(account.toolName);
     if (!findCatalogTool(toolKey)) continue;
+    let effectivePlan = account.plan ?? null;
+    if (!hasReportedVendorPlan(effectivePlan) && account.vendorOrgId?.trim()) {
+      effectivePlan = orgPlanMap.get(`${toolKey}\u0000${account.vendorOrgId.trim()}`) ?? effectivePlan;
+    }
     const existing = byTool.get(toolKey) ?? {
       plan: null,
       email: null,
       hasVendorPlan: false,
       authPresent: false,
     };
-    const hasVendorPlan = hasReportedVendorPlan(account.plan);
-    byTool.set(toolKey, {
-      plan: account.plan ?? existing.plan,
-      email: account.email ?? existing.email,
+    const hasVendorPlan = hasReportedVendorPlan(effectivePlan);
+    const next = {
+      plan: existing.plan,
+      email: existing.email ?? account.email ?? null,
       hasVendorPlan: existing.hasVendorPlan || hasVendorPlan,
       authPresent: existing.authPresent || Boolean(account.authPresent),
-    });
+    };
+    // One person can have several logins for a tool (e.g. a personal Pro and a
+    // work Team account). The seat is singular, so keep the strongest plan and
+    // the email that goes with it, rather than letting the last account win.
+    if (hasVendorPlan && effectivePlan) {
+      if (!existing.plan || strongerVendorPlan(toolKey, effectivePlan, existing.plan) === effectivePlan) {
+        next.plan = effectivePlan;
+        next.email = account.email ?? existing.email ?? null;
+      }
+    }
+    byTool.set(toolKey, next);
   }
 
   if (byTool.size === 0) return { created: 0, assigned: 0 };

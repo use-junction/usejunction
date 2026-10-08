@@ -227,9 +227,9 @@ export function BillingSettingsCard({ billing, members }: BillingSettingsCardPro
           role="status"
           className="border-t border-brand-yellow-dark/20 bg-brand-yellow-pale px-5 py-4 text-sm leading-6 text-foreground sm:px-6"
         >
-          Billing sync pending. Lemon Squeezy currently shows {billing.billingSeatQuantity} seat
-          {billing.billingSeatQuantity === 1 ? "" : "s"}; Junction currently counts{" "}
-          {pluralizeUsers(billing.usersUsed)}.
+          Updating your subscription: it lists {billing.billingSeatQuantity} seat
+          {billing.billingSeatQuantity === 1 ? "" : "s"} and this workspace now has{" "}
+          {pluralizeUsers(billing.usersUsed)}. This usually settles within a few minutes.
         </div>
       ) : null}
     </Panel>

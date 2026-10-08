@@ -16,7 +16,7 @@ afterEach(() => {
 test("page loading keeps the real title and shows metrics skeleton", () => {
   render(<DashboardPageLoading showSyncPlaceholder />);
 
-  assert.ok(screen.getByRole("heading", { name: "What's reporting?" }));
+  assert.ok(screen.getByRole("heading", { name: "Usage." }));
   assert.ok(screen.getByLabelText("Loading period"));
   assert.equal(screen.queryByText("Crunching your numbers."), null);
 });

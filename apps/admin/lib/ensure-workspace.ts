@@ -138,6 +138,7 @@ export async function createWorkspaceForUser(
 
   return {
     orgId: organization.id,
+    userId: authUser.id,
     name: organization.name,
     slug: organization.slug,
     color: organization.color,
@@ -166,7 +167,12 @@ export async function ensureOwnerWorkspace(
     orderBy: { createdAt: "desc" },
   });
   if (existing) {
-    return { orgId: existing.orgId, role: existing.role, created: false as const };
+    return {
+      orgId: existing.orgId,
+      userId: authUser.id,
+      role: existing.role,
+      created: false as const,
+    };
   }
 
   if (options?.rejectPendingInvite && (await hasPendingWorkspaceInvite(authUser.email))) {

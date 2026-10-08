@@ -74,7 +74,7 @@ function TrendChart({ data, isMobile, allocatedMicros }: { data: WorkSpendTrend;
     for (const series of data.series) row[seriesKey(series.id)] = series.points[index] ?? 0;
     return row;
   });
-  if (!data.series.length) return <p className="py-10 text-sm text-muted-foreground">No allocated work in this period.</p>;
+  if (!data.series.length) return <p className="py-10 text-sm text-muted-foreground">No spend tied to a project or person in this period yet.</p>;
   if (sparse) {
     return (
       <ol>

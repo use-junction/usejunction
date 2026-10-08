@@ -21,9 +21,10 @@ import (
 
 // ClaudeDesktopAccount is one login seen in the Claude desktop app.
 type ClaudeDesktopAccount struct {
-	AccountUUID string
-	OrgUUID     string
-	SessionIDs  []string
+	AccountUUID  string
+	OrgUUID      string
+	SessionIDs   []string
+	LastActivity time.Time
 }
 
 type knownClaudeAccount struct {
@@ -55,6 +56,21 @@ func ClaudeDesktopAccounts() []ClaudeDesktopAccount {
 	return claudeDesktopAccountsIn(filepath.Join(claudeDesktopDir(), "claude-code-sessions"))
 }
 
+// ClaudeActiveDesktopAccount returns the desktop login the user is currently
+// running — the one with the most recent session activity — or nil when none is
+// known. This is the account whose live limits matter most, even when the
+// Claude Code CLI is signed into a different login.
+func ClaudeActiveDesktopAccount() *ClaudeDesktopAccount {
+	var active *ClaudeDesktopAccount
+	for _, account := range ClaudeDesktopAccounts() {
+		a := account
+		if active == nil || a.LastActivity.After(active.LastActivity) {
+			active = &a
+		}
+	}
+	return active
+}
+
 func claudeDesktopAccountsIn(root string) []ClaudeDesktopAccount {
 	accountDirs, err := os.ReadDir(root)
 	if err != nil {
@@ -73,7 +89,18 @@ func claudeDesktopAccountsIn(root string) []ClaudeDesktopAccount {
 			account := ClaudeDesktopAccount{AccountUUID: accountDir.Name(), OrgUUID: orgDir.Name()}
 			files, _ := filepath.Glob(filepath.Join(root, accountDir.Name(), orgDir.Name(), "local_*.json"))
 			for _, file := range files {
-				account.SessionIDs = append(account.SessionIDs, claudeSessionIDsFromFile(file)...)
+				ids, activity := claudeSessionInfoFromFile(file)
+				account.SessionIDs = append(account.SessionIDs, ids...)
+				if activity.After(account.LastActivity) {
+					account.LastActivity = activity
+				}
+			}
+			// The desktop app leaves stray empty org folders — an account can have
+			// a 0-session folder under an org that belongs to a different login.
+			// Those misattribute the account's org (and, via org→plan resolution,
+			// its plan), so skip any (account, org) pair with no real sessions.
+			if len(account.SessionIDs) == 0 {
+				continue
 			}
 			out = append(out, account)
 		}
@@ -82,16 +109,27 @@ func claudeDesktopAccountsIn(root string) []ClaudeDesktopAccount {
 }
 
 func claudeSessionIDsFromFile(path string) []string {
+	ids, _ := claudeSessionInfoFromFile(path)
+	return ids
+}
+
+// claudeSessionInfoFromFile returns the session ids a desktop metadata file
+// owns and the newest activity timestamp on it, used to tell which login the
+// user is actively running.
+func claudeSessionInfoFromFile(path string) ([]string, time.Time) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil
+		return nil, time.Time{}
 	}
 	var doc struct {
 		CLISessionID       string   `json:"cliSessionId"`
 		PriorCLISessionIDs []string `json:"priorCliSessionIds"`
+		LastActivityAt     int64    `json:"lastActivityAt"`
+		LastFocusedAt      int64    `json:"lastFocusedAt"`
+		CreatedAt          int64    `json:"createdAt"`
 	}
 	if json.Unmarshal(data, &doc) != nil {
-		return nil
+		return nil, time.Time{}
 	}
 	var ids []string
 	for _, id := range append([]string{doc.CLISessionID}, doc.PriorCLISessionIDs...) {
@@ -99,7 +137,17 @@ func claudeSessionIDsFromFile(path string) []string {
 			ids = append(ids, id)
 		}
 	}
-	return ids
+	activityMs := doc.LastActivityAt
+	for _, candidate := range []int64{doc.LastFocusedAt, doc.CreatedAt} {
+		if candidate > activityMs {
+			activityMs = candidate
+		}
+	}
+	var activity time.Time
+	if activityMs > 0 {
+		activity = time.UnixMilli(activityMs)
+	}
+	return ids, activity
 }
 
 func knownClaudeAccountsPath() string {
@@ -171,12 +219,55 @@ func ClaudeAccountKey(accountUUID, email string) string {
 	return "claude:" + strings.TrimSpace(accountUUID)
 }
 
+// claudeAccountIdentity resolves the best email+plan for a desktop login from
+// what we have learned on this device: nothing on disk names a non-active
+// login's email or plan in plaintext (that lives only in the desktop app's
+// encrypted store, which we deliberately do not read), so this is empty until
+// the login has been the active Claude Code login at least once. The login's
+// org, however, is plaintext (see ClaudeDesktopAccounts), and the control plane
+// resolves the plan from that org.
+func claudeAccountIdentity(uuid string, known map[string]knownClaudeAccount) (email, plan string) {
+	info := known[uuid]
+	return info.Email, info.Plan
+}
+
+// claudeBestDesktopEntryByUUID picks, for each login, the organization it is
+// most actively using — the (account, org) pair with the most recent session
+// activity. Empty org folders are already dropped upstream; this guards the
+// case where a login legitimately has sessions under more than one org.
+func claudeBestDesktopEntryByUUID() map[string]ClaudeDesktopAccount {
+	out := map[string]ClaudeDesktopAccount{}
+	for _, desktop := range ClaudeDesktopAccounts() {
+		uuid := strings.TrimSpace(desktop.AccountUUID)
+		if uuid == "" || strings.TrimSpace(desktop.OrgUUID) == "" {
+			continue
+		}
+		if best, ok := out[uuid]; !ok || desktop.LastActivity.After(best.LastActivity) {
+			out[uuid] = desktop
+		}
+	}
+	return out
+}
+
+// claudePrimaryOrgByUUID maps each desktop login to the organization it is most
+// actively using.
+func claudePrimaryOrgByUUID() map[string]string {
+	out := map[string]string{}
+	for uuid, entry := range claudeBestDesktopEntryByUUID() {
+		out[uuid] = entry.OrgUUID
+	}
+	return out
+}
+
 // ClaudeOtherAccounts returns desktop-app logins other than the active Claude
-// Code login. Email and plan come from when each was last the active login.
+// Code login. Email/plan are filled only when this device has seen the login as
+// active before; otherwise the login carries just its account key and org, and
+// the control plane resolves the plan from the org.
 func ClaudeOtherAccounts() []types.ToolAccount {
 	home, _ := os.UserHomeDir()
 	activeUUID, _ := activeClaudeAccount(home)
 	known := loadKnownClaudeAccounts()
+	orgByUUID := claudePrimaryOrgByUUID()
 	seen := map[string]bool{}
 	var out []types.ToolAccount
 	for _, desktop := range ClaudeDesktopAccounts() {
@@ -185,17 +276,57 @@ func ClaudeOtherAccounts() []types.ToolAccount {
 			continue
 		}
 		seen[uuid] = true
-		info := known[uuid]
+		email, plan := claudeAccountIdentity(uuid, known)
 		out = append(out, types.ToolAccount{
 			ToolName:    "claude",
-			AccountKey:  ClaudeAccountKey(uuid, info.Email),
-			Email:       info.Email,
-			Plan:        info.Plan,
+			AccountKey:  ClaudeAccountKey(uuid, email),
+			Email:       email,
+			Plan:        plan,
+			OrgKey:      orgByUUID[uuid],
 			LoginMethod: "desktop",
 			AuthPresent: true,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].AccountKey < out[j].AccountKey })
+	return out
+}
+
+// ClaudeOtherAccountQuotas returns live quota windows for desktop logins other
+// than the active Claude Code login, read from the desktop app's cached usage
+// history and scoped to each login's organization. Each snapshot carries the
+// account key so the control plane files it under the right login rather than
+// the active one. Returns nil when no other login has fresh usage.
+func ClaudeOtherAccountQuotas() []types.QuotaSnapshot {
+	usageByOrg := ClaudeDesktopUsageByOrg()
+	if len(usageByOrg) == 0 {
+		return nil
+	}
+	home, _ := os.UserHomeDir()
+	activeUUID, _ := activeClaudeAccount(home)
+	known := loadKnownClaudeAccounts()
+
+	// Map each non-active login's org to its account key from the plaintext
+	// session-folder layout, so the usage history (keyed by org) can be filed
+	// under the right login. Use the login's most-active org only.
+	orgToKey := map[string]string{}
+	for uuid, entry := range claudeBestDesktopEntryByUUID() {
+		if uuid == activeUUID {
+			continue
+		}
+		orgToKey[entry.OrgUUID] = ClaudeAccountKey(uuid, known[uuid].Email)
+	}
+
+	var out []types.QuotaSnapshot
+	for org, snaps := range usageByOrg {
+		key, ok := orgToKey[org]
+		if !ok {
+			continue
+		}
+		for _, snap := range snaps {
+			snap.AccountKey = key
+			out = append(out, snap)
+		}
+	}
 	return out
 }
 
@@ -207,7 +338,7 @@ func ClaudeSessionAccountKeys() map[string]string {
 	known := loadKnownClaudeAccounts()
 	out := map[string]string{}
 	for _, desktop := range ClaudeDesktopAccounts() {
-		email := known[desktop.AccountUUID].Email
+		email, _ := claudeAccountIdentity(desktop.AccountUUID, known)
 		if desktop.AccountUUID == activeUUID && active != nil {
 			email = active.Email
 		}

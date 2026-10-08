@@ -80,7 +80,7 @@ describe("calculation-bearing components", () => {
 
     expect(screen.getByText(/100 suggested · 25% accept/)).toBeInTheDocument();
     expect(screen.getByText("$3.00")).toBeInTheDocument();
-    expect(screen.getByText("26 usage models with no truncation")).toBeInTheDocument();
+    expect(screen.getByText("All 26 models used in this period")).toBeInTheDocument();
     expect(screen.queryByText("Productivity attribution")).not.toBeInTheDocument();
     expect(screen.queryByText("productivity-row")).not.toBeInTheDocument();
     expect(screen.getByText("Showing 1–25 of 26")).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe("calculation-bearing components", () => {
 
     expect(screen.queryByText(/accept$/)).not.toBeInTheDocument();
     expect(screen.getByText("No token breakdown yet.")).toBeInTheDocument();
-    expect(screen.getByText("0 usage models with no truncation")).toBeInTheDocument();
+    expect(screen.getByText("Models appear once usage reports")).toBeInTheDocument();
   });
 
   test("RosterPlanUsage averages signaled plans, clamps the visual meter, and chooses the worst verdict", () => {
@@ -137,6 +137,18 @@ describe("calculation-bearing components", () => {
     expect(meter).toHaveAttribute("aria-label", "Average plan use 85 percent, Over quota");
     expect(screen.getByText("85%")).toBeInTheDocument();
     expect(screen.getByText(/avg across 2 plans · Over quota/)).toBeInTheDocument();
+  });
+
+  test("RosterPlanUsage calls a paid seat at 0% unused instead of within allowance", () => {
+    render(
+      <RosterPlanUsage
+        plans={[{ toolName: "cursor", toolKey: "cursor", planName: "Pro", primaryRatio: 0, verdict: { code: "LIGHT_USE", severity: "info", reasons: [], policyVersion: "plan-utilization-v1" } }]}
+      />,
+    );
+
+    expect(screen.getByRole("meter")).toHaveAttribute("aria-label", "Average plan use 0 percent, No use yet");
+    expect(screen.getByText("No use yet")).toBeInTheDocument();
+    expect(screen.queryByText(/Within allowance/)).not.toBeInTheDocument();
   });
 
   test("RosterPlanUsage reports no signal without inventing a percentage", () => {

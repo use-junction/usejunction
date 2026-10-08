@@ -256,6 +256,7 @@ type AccountReport struct {
 	AccountKey  string `json:"accountKey,omitempty"`
 	Email       string `json:"email,omitempty"`
 	Plan        string `json:"plan,omitempty"`
+	OrgKey      string `json:"orgKey,omitempty"`
 	LoginMethod string `json:"loginMethod"`
 	AuthPresent bool   `json:"authPresent"`
 }

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowDownRight, ArrowRight, ArrowUpRight } from "lucide-react";
 import { Panel } from "@/components/panel";
+import { Ghost } from "@/components/empty-states/ghost";
 import { SignalsKpi, SignalsSectionHeader } from "@/components/signals/signals-ui";
 import { formatMicrosAsCurrency, formatRelativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -84,8 +85,28 @@ function rangeLabel(from: string, to: string) {
   return from === to ? format(from) : `${format(from)} – ${format(to)}`;
 }
 
+/** Assigned-but-idle plus unassigned seats, per tool, so this matches the Cost page. */
+function paidSeatsNotUsed(data: TeamAdoption) {
+  const unassigned = data.unassignedSeats ?? { count: 0, monthlyMicros: "0", tools: [] };
+  const byTool = new Map<string, { toolName: string; count: number; micros: bigint }>();
+  for (const tool of [...data.idleSeats.tools, ...unassigned.tools]) {
+    const entry = byTool.get(tool.toolName) ?? { toolName: tool.toolName, count: 0, micros: 0n };
+    entry.count += tool.count;
+    entry.micros += BigInt(tool.monthlyMicros);
+    byTool.set(tool.toolName, entry);
+  }
+  return {
+    assigned: data.idleSeats.count,
+    unassigned: unassigned.count,
+    count: data.idleSeats.count + unassigned.count,
+    micros: BigInt(data.idleSeats.monthlyMicros) + BigInt(unassigned.monthlyMicros),
+    tools: [...byTool.values()].sort((a, b) => (b.micros > a.micros ? 1 : b.micros < a.micros ? -1 : a.toolName.localeCompare(b.toolName))),
+  };
+}
+
 function AdoptionSummary({ data }: { data: TeamAdoption }) {
-  const { counts, idleSeats } = data;
+  const { counts } = data;
+  const idle = paidSeatsNotUsed(data);
   const nudges = counts.notStarted + counts.noData + data.notEnrolled.length;
   return (
     <section aria-label="Adoption summary" className="mb-10">
@@ -95,7 +116,15 @@ function AdoptionSummary({ data }: { data: TeamAdoption }) {
           hero
           className="pl-5"
           value={<span className="tabular-nums">{counts.active}<span className="text-muted-foreground"> of {counts.enrolled}</span></span>}
-          sub={<Delta now={counts.active} before={counts.previousActive} />}
+          sub={
+            <span className="flex flex-col gap-0.5">
+              <span>
+                {counts.enrolled === 1 ? "person" : "people"} with a connected machine
+                {data.notEnrolled.length ? ` · ${data.notEnrolled.length} more on the roster without one` : ""}
+              </span>
+              <Delta now={counts.active} before={counts.previousActive} />
+            </span>
+          }
         />
         <SignalsKpi
           label="Need a nudge"
@@ -106,23 +135,31 @@ function AdoptionSummary({ data }: { data: TeamAdoption }) {
         <SignalsKpi
           label="Paid seats not used"
           className="sm:border-l sm:border-border sm:pl-8"
-          value={idleSeats.count ? (
+          value={idle.count ? (
             <span className="tabular-nums">
-              {formatMicrosAsCurrency(idleSeats.cycleMicros)}
-              <span className="ml-1 text-base font-normal text-muted-foreground">/ cycle</span>
+              {formatMicrosAsCurrency(idle.micros)}
+              <span className="ml-1 text-base font-normal text-muted-foreground">/ mo</span>
             </span>
           ) : "None"}
-          sub={idleSeats.count ? (
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {idleSeats.tools.map((tool) => (
-                <span key={tool.toolName} className="inline-flex items-center gap-1 text-foreground/80">
-                  <ToolName tool={tool.toolName} size={13} linked />
-                  {idleSeats.tools.length > 1 || tool.count > 1 ? (
-                    <span className="tabular-nums text-muted-foreground">{formatMicrosAsCurrency(tool.cycleMicros)}{tool.count > 1 ? ` ×${tool.count}` : ""}</span>
-                  ) : null}
-                </span>
-              ))}
-              <Link href="/tools" className="inline-flex items-center gap-0.5 hover:underline">Review in Cost <ArrowRight className="size-3" aria-hidden /></Link>
+          sub={idle.count ? (
+            <span className="flex flex-col gap-1">
+              <span>
+                {[
+                  idle.assigned ? `${plural(idle.assigned, "assigned seat")} unused` : null,
+                  idle.unassigned ? `${plural(idle.unassigned, "seat")} assigned to no one` : null,
+                ].filter(Boolean).join(" · ")}
+              </span>
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                {idle.tools.map((tool) => (
+                  <span key={tool.toolName} className="inline-flex items-center gap-1 text-foreground/80">
+                    <ToolName tool={tool.toolName} size={13} linked />
+                    {idle.tools.length > 1 || tool.count > 1 ? (
+                      <span className="tabular-nums text-muted-foreground">{formatMicrosAsCurrency(tool.micros)}{tool.count > 1 ? ` ×${tool.count}` : ""}</span>
+                    ) : null}
+                  </span>
+                ))}
+                <Link href="/tools" className="inline-flex items-center gap-0.5 hover:underline">Review in Cost <ArrowRight className="size-3" aria-hidden /></Link>
+              </span>
             </span>
           ) : "every paid seat saw use"}
         />
@@ -451,27 +488,27 @@ function NudgeList({ rows }: { rows: Nudge[] }) {
 }
 
 export function TeamAdoptionView({
-  data, children,
+  data, sample, children,
 }: {
   data: TeamAdoption;
+  /** Sample team drawn faded into the activity and tool panels while nobody has a connected machine. */
+  sample?: TeamAdoption;
   /** Collection diagnostics, rendered folded at the bottom. */
   children?: ReactNode;
 }) {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const nudges = nudgesFor(data);
-  useEffect(() => {
-    // Report links land on #reports; open the fold so the anchor is visible.
-    if (window.location.hash === "#reports") setDiagnosticsOpen(true);
-  }, []);
   return (
     <>
       <AdoptionSummary data={data} />
-      <PeopleGrid data={data} />
+      {sample ? <Ghost><PeopleGrid data={sample} /></Ghost> : <PeopleGrid data={data} />}
       {nudges.length ? (
         <div className="grid gap-6 lg:grid-cols-2">
           <NudgeList rows={nudges} />
-          <ToolSpread data={data} />
+          {sample ? <Ghost><ToolSpread data={sample} /></Ghost> : <ToolSpread data={data} />}
         </div>
+      ) : sample ? (
+        <Ghost><ToolSpread data={sample} /></Ghost>
       ) : (
         <ToolSpread data={data} />
       )}
@@ -483,7 +520,7 @@ export function TeamAdoptionView({
         >
           <summary className="cursor-pointer list-none text-sm font-semibold marker:hidden">
             <span className="mr-1.5 inline-block transition-transform group-open:rotate-90" aria-hidden>›</span>
-            Collection health and sent reports
+            Collection health
           </summary>
           <div className="mt-6">{children}</div>
         </details>

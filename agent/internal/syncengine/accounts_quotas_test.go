@@ -40,7 +40,7 @@ func TestAccountsContentHashFixture(t *testing.T) {
 		{ToolName: "cursor", Email: "a@x.com", Plan: "pro", LoginMethod: "local_app", AuthPresent: true},
 		{ToolName: "codex", Email: "", Plan: "plus", LoginMethod: "chatgpt", AuthPresent: true},
 	})
-	if got != "ffd1b111476f51ed1268d111947636e6" {
+	if got != "a39e2436620c9f42c16586b34188e790" {
 		t.Fatalf("accounts fixture hash = %s", got)
 	}
 }

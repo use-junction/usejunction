@@ -34,7 +34,7 @@ export default function MyDataClientScreen() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <PageHeader title="What do we hold?" className="mb-8" />
+      <PageHeader title="My data." description="What UseJunction holds about you, and your controls over it." className="mb-8" />
       <div className="space-y-6">
         {data.membership.collectionNoticeAcked ? null : noticeBanner}
         <MyDataSummary

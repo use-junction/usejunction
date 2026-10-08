@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { ToolBrandIcon } from "@/components/tools/tool-brand-icon";
 import { MemberPlanBoard } from "@/components/developers/member-plan-board";
 import { MemberWorkSessionList } from "@/components/developers/member-work-session-list";
 import { SignalsKpi } from "@/components/signals/signals-ui";
@@ -10,13 +11,14 @@ import { useMemberClientData } from "@/components/developers/member-client-layou
 import { formatCompactNumber, formatUsd } from "@/lib/format";
 import { buildMemberPlanBoard, planBoardLeadLabel } from "@/lib/quotas/plan-board";
 import type { WorkActivitySession } from "@/lib/signals/queries/get-work-activity";
-import { canonicalToolKey } from "@/lib/tools/catalog";
+import { canonicalToolKey, toolDisplayName } from "@/lib/tools/catalog";
 import { signalsProductEnabled } from "@/lib/region";
 
 export default function MemberOverviewClientScreen() {
   const searchParams = useSearchParams();
-  const { developerId, personal, selectedPeriodLabel, cycleView, work, workExtractionEnabled } =
+  const { developerId, personal, selectedPeriodLabel, cycleView, work, workExtractionEnabled, toolsUsedLast30d } =
     useMemberClientData();
+  const usedTools = new Set(toolsUsedLast30d ?? []);
   const workData = work ?? { enabled: false, sessions: [] };
   const recentWorkSessions = workData.sessions.slice(0, 4);
   const queryString = searchParams.toString();
@@ -94,6 +96,51 @@ export default function MemberOverviewClientScreen() {
 
       <section className="mt-10">
         <div className="mb-4">
+          <h2 className="text-lg font-semibold tracking-tight">Seats.</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Paid seats assigned to {personal.developer.name} · use in the last 30 days, the same window as Cost.
+          </p>
+        </div>
+        {personal.planSeats.length ? (
+          <ul className="divide-y divide-border border-y border-border">
+            {personal.planSeats.map((seat, index) => {
+              const used = usedTools.has(seat.toolKey);
+              return (
+                <li key={`${seat.toolKey}-${seat.planName}-${index}`}>
+                  <Link
+                    href={`/tools/${encodeURIComponent(seat.toolKey)}`}
+                    className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm transition-colors hover:bg-muted/30"
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <ToolBrandIcon tool={seat.toolKey} size={18} />
+                      <span className="min-w-0">
+                        <span className="block font-medium">{toolDisplayName(seat.toolKey)}</span>
+                        <span className="block text-xs text-muted-foreground">{seat.planName}</span>
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-4">
+                      <span className={used ? "text-xs text-muted-foreground" : "text-xs font-medium text-warning"}>
+                        {used ? "Used in the last 30 days" : "No use in 30 days"}
+                      </span>
+                      <span className="tabular-nums">
+                        {seat.monthlySeatCost > 0 ? `${formatUsd(seat.monthlySeatCost)}/mo` : "Free"}
+                      </span>
+                      <ArrowRight className="size-3.5 text-muted-foreground" aria-hidden />
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="border p-4 text-sm text-muted-foreground">
+            No paid seats assigned. Assign one from a tool&apos;s page under Cost.
+          </p>
+        )}
+      </section>
+
+      <section className="mt-10">
+        <div className="mb-4">
           <h2 className="text-lg font-semibold tracking-tight">Plans.</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Billing cycle, accounted usage, and burn pace by product · {selectedPeriodLabel}.
@@ -103,7 +150,7 @@ export default function MemberOverviewClientScreen() {
           <MemberPlanBoard cards={planCards} workSessionsByTool={workSessionsByTool} />
         ) : (
           <p className="border p-4 text-sm text-muted-foreground">
-            No plan windows or tool traffic yet for this period.
+            No plan limits or tool usage reported in this period yet.
           </p>
         )}
       </section>

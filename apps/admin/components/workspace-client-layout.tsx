@@ -113,7 +113,11 @@ function WorkspaceClientLayoutInner({ children }: { children: React.ReactNode })
       pathname === "/features" ||
       pathname.startsWith("/features/") ||
       pathname === "/work-spend" ||
-      pathname.startsWith("/work-spend/")
+      pathname.startsWith("/work-spend/") ||
+      pathname === "/overview" ||
+      pathname === "/accounts" ||
+      pathname === "/settings/integrations" ||
+      pathname === "/settings/audit"
     ) {
       router.replace("/dashboard");
     }

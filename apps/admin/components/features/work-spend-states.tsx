@@ -16,6 +16,18 @@ export function WorkSpendStates({
   onItem?: (item: WorkStateItem) => void;
 }) {
   const allocated = data.coverage.attributedMicros;
+  const onItems = BigInt(data.states.shipped.micros) + BigInt(data.states.inFlight.micros) + BigInt(data.states.stalled.micros);
+  const outsideItems = BigInt(allocated) > onItems ? BigInt(allocated) - onItems : 0n;
+  const recorded = `${Math.round(data.coverage.attributedPct)}% of recorded AI spend`;
+  const heroSub = data.workCount === 0
+    ? BigInt(allocated) > 0n
+      ? `${recorded} · on repository commits, not yet on a PR or issue`
+      : "No PRs or issues in this period"
+    : [
+      `${data.workCount} ${data.workCount === 1 ? "item" : "items"}`,
+      recorded,
+      outsideItems > 0n ? `${formatMicrosAsCurrency(outsideItems)} on commits outside a PR or issue` : null,
+    ].filter(Boolean).join(" · ");
   const cards = [
     { key: "shipped" as const, label: WORK_STATE_LABELS.shipped, bucket: data.states.shipped, color: WORK_STATE_COLORS.shipped, hint: undefined as string | undefined },
     { key: "in_flight" as const, label: WORK_STATE_LABELS.in_flight, bucket: data.states.inFlight, color: WORK_STATE_COLORS.in_flight, hint: undefined },
@@ -33,7 +45,7 @@ export function WorkSpendStates({
         accent
         compactMobile
         className="h-full px-3 sm:px-4"
-        sub={`${data.workCount} ${data.workCount === 1 ? "item" : "items"} · ${Math.round(data.coverage.attributedPct)}% of recorded`}
+        sub={heroSub}
       />
       {cards.map((card) => {
         const share = microsSharePct(card.bucket.micros, allocated);

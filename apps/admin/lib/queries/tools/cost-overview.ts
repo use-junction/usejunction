@@ -2,7 +2,11 @@ import { prisma } from "@usejunction/db";
 import { UTC_TIMEZONE } from "@/lib/analytics/contracts/time-window";
 import { readOrgUsageFromSnapshots } from "@/lib/analytics/snapshots";
 import { normalizeBillingCadence, resolveBillingCycle } from "@/lib/billing/cycles";
+import { monthlyFactor, provenFreeSeats } from "@/lib/billing/monthly";
 import { getTeamAdoption } from "@/lib/queries/activity/adoption";
+import { getToolUsers } from "@/lib/queries/usage-activity";
+import { usageByToolForPeople } from "@/lib/teams/usage";
+export { idleMicrosByTool, idleSeatMicros } from "@/lib/queries/tools/cost-idle";
 import { canonicalToolKey } from "@/lib/tools/catalog";
 
 /**
@@ -19,7 +23,6 @@ import { canonicalToolKey } from "@/lib/tools/catalog";
  */
 
 const DAY_MS = 86_400_000;
-const AVG_MONTH_DAYS = 30.4375;
 export const MIN_PROJECTION_DAYS = 7;
 export const SIGNAL_DAYS = 30;
 /** A person "hits the limit" when any plan window reached this share. */
@@ -35,6 +38,8 @@ export type CostPlan = {
   cadence: "weekly" | "monthly" | "annual" | "custom";
   seatCapacity: number;
   assignedSeats: number;
+  /** Seats we can show are held by no one and used by no one; see provenFreeSeats. */
+  unassignedSeats: number;
   monthlyMicros: string;
   priceTag: PriceTag;
   renewsOn: string;
@@ -111,9 +116,12 @@ export type CostOverviewInput = {
   usage: Array<{ toolName: string; verifiedMicros: bigint; estimatedMicros: bigint; actualMicros: bigint }>;
   previousUsage: Array<{ toolName: string; verifiedMicros: bigint; estimatedMicros: bigint; actualMicros: bigint }>;
   activePeople: Array<{ toolName: string; developerId: string }>;
+  /** People holding an active seat on each tool right now. */
+  seatHolders: Array<{ toolName: string; developerId: string }>;
   /** Peak used % per person, tool, and plan window in the trailing SIGNAL_DAYS. */
   quotaPeaks: Array<{ toolName: string; developerId: string; peak: number }>;
-  idleSeats: Array<{ toolName: string; count: number; cycleMicros: string }>;
+  /** Assigned paid seats with no use in the trailing SIGNAL_DAYS, priced per month. */
+  idleSeats: Array<{ toolName: string; count: number; monthlyMicros: string }>;
 };
 
 function dayKey(date: Date) {
@@ -124,14 +132,7 @@ function key(name: string | null | undefined) {
   return canonicalToolKey((name ?? "").trim().toLowerCase());
 }
 
-/** Monthly equivalent of one cycle's amount. */
-export function monthlyFactor(cadence: string, cycleDays: number | null) {
-  const normalized = normalizeBillingCadence(cadence);
-  if (normalized === "annual") return 1 / 12;
-  if (normalized === "weekly") return AVG_MONTH_DAYS / 7;
-  if (normalized === "custom" && cycleDays && cycleDays > 0) return AVG_MONTH_DAYS / cycleDays;
-  return 1;
-}
+export { monthlyFactor };
 
 function scale(micros: bigint, factor: number) {
   return factor === 1 ? micros : BigInt(Math.round(Number(micros) * factor));
@@ -178,6 +179,7 @@ export function buildCostOverview(input: CostOverviewInput): CostOverview {
     const toolKey = key(row.toolName);
     peopleByTool.set(toolKey, (peopleByTool.get(toolKey) ?? new Set()).add(row.developerId));
   }
+  const unseated = unseatedCounts(input.activePeople, input.seatHolders);
   const peaksByTool = new Map<string, Map<string, number[]>>();
   for (const row of input.quotaPeaks) {
     const toolKey = key(row.toolName);
@@ -191,7 +193,8 @@ export function buildCostOverview(input: CostOverviewInput): CostOverview {
     if (!toolKey) continue;
     const plans = plansByTool.get(toolKey) ?? [];
     const usage = usageByTool.get(toolKey) ?? { verified: 0n, estimated: 0n };
-    const costPlans: CostPlan[] = plans.map((plan) => {
+    const free = provenFreeSeats(plans, () => toolKey, unseated);
+    const costPlans: CostPlan[] = plans.map((plan, index) => {
       const factor = monthlyFactor(plan.billingCadence, plan.billingCycleDays);
       const cycleMicros = plan.cycleSeatMicros * BigInt(plan.seatCapacity);
       const cycle = resolveBillingCycle(plan, input.now);
@@ -201,6 +204,7 @@ export function buildCostOverview(input: CostOverviewInput): CostOverview {
         cadence: normalizeBillingCadence(plan.billingCadence),
         seatCapacity: plan.seatCapacity,
         assignedSeats: plan.assignedSeats,
+        unassignedSeats: free[index]!,
         monthlyMicros: scale(cycleMicros, factor).toString(),
         priceTag: priceTag(plan),
         renewsOn: dayKey(cycle.nextRenewalDate),
@@ -277,7 +281,7 @@ function buildChanges(tools: CostTool[], idleSeats: CostOverviewInput["idleSeats
   const changes: CostChange[] = [];
   for (const tool of tools) {
     for (const plan of tool.plans) {
-      const free = plan.seatCapacity - plan.assignedSeats;
+      const free = plan.unassignedSeats;
       const perSeat = plan.seatCapacity ? BigInt(plan.monthlyMicros) / BigInt(plan.seatCapacity) : 0n;
       if (free > 0 && perSeat > 0n) {
         changes.push({
@@ -329,8 +333,8 @@ function buildChanges(tools: CostTool[], idleSeats: CostOverviewInput["idleSeats
       kind: "unused_seats",
       toolKey: key(idle.toolName),
       text: `${idle.count} assigned ${idle.count === 1 ? "seat" : "seats"} saw no use in the last ${SIGNAL_DAYS} days`,
-      monthlyMicros: idle.cycleMicros,
-      basis: "per cycle · people with healthy collection only",
+      monthlyMicros: idle.monthlyMicros,
+      basis: "per month · people with healthy collection only",
       href: "/activity",
     });
   }
@@ -340,15 +344,72 @@ function buildChanges(tools: CostTool[], idleSeats: CostOverviewInput["idleSeats
   });
 }
 
+/** People with real use of a tool who hold no seat on it, per tool key. */
+export function unseatedCounts(
+  activePeople: Array<{ toolName: string; developerId: string }>,
+  seatHolders: Array<{ toolName: string; developerId: string }>,
+) {
+  const holders = new Set(seatHolders.map((row) => `${key(row.toolName)}:${row.developerId}`));
+  const seen = new Set<string>();
+  const counts = new Map<string, number>();
+  for (const row of activePeople) {
+    const toolKey = key(row.toolName);
+    const id = `${toolKey}:${row.developerId}`;
+    if (holders.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    counts.set(toolKey, (counts.get(toolKey) ?? 0) + 1);
+  }
+  return counts;
+}
+
+export async function getSeatHolders(orgId: string) {
+  const rows = await prisma.developerPlanAssignment.findMany({
+    where: { orgId, active: true, seatStatus: "active", template: { active: true } },
+    select: { developerId: true, toolName: true, template: { select: { toolKey: true, toolName: true } } },
+  });
+  return rows.map((row) => ({ toolName: row.template.toolKey ?? row.template.toolName ?? row.toolName, developerId: row.developerId }));
+}
+
+/** Unseated people per tool over the trailing SIGNAL_DAYS; Adoption uses it to match Cost. */
+export async function getUnseatedUsers(orgId: string, now: Date = new Date()) {
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const signalStart = new Date(today.getTime() - (SIGNAL_DAYS - 1) * DAY_MS);
+  const [activePeople, seatHolders] = await Promise.all([getToolUsers(orgId, signalStart, today), getSeatHolders(orgId)]);
+  return unseatedCounts(activePeople, seatHolders);
+}
+
 function toMicros(dollars: number) {
   return BigInt(Math.round(dollars * 1_000_000));
 }
 
+/**
+ * Plans as seen by one team: only the seats its members hold. Unassigned seats belong to the
+ * workspace, not a team, so a team view never reports them.
+ */
+async function teamScopedPlans(orgId: string, plans: PlanInput[], developerIds: string[]): Promise<PlanInput[]> {
+  if (!developerIds.length) return [];
+  const held = await prisma.developerPlanAssignment.groupBy({
+    by: ["planTemplateId"],
+    where: { orgId, active: true, seatStatus: "active", developerId: { in: developerIds } },
+    _sum: { seatCount: true },
+  });
+  const seatsByPlan = new Map(held.map((row) => [row.planTemplateId, row._sum.seatCount ?? 0]));
+  return plans
+    .filter((plan) => (seatsByPlan.get(plan.id) ?? 0) > 0)
+    .map((plan) => {
+      const seats = seatsByPlan.get(plan.id) ?? 0;
+      return { ...plan, seatCapacity: seats, assignedSeats: seats };
+    });
+}
+
 export async function getCostOverview(
   orgId: string,
-  plans: PlanInput[],
+  allPlans: PlanInput[],
   now: Date = new Date(),
+  options: { developerIds?: string[] } = {},
 ): Promise<CostOverview> {
+  const team = options.developerIds ? new Set(options.developerIds) : null;
+  const plans = options.developerIds ? await teamScopedPlans(orgId, allPlans, options.developerIds) : allPlans;
   const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const monthStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
   const previousStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1));
@@ -357,19 +418,20 @@ export async function getCostOverview(
   const signalStart = new Date(today.getTime() - (SIGNAL_DAYS - 1) * DAY_MS);
   const window = (from: Date, to: Date) => ({ from, to, timezone: UTC_TIMEZONE, grain: "day" as const });
 
-  const [current, previous, activePeople, quotaPeaks, adoption] = await Promise.all([
-    readOrgUsageFromSnapshots(orgId, window(monthStart, today), { includeTools: true, ensure: false }),
-    readOrgUsageFromSnapshots(orgId, window(previousStart, previousSameDay), { includeTools: true, ensure: false }),
-    prisma.$queryRaw<Array<{ toolName: string; developerId: string }>>`
-      SELECT DISTINCT tool_name AS "toolName", developer_id AS "developerId"
-      FROM usage_daily
-      WHERE org_id = ${orgId}
-        AND developer_id IS NOT NULL
-        AND date >= ${dayKey(signalStart)}::date
-        AND date <= ${dayKey(today)}::date
-        AND metric_kind <> 'productivity'
-        AND (requests > 0 OR sessions > 0 OR input_tokens > 0 OR output_tokens > 0 OR active_seconds > 0)
-    `,
+  const usageRows = (rows: Array<{ toolName: string; verifiedUsageCost: number; estimatedApiCost: number; actualSpendCost: number }>) => rows.map((row) => ({
+    toolName: row.toolName,
+    verifiedMicros: toMicros(row.verifiedUsageCost),
+    estimatedMicros: toMicros(row.estimatedApiCost),
+    actualMicros: toMicros(row.actualSpendCost),
+  }));
+  const usageFor = (from: Date, to: Date) => options.developerIds
+    ? usageByToolForPeople(orgId, options.developerIds, { from, to })
+    : readOrgUsageFromSnapshots(orgId, window(from, to), { includeTools: true, ensure: false }).then((result) => usageRows(result.tools));
+
+  const [current, previous, activePeople, quotaPeaks, adoption, seatHolders] = await Promise.all([
+    usageFor(monthStart, today),
+    usageFor(previousStart, previousSameDay),
+    getToolUsers(orgId, signalStart, today).then((rows) => (team ? rows.filter((row) => team.has(row.developerId)) : rows)),
     prisma.$queryRaw<Array<{ toolName: string; developerId: string; peak: number }>>`
       SELECT q.tool_name AS "toolName", d.user_id AS "developerId", MAX(q.used_percent)::float AS peak
       FROM quota_observations q
@@ -378,23 +440,18 @@ export async function getCostOverview(
         AND q.observed_at >= ${signalStart}
       GROUP BY q.tool_name, d.user_id, q.window_type, q.reset_at
     `,
-    getTeamAdoption(orgId, window(signalStart, today), now),
+    getTeamAdoption(orgId, window(signalStart, today), now, { developerIds: options.developerIds }),
+    getSeatHolders(orgId),
   ]);
-
-  const usageRows = (rows: typeof current.tools) => rows.map((row) => ({
-    toolName: row.toolName,
-    verifiedMicros: toMicros(row.verifiedUsageCost),
-    estimatedMicros: toMicros(row.estimatedApiCost),
-    actualMicros: toMicros(row.actualSpendCost),
-  }));
 
   return buildCostOverview({
     now,
     plans,
-    usage: usageRows(current.tools),
-    previousUsage: usageRows(previous.tools),
+    usage: current,
+    previousUsage: previous,
     activePeople,
-    quotaPeaks,
+    seatHolders,
+    quotaPeaks: team ? quotaPeaks.filter((row) => team.has(row.developerId)) : quotaPeaks,
     idleSeats: adoption.idleSeats.tools,
   });
 }

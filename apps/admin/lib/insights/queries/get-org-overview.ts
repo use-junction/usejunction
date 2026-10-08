@@ -635,9 +635,10 @@ export async function getOrgOverviewMetrics(
   const developerNames = activityDeveloperIds.length
     ? await prisma.developer.findMany({
         where: { orgId, id: { in: activityDeveloperIds }, removedAt: null },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true, email: true, teamId: true },
       })
     : [];
+  const teamRecords = await prisma.team.findMany({ where: { orgId }, select: { id: true, name: true, color: true } });
   const nameById = new Map(
     developerNames.map((row) => [row.id, row.name?.trim() || row.email || "Unknown"]),
   );
@@ -652,6 +653,23 @@ export async function getOrgOverviewMetrics(
     .filter((row) => row.cost > 0 || row.requests > 0)
     .sort((a, b) => b.cost - a.cost || b.requests - a.requests)
     .slice(0, 8);
+
+  // Every active person counts toward their team, not just the top eight shown above.
+  const teamOf = new Map(developerNames.map((row) => [row.id, row.teamId]));
+  const teamTotals = new Map<string, { id: string; name: string; color: string | null; people: number; requests: number; cost: number }>();
+  if (teamRecords.length) {
+    for (const team of teamRecords) teamTotals.set(team.id, { ...team, people: 0, requests: 0, cost: 0 });
+    for (const row of peopleActivity) {
+      if (!teamOf.has(row.developerId) || (row.cost <= 0 && row.requests <= 0)) continue;
+      const key = teamOf.get(row.developerId) ?? "none";
+      const entry = teamTotals.get(key) ?? { id: "none", name: "No team", color: null, people: 0, requests: 0, cost: 0 };
+      entry.people += 1;
+      entry.requests += row.requests;
+      entry.cost += row.cost;
+      teamTotals.set(key, entry);
+    }
+  }
+  const teams = [...teamTotals.values()].sort((a, b) => b.cost - a.cost || a.name.localeCompare(b.name));
 
   const firstActivityDate = currentTrend.find((row) => row.modelCalls > 0)?.date ?? null;
   const observation = observationCoverage({
@@ -796,6 +814,7 @@ export async function getOrgOverviewMetrics(
     models: currentUsage.models,
     providerCards,
     people,
+    teams,
     coverage: {
       activeDevelopers: currentUsage.activeDevelopers,
     },

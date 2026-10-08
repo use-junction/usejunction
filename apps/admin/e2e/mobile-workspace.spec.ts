@@ -35,8 +35,8 @@ for (const route of routes) {
 test("workspace navigation uses a closing mobile drawer", async ({ page }) => {
   await page.goto("/dashboard");
   await page.getByRole("button", { name: "Open navigation" }).click();
-  await expect(page.getByRole("link", { name: "Team", exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Team", exact: true }).click();
+  await expect(page.getByRole("link", { name: "People", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "People", exact: true }).click();
   await expect(page).toHaveURL(/\/team$/);
   await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
 });
@@ -44,7 +44,7 @@ test("workspace navigation uses a closing mobile drawer", async ({ page }) => {
 test("mobile dashboard uses the compact header, period picker, and KPI grid", async ({ page }) => {
   await page.goto("/dashboard");
 
-  await expect(page.getByRole("link", { name: "UseJunction dashboard" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "UseJunction home" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
 
   const audience = page.getByRole("tablist", { name: "Audience" });

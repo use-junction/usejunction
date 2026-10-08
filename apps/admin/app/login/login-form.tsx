@@ -52,7 +52,7 @@ export function LoginForm() {
       setError("We could not sign you in. Check your details and verify your email first.");
       return;
     }
-    router.push(from);
+    router.push(from === "/dashboard" || from === "/" ? `/auth/continue?from=${encodeURIComponent(from)}` : from);
     router.refresh();
   }
 

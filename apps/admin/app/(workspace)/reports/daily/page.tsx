@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Legacy route — reports live under Activity. */
+/** Legacy route; reports have their own page now. */
 export default async function DailyReportRedirectPage({
   searchParams,
 }: {
@@ -16,5 +16,5 @@ export default async function DailyReportRedirectPage({
   if (!query.has("scope") && query.get("kind") === "org") query.set("scope", "team");
   query.delete("kind");
   const suffix = query.toString();
-  redirect(suffix ? `/activity?${suffix}#reports` : "/activity#reports");
+  redirect(suffix ? `/reports?${suffix}` : "/reports");
 }

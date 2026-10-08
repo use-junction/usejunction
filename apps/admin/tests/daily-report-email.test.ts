@@ -98,7 +98,7 @@ describe("daily report email", () => {
     const built = buildDailyReportEmail({ report, recipientName: "Dinuda" });
     assert.match(built.subject, /Your UseJunction day/);
     assert.match(built.html, /Open today's report/);
-    assert.match(built.url, /\/activity\?scope=you&date=2026-07-21#reports/);
+    assert.match(built.url, /\/reports\?scope=you&date=2026-07-21$/);
     assert.match(built.html, /\/settings/);
     assert.match(built.text, /Manage email reports|Turn off daily emails/);
   });
@@ -191,7 +191,7 @@ describe("daily report email", () => {
       },
     });
     assert.match(built.subject, /Team week/);
-    assert.match(built.url, /\/activity\?scope=team&date=2026-07-26&period=week#reports/);
+    assert.match(built.url, /\/reports\?scope=team&date=2026-07-26&period=week$/);
     assert.match(built.html, /Open this week's report/);
     assert.match(built.html, /Sent Sundays at 19:00/);
     assert.doesNotMatch(built.url, /scope=you/);

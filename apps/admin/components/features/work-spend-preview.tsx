@@ -3,6 +3,7 @@
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { Panel } from "@/components/panel";
+import { Ghost } from "@/components/empty-states/ghost";
 import { WorkSpendSectionHeader, TREND_SERIES_COLORS, WORK_STATE_COLORS, WORK_STATE_LABELS } from "@/components/features/work-spend-ui";
 
 /**
@@ -55,13 +56,7 @@ const STATES = ["shipped", "in_flight", "stalled"] as const;
 
 export function WorkSpendPreview() {
   return (
-    <div className="mt-10">
-      <p className="mb-3 text-xs text-muted-foreground">With GitHub connected · sample data</p>
-      <div
-        aria-hidden
-        inert
-        className="pointer-events-none max-h-[46rem] select-none overflow-hidden opacity-50 [mask-image:linear-gradient(to_bottom,black_25%,transparent_92%)]"
-      >
+    <Ghost fade className="mt-10 max-h-[46rem] overflow-hidden">
         <div className="grid items-stretch gap-6 xl:grid-cols-[1.45fr_1fr]">
           <Panel className="min-w-0">
             <WorkSpendSectionHeader
@@ -164,7 +159,6 @@ export function WorkSpendPreview() {
             </ul>
           </Panel>
         </div>
-      </div>
-    </div>
+    </Ghost>
   );
 }

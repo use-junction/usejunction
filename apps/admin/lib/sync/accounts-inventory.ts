@@ -21,6 +21,7 @@ export type AccountInventoryItem = {
   accountKey?: string | null;
   email?: string | null;
   plan?: string | null;
+  orgKey?: string | null;
   loginMethod?: string | null;
   authPresent?: boolean;
 };
@@ -32,6 +33,7 @@ export type AccountInventoryReported = {
   accountKey: string;
   plan: string | null;
   email: string | null;
+  vendorOrgId: string | null;
   authPresent: boolean;
   usageEnabled: boolean;
   loggingEnabled: boolean;
@@ -44,9 +46,11 @@ export function accountsInventoryCanonicalLine(item: AccountInventoryItem): stri
   const accountKey = String(item.accountKey ?? "").trim();
   const email = String(item.email ?? "").trim();
   const plan = String(item.plan ?? "").trim();
+  const orgKey = String(item.orgKey ?? "").trim();
   const loginMethod = String(item.loginMethod ?? "").trim();
   const authPresent = item.authPresent ? "1" : "0";
-  return `${toolName}|${accountKey}|${email}|${plan}|${loginMethod}|${authPresent}`;
+  // Keep field order byte-compatible with agent/internal/syncengine/accounts.go.
+  return `${toolName}|${accountKey}|${email}|${plan}|${orgKey}|${loginMethod}|${authPresent}`;
 }
 
 /** Plan merge: non-empty incoming always wins; sticky last-known only while authPresent. */
@@ -93,7 +97,7 @@ export async function applyDeviceAccountInventory(params: {
     const accountKey = normalizeAccountKey(acct.accountKey, incomingEmail);
     const existingRows = await prisma.toolAccount.findMany({
       where: { deviceId: params.deviceId, toolName },
-      select: { id: true, accountKey: true, email: true, plan: true },
+      select: { id: true, accountKey: true, email: true, plan: true, vendorOrgId: true },
     });
     const existing = pickExistingAccount(existingRows, { accountKey, email: incomingEmail });
 
@@ -105,6 +109,9 @@ export async function applyDeviceAccountInventory(params: {
       authPresent,
     });
     const email = incomingEmail || existing?.email || null;
+    // Org id is sticky: keep the last-known when a report omits it.
+    const incomingOrgId = typeof acct.orgKey === "string" ? acct.orgKey.trim() : "";
+    const vendorOrgId = incomingOrgId || existing?.vendorOrgId || null;
     const flags = defaultCollectionFlags(toolName);
 
     if (existing) {
@@ -114,6 +121,7 @@ export async function applyDeviceAccountInventory(params: {
           accountKey,
           email,
           plan,
+          vendorOrgId,
           loginMethod: acct.loginMethod?.trim() || "unknown",
           authPresent,
           updatedAt: new Date(),
@@ -129,6 +137,7 @@ export async function applyDeviceAccountInventory(params: {
           accountKey,
           email,
           plan,
+          vendorOrgId,
           loginMethod: acct.loginMethod?.trim() || "unknown",
           authPresent,
           usageEnabled: flags.usageEnabled,
@@ -158,6 +167,7 @@ export async function applyDeviceAccountInventory(params: {
       accountKey,
       plan,
       email,
+      vendorOrgId,
       authPresent,
       usageEnabled: stored?.usageEnabled ?? flags.usageEnabled,
       loggingEnabled: stored?.loggingEnabled ?? flags.loggingEnabled,

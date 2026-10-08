@@ -1,13 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { DeveloperToolInventory } from "@/components/developers/developer-tool-inventory";
 import { HubTabList } from "@/components/hub-nav";
 import { PageHeader } from "@/components/page-header";
 import { InvitePeopleDialog } from "@/components/team/team-connect-panel";
+import { TeamGhostRows } from "@/components/team/team-ghost-rows";
 import { TeamInvitedPanel, type PendingInvite } from "@/components/team/team-invited-panel";
 import { TeamSyncsPanel } from "@/components/team/team-syncs-panel";
+import { TeamTeamsPanel } from "@/components/team/team-teams-panel";
+import { TeamFilter } from "@/components/team-filter";
+import { useSession } from "next-auth/react";
+import { canManageSettings, type OrganizationRole } from "@/lib/rbac/permissions";
 import { serializeBigInts } from "@/lib/billing/validation";
 import {
   cycleViewShortSuffix,
@@ -23,13 +27,22 @@ import { useAppPageQuery } from "@/lib/api/client";
 import { teamInvitesKey, teamKey, teamSyncsKey, teamUsageKey } from "@/lib/app-pages/query-keys";
 import { AppPageError, AppPageSkeleton, isBlockingAppQueryError, useAppQueryErrorToast } from "@/components/app-data-state";
 
-type TeamView = "active" | "invited" | "syncs";
+type TeamView = "active" | "teams" | "invited" | "fleet";
 
 const teamViews: { id: TeamView; label: string }[] = [
-  { id: "active", label: "Active" },
+  { id: "active", label: "Members" },
+  { id: "teams", label: "Teams" },
   { id: "invited", label: "Invited" },
-  { id: "syncs", label: "Syncs" },
+  { id: "fleet", label: "Fleet" },
 ];
+
+/** `?tab=` keeps the open tab linkable; `syncs` is the old name for Fleet. */
+function parseTeamView(value: string | null): TeamView {
+  if (value === "invited") return "invited";
+  if (value === "teams") return "teams";
+  if (value === "fleet" || value === "syncs") return "fleet";
+  return "active";
+}
 
 type TeamPayload = {
   cycleView: CycleView;
@@ -54,9 +67,24 @@ type TeamSyncsPayload = {
 };
 
 export default function TeamClientScreen() {
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const queryString = searchParams.toString();
-  const [view, setView] = useState<TeamView>("active");
+  const { data: session } = useSession();
+  const canManage = canManageSettings(session?.user?.role as OrganizationRole | null | undefined);
+  const view = parseTeamView(searchParams.get("tab"));
+  const dataParams = new URLSearchParams(searchParams.toString());
+  dataParams.delete("tab");
+  // The team filter narrows the roster client-side; it must not refetch the page data.
+  dataParams.delete("team");
+  const queryString = dataParams.toString();
+  function setView(next: TeamView) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "active") params.delete("tab");
+    else params.set("tab", next);
+    const search = params.toString();
+    router.replace(`${pathname}${search ? `?${search}` : ""}`, { scroll: false });
+  }
   const query = useAppPageQuery<TeamPayload>(
     teamKey(queryString),
     `/api/app/team${queryString ? `?${queryString}` : ""}`,
@@ -74,7 +102,7 @@ export default function TeamClientScreen() {
   const syncsQuery = useAppPageQuery<TeamSyncsPayload>(
     teamSyncsKey,
     "/api/app/team/syncs",
-    { enabled: view === "syncs" },
+    { enabled: view === "fleet" },
   );
   useAppQueryErrorToast(usageQuery.error, {
     enabled: view === "active" && Boolean(query.data),
@@ -86,7 +114,7 @@ export default function TeamClientScreen() {
     retry: () => void invitesQuery.refetch(),
   });
   useAppQueryErrorToast(syncsQuery.error, {
-    enabled: view === "syncs" && Boolean(query.data),
+    enabled: view === "fleet" && Boolean(query.data),
     retry: () => void syncsQuery.refetch(),
   });
 
@@ -112,7 +140,16 @@ export default function TeamClientScreen() {
 
   return (
     <>
-      <PageHeader title="Who's here?" actions={<InvitePeopleDialog />}>
+      <PageHeader
+        title="People."
+        description="Who's here, which team they're on, and whether their machine reports."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {view === "active" ? <TeamFilter /> : null}
+            <InvitePeopleDialog />
+          </div>
+        }
+      >
         <HubTabList
           items={teamViews}
           value={view}
@@ -144,7 +181,10 @@ export default function TeamClientScreen() {
           planUsageError={usageQuery.error?.message ?? null}
           retryPlanUsage={() => void usageQuery.refetch()}
           periodSuffix={periodSuffix}
+          ghostRows={empty ? <TeamGhostRows /> : undefined}
         />
+      ) : view === "teams" ? (
+        <TeamTeamsPanel canManage={canManage} />
       ) : view === "invited" ? (
         invitesQuery.isPending && !invitesQuery.data ? (
           <AppPageSkeleton />

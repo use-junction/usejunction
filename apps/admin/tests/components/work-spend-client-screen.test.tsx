@@ -33,7 +33,7 @@ async function openMore() { await userEvent.setup().click(screen.getByRole("butt
 
 test("leads with allocated work, state cards, and header actions", async () => {
   await renderScreen();
-  expect(screen.getByRole("heading", { name: "What did it produce?" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Work." })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Sync now" })).toBeEnabled();
   expect(screen.getByRole("button", { name: /Integrations/ })).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Where the work stands" })).toHaveTextContent("Merged");

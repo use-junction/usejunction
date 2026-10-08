@@ -26,7 +26,7 @@ type RepairCommandResponse = {
   hostname: string;
 };
 
-type RepairStatus = "waiting" | "enrolled" | "connected" | "expired";
+type RepairStatus = "waiting" | "enrolled" | "syncing" | "connected" | "expired";
 
 type Repair = {
   tokenId: string;
@@ -35,15 +35,15 @@ type Repair = {
 };
 
 /**
- * idle: command shown, not copied yet. waiting/enrolled: polling the machine.
+ * idle: command shown, not copied yet. waiting/enrolled/syncing: polling the machine.
  * timedOut: stopped polling, the token still works. expired: token is dead.
  */
-type Phase = "idle" | "waiting" | "enrolled" | "connected" | "timedOut" | "expired";
+type Phase = "idle" | "waiting" | "enrolled" | "syncing" | "connected" | "timedOut" | "expired";
 
 type Props = {
   device: RepairDeviceTarget | null;
   onOpenChange: (open: boolean) => void;
-  /** Called once the machine re-enrolls and reports a heartbeat. */
+  /** Called once the machine re-enrolls and finishes a usage sync. */
   onRepaired?: () => void;
 };
 
@@ -115,10 +115,12 @@ export function RepairConnectionDialog({ device, onOpenChange, onRepaired }: Pro
   const startWaiting = useCallback(() => {
     if (!repair) return;
     setDeadline(Math.min(Date.now() + WAIT_TIMEOUT_MS, repair.expiresAt));
-    setPhase((current) => (current === "enrolled" || current === "connected" ? current : "waiting"));
+    setPhase((current) =>
+      current === "enrolled" || current === "syncing" || current === "connected" ? current : "waiting",
+    );
   }, [repair]);
 
-  const polling = phase === "waiting" || phase === "enrolled";
+  const polling = phase === "waiting" || phase === "enrolled" || phase === "syncing";
 
   // Poll only while the dialog is open and waiting; closing it unmounts the
   // device, which clears the interval and aborts any in-flight request.
@@ -146,6 +148,8 @@ export function RepairConnectionDialog({ device, onOpenChange, onRepaired }: Pro
         if (payload.status === "connected") {
           setPhase("connected");
           onRepairedRef.current?.();
+        } else if (payload.status === "syncing") {
+          setPhase("syncing");
         } else if (payload.status === "enrolled") {
           setPhase("enrolled");
         } else if (payload.status === "expired") {
@@ -200,7 +204,7 @@ export function RepairConnectionDialog({ device, onOpenChange, onRepaired }: Pro
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
                 <div>
                   <p className="font-medium">{hostname} is reporting again.</p>
-                  <p className="mt-0.5 text-muted-foreground">Usage will catch up on the next sync.</p>
+                  <p className="mt-0.5 text-muted-foreground">Usage is synced. Dashboards update in a moment.</p>
                 </div>
               </div>
               <div className="flex justify-end">
@@ -241,13 +245,15 @@ function RepairProgress({
   onKeepWaiting: () => void;
   onNewCommand: () => void;
 }) {
-  if (phase === "waiting" || phase === "enrolled") {
+  if (phase === "waiting" || phase === "enrolled" || phase === "syncing") {
     return (
       <div className="flex items-center gap-2 border border-border bg-muted/30 px-3 py-2.5 text-sm text-muted-foreground" role="status">
         <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden />
         {phase === "waiting"
           ? `Waiting for ${hostname} to run the command…`
-          : `${hostname} re-enrolled. Waiting for the agent to check in…`}
+          : phase === "enrolled"
+            ? `${hostname} re-enrolled. Waiting for the agent to check in…`
+            : `${hostname} checked in. Scanning tools and uploading usage…`}
       </div>
     );
   }

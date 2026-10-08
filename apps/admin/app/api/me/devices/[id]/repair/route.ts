@@ -69,11 +69,12 @@ export async function POST(req: NextRequest, context: RouteContext) {
   );
 }
 
-type RepairStatus = "waiting" | "enrolled" | "connected" | "expired";
+type RepairStatus = "waiting" | "enrolled" | "syncing" | "connected" | "expired";
 
 /**
  * Repair progress for one issued token: waiting for the command to run,
- * enrolled (token used, no heartbeat yet), connected, or expired.
+ * enrolled (token used, no heartbeat yet), syncing (heartbeat seen, first usage
+ * sync not finished), connected (usage sync landed), or expired.
  */
 export async function GET(req: NextRequest, context: RouteContext) {
   const principal = await requireAppPrincipal(req, rolesFor("self_view"));
@@ -103,7 +104,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
     select: {
       usedAt: true,
       expiresAt: true,
-      repairDevice: { select: { lastSeenAt: true, decommissionedAt: true } },
+      repairDevice: { select: { lastSeenAt: true, lastUsageSyncAt: true, decommissionedAt: true } },
     },
   });
   if (!token || !token.repairDevice || token.repairDevice.decommissionedAt) {
@@ -112,7 +113,12 @@ export async function GET(req: NextRequest, context: RouteContext) {
 
   let status: RepairStatus;
   if (token.usedAt) {
-    status = token.repairDevice.lastSeenAt > token.usedAt ? "connected" : "enrolled";
+    // The agent heartbeats before it scans, so only a usage sync after the
+    // repair means the machine is actually reporting again.
+    const { lastSeenAt, lastUsageSyncAt } = token.repairDevice;
+    if (lastUsageSyncAt && lastUsageSyncAt > token.usedAt) status = "connected";
+    else if (lastSeenAt > token.usedAt) status = "syncing";
+    else status = "enrolled";
   } else {
     status = token.expiresAt <= new Date() ? "expired" : "waiting";
   }

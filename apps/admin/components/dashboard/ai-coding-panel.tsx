@@ -190,7 +190,9 @@ function ModelTable({ title, description, rows }: { title: string; description: 
         </>
       ) : (
         <Empty className="min-h-0 gap-1 border-0 p-6 md:p-6">
-          <EmptyDescription>No models match your search.</EmptyDescription>
+          <EmptyDescription>
+            {query.trim() ? "No models match your search." : "No model usage reported in this period yet."}
+          </EmptyDescription>
         </Empty>
       )}
     </div>
@@ -327,7 +329,11 @@ export function AiCodingPanel({
 
       <ModelTable
         title="Every model"
-        description={`${usageModels.length} usage models with no truncation`}
+        description={
+          usageModels.length
+            ? `All ${usageModels.length} ${usageModels.length === 1 ? "model" : "models"} used in this period`
+            : "Models appear once usage reports"
+        }
         rows={usageModels}
       />
     </>

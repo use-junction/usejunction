@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useState } from "react";
-import { ChevronDown, Loader2, Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -114,6 +114,7 @@ export function ToolProviderDetail({
   periodLabel = "current billing cycles",
   periodBasePath,
   cycleWindows,
+  showBreadcrumb = true,
 }: {
   data: DetailProps;
   scope?: "org" | "self";
@@ -123,6 +124,8 @@ export function ToolProviderDetail({
   periodSuffix?: string;
   periodBasePath?: string;
   cycleWindows?: CycleViewWindows;
+  /** The tool page renders its own breadcrumb above the refreshing area. */
+  showBreadcrumb?: boolean;
 }) {
   const router = useRouter();
   const invalidateAppData = useInvalidateAppData();
@@ -131,7 +134,6 @@ export function ToolProviderDetail({
   const [addOpen, setAddOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PlanRow | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [modelView, setModelView] = useState<"model" | "person">("model");
   const [showAllModels, setShowAllModels] = useState(false);
   const basePath = periodBasePath ?? `/tools/${data.toolKey}`;
@@ -204,47 +206,112 @@ export function ToolProviderDetail({
   const peopleByDeveloperId = new Map<string, (typeof data.people)[number]>();
   for (const person of data.people) peopleByDeveloperId.set(person.developerId, person);
 
-  // One row per person: combine all their quota windows, and fold in plan assignment.
+  // One row per (person, login): a person can hold several accounts for a tool
+  // (e.g. a personal Pro login and a work Team login), each with its own plan
+  // and its own limits. Groups are keyed by developer + accountKey; people with
+  // no account rows fall back to a single developer-level group (accountKey "").
   type QuotaGroup = {
     key: string;
     developerId: string | null;
     developerName: string;
     deviceHostname: string | null;
+    accountKey: string | null;
+    accountEmail: string | null;
+    accountPlanKey: string | null;
+    accountPlanName: string | null;
+    accountPlanInferred: boolean;
     windows: typeof data.quotas;
   };
+  const GROUP_SEP = "\u0000";
+  const groupKey = (developerId: string | null, accountKey: string | null) =>
+    `${developerId ?? "org"}${GROUP_SEP}${accountKey ?? ""}`;
+  const normKey = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
+
+  const accountsByDeveloper = new Map<string, typeof data.accounts>();
+  for (const account of data.accounts) {
+    const list = accountsByDeveloper.get(account.developerId) ?? [];
+    list.push(account);
+    accountsByDeveloper.set(account.developerId, list);
+  }
+  const developersWithAccounts = new Set(data.accounts.map((account) => account.developerId));
+
   const quotaGroupMap = new Map<string, QuotaGroup>();
-  for (const quota of data.quotas) {
-    const key = quota.developerId ?? quota.developerName ?? `device:${quota.deviceHostname ?? "org"}`;
-    const existing = quotaGroupMap.get(key);
-    if (existing) {
-      existing.windows.push(quota);
-    } else {
-      quotaGroupMap.set(key, {
+  // Seed a group per known login, so every account shows even before it reports
+  // any live limits.
+  for (const account of data.accounts) {
+    const key = groupKey(account.developerId, account.accountKey);
+    if (quotaGroupMap.has(key)) continue;
+    quotaGroupMap.set(key, {
+      key,
+      developerId: account.developerId,
+      developerName: peopleByDeveloperId.get(account.developerId)?.name ?? "Unknown",
+      deviceHostname: account.deviceHostname,
+      accountKey: account.accountKey,
+      accountEmail: account.email,
+      accountPlanKey: account.mappedCatalogPlanKey,
+      accountPlanName: account.mappedCatalogPlanName,
+      accountPlanInferred: account.planInferredFromOrg,
+      windows: [],
+    });
+  }
+
+  const ensureDeveloperGroup = (
+    developerId: string | null,
+    name: string,
+    deviceHostname: string | null,
+  ): QuotaGroup => {
+    const key = groupKey(developerId, "");
+    let group = quotaGroupMap.get(key);
+    if (!group) {
+      group = {
         key,
-        developerId: quota.developerId,
-        developerName: quota.developerName ?? "Unassigned device",
-        deviceHostname: quota.deviceHostname,
-        windows: [quota],
-      });
+        developerId,
+        developerName: name,
+        deviceHostname,
+        accountKey: null,
+        accountEmail: null,
+        accountPlanKey: null,
+        accountPlanName: null,
+        accountPlanInferred: false,
+        windows: [],
+      };
+      quotaGroupMap.set(key, group);
     }
+    return group;
+  };
+
+  // Attach each quota window to the login it belongs to: match by accountKey,
+  // and when a person has exactly one login send its windows there anyway.
+  for (const quota of data.quotas) {
+    const devId = quota.developerId;
+    const logins = devId ? accountsByDeveloper.get(devId) ?? [] : [];
+    const qKey = normKey(quota.accountKey);
+    const match = qKey ? logins.find((account) => normKey(account.accountKey) === qKey) : undefined;
+    let group: QuotaGroup | undefined;
+    if (match) {
+      group = quotaGroupMap.get(groupKey(devId, match.accountKey));
+    } else if (logins.length === 1) {
+      group = quotaGroupMap.get(groupKey(devId, logins[0].accountKey));
+    }
+    if (!group) {
+      const name = quota.developerName ?? (devId ? peopleByDeveloperId.get(devId)?.name ?? "Unassigned device" : "Unassigned device");
+      group = ensureDeveloperGroup(devId, name, quota.deviceHostname);
+    }
+    group.windows.push(quota);
   }
   // People with an assignment but no quota windows still appear so the assignment is visible.
   for (const person of data.people) {
-    if (quotaGroupMap.has(person.developerId)) continue;
+    if (developersWithAccounts.has(person.developerId)) continue;
+    if (quotaGroupMap.has(groupKey(person.developerId, ""))) continue;
     if (person.coverage === "install_only") continue;
     if (!person.assignment) continue;
-    quotaGroupMap.set(person.developerId, {
-      key: person.developerId,
-      developerId: person.developerId,
-      developerName: person.name,
-      deviceHostname: person.deviceHostname,
-      windows: [],
-    });
+    ensureDeveloperGroup(person.developerId, person.name, person.deviceHostname);
   }
   // Detected installs / reported plans / usage-only people with no quota or seat yet —
   // otherwise a second Claude user shows in Models ($0.016) and disappears here.
   for (const person of data.people) {
-    if (quotaGroupMap.has(person.developerId)) continue;
+    if (developersWithAccounts.has(person.developerId)) continue;
+    if (quotaGroupMap.has(groupKey(person.developerId, ""))) continue;
     if (person.coverage === "install_only") continue;
     if (!person.detected && !person.vendorPlan && !person.assignment) {
       const hasModelUsage = data.modelsByDeveloper.some(
@@ -252,25 +319,15 @@ export function ToolProviderDetail({
       );
       if (!hasModelUsage) continue;
     }
-    quotaGroupMap.set(person.developerId, {
-      key: person.developerId,
-      developerId: person.developerId,
-      developerName: person.name,
-      deviceHostname: person.deviceHostname,
-      windows: [],
-    });
+    ensureDeveloperGroup(person.developerId, person.name, person.deviceHostname);
   }
   // Belt-and-suspenders: model rows whose developer never made it into people.
   for (const row of data.modelsByDeveloper) {
-    if (!row.developerId || quotaGroupMap.has(row.developerId)) continue;
+    if (!row.developerId) continue;
+    if (developersWithAccounts.has(row.developerId)) continue;
+    if (quotaGroupMap.has(groupKey(row.developerId, ""))) continue;
     if (!(row.requests > 0 || row.cost > 0)) continue;
-    quotaGroupMap.set(row.developerId, {
-      key: row.developerId,
-      developerId: row.developerId,
-      developerName: row.developerName,
-      deviceHostname: peopleByDeveloperId.get(row.developerId)?.deviceHostname ?? null,
-      windows: [],
-    });
+    ensureDeveloperGroup(row.developerId, row.developerName, peopleByDeveloperId.get(row.developerId)?.deviceHostname ?? null);
   }
   // Worst first: whoever is closest to a limit leads; people with nothing reported sink.
   const quotaGroups = Array.from(quotaGroupMap.values())
@@ -328,21 +385,21 @@ export function ToolProviderDetail({
   const share = (part: number, whole: number) => (whole > 0 ? part / whole : 0);
   const pct = (value: number) => `${Math.round(value * 100)}%`;
 
-  function toggleExpanded(key: string) {
-    setExpanded((old) => {
-      const next = new Set(old);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
   const planFor = (developerId: string | null) => {
     const person = developerId ? peopleByDeveloperId.get(developerId) ?? null : null;
     if (person?.assignment) return { person, name: person.assignment.planName, source: person.assignment.source === "detected" ? "Detected plan" : "Assigned plan" };
     if (person?.vendorPlan) return { person, name: person.vendorPlan, source: "Reported plan" };
     if (person?.detected) return { person, name: null, source: "Plan unknown" };
     return { person, name: null, source: "No plan signal" };
+  };
+  // A single login's plan comes from that login's own detected plan when known;
+  // otherwise fall back to the person-level assignment/vendor signal.
+  const planForGroup = (group: QuotaGroup) => {
+    const person = group.developerId ? peopleByDeveloperId.get(group.developerId) ?? null : null;
+    if (group.accountPlanName) {
+      return { person, name: group.accountPlanName, source: group.accountPlanInferred ? "Plan via org" : "Detected plan" };
+    }
+    return planFor(group.developerId);
   };
   const selfPlan = isSelf ? planFor(quotaGroups[0]?.developerId ?? data.people[0]?.developerId ?? null) : null;
 
@@ -378,7 +435,7 @@ export function ToolProviderDetail({
 
   return (
     <>
-      <Breadcrumb className="mb-6">
+      {showBreadcrumb ? <Breadcrumb className="mb-6">
         <BreadcrumbList>
           <BreadcrumbItem>
             <BreadcrumbLink asChild>
@@ -390,7 +447,7 @@ export function ToolProviderDetail({
             <BreadcrumbPage>{data.name}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
-      </Breadcrumb>
+      </Breadcrumb> : null}
 
       <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex items-center gap-4">
@@ -475,113 +532,97 @@ export function ToolProviderDetail({
             <table className="w-full min-w-[640px] text-sm">
               <thead className="border-b text-left text-xs text-muted-foreground">
                 <tr>
-                  <th className="px-4 py-2.5 font-medium">{isSelf ? "Plan" : "Person"}</th>
-                  <th className="px-4 py-2.5 font-medium">Tightest limit</th>
-                  <th className="w-40 px-4 py-2.5 font-medium">Resets</th>
-                  <th className="w-28 px-4 py-2.5 text-right font-medium"><span className="sr-only">Other limits</span></th>
+                  <th className="w-64 px-4 py-2.5 font-medium">{isSelf ? "Plan" : "Person"}</th>
+                  <th className="px-4 py-2.5 font-medium">Limits</th>
                 </tr>
               </thead>
               <tbody>
                 {quotaGroups.map((group) => {
-                  const { person, name: planName, source } = planFor(group.developerId);
-                  const tight = group.tightest;
-                  const percent = group.tightestPercent;
-                  const tone = quotaTone(percent);
-                  const reset = tight ? resetCopy(tight.resetAt) : null;
-                  const others = group.windows.filter((quota) => quota !== tight);
-                  const open = expanded.has(group.key);
+                  const { person, name: planName, source } = planForGroup(group);
+                  // Show every window, tightest first, rather than hiding all but one.
+                  const windows = [...group.windows].sort(
+                    (a, b) => (quotaPercent(b) ?? -1) - (quotaPercent(a) ?? -1),
+                  );
+                  // Only surface the plan-mismatch nudge on the login whose detected
+                  // plan actually differs from the assigned seat.
+                  const showMismatch = Boolean(
+                    !isSelf &&
+                      person?.planMismatch &&
+                      person.mappedCatalogPlanKey &&
+                      (group.accountKey == null || group.accountPlanKey === person.mappedCatalogPlanKey),
+                  );
                   return (
-                    <Fragment key={group.key}>
-                      <tr className={cn("align-top", open ? "" : "border-b last:border-b-0")}>
-                        <td className="px-4 py-3">
-                          {isSelf ? null : <p className="font-medium">{group.developerName}</p>}
-                          <p className={cn("text-xs text-muted-foreground", isSelf && "text-sm text-foreground")}>
-                            {planName ? <span className="font-medium text-foreground">{planName}</span> : null}
-                            {planName ? " · " : ""}{source}
-                            {group.deviceHostname && !isSelf ? <span className="block truncate">{group.deviceHostname}</span> : null}
-                          </p>
-                          {person?.planMismatch && person.mappedCatalogPlanKey && !isSelf ? (
-                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                              <span className="bg-brand-orange-pale px-1.5 py-0.5 text-brand-orange-dark">
-                                Reports {person.mappedCatalogPlanKey}, assigned {person.assignment?.catalogPlanKey ?? "another plan"}
-                              </span>
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                disabled={applyingId === person.developerId}
-                                onClick={() => void applyDetected(person.developerId)}
-                              >
-                                {applyingId === person.developerId ? <Loader2 className="size-3 animate-spin" /> : "Use detected plan"}
-                              </Button>
-                            </div>
-                          ) : null}
-                        </td>
-                        <td className="px-4 py-3">
-                          {tight && percent != null ? (
-                            <div className="max-w-sm">
-                              <div className="flex items-baseline justify-between gap-3">
-                                <span>{quotaWindowLabel(tight.windowType)}</span>
-                                <span className="tabular-nums">
-                                  <span className="font-semibold">{Math.round(percent)}%</span>
-                                  <span className={cn("ml-2 text-xs", tone.text)}>{tone.label}</span>
-                                </span>
-                              </div>
-                              <div className="mt-1.5"><QuotaMeter quota={tight} percent={percent} /></div>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              {group.windows.length
-                                ? "Only balances reported"
-                                : planName
-                                  ? "No live limits yet. They appear once the tool is signed in on this machine."
-                                  : "No limits reported yet"}
+                    <tr key={group.key} className="border-b align-top last:border-b-0">
+                      <td className="px-4 py-3">
+                        {isSelf ? null : <p className="font-medium">{group.developerName}</p>}
+                        <p className={cn("text-xs text-muted-foreground", isSelf && "text-sm text-foreground")}>
+                          {planName ? <span className="font-medium text-foreground">{planName}</span> : null}
+                          {planName ? " · " : ""}{source}
+                        </p>
+                        {group.accountEmail && !isSelf ? (
+                          <p className="truncate text-xs text-muted-foreground">{group.accountEmail}</p>
+                        ) : null}
+                        {group.deviceHostname && !isSelf ? (
+                          <p className="truncate text-xs text-muted-foreground">{group.deviceHostname}</p>
+                        ) : null}
+                        {showMismatch && person ? (
+                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                            <span className="bg-brand-orange-pale px-1.5 py-0.5 text-brand-orange-dark">
+                              Reports {person.mappedCatalogPlanKey}, assigned {person.assignment?.catalogPlanKey ?? "another plan"}
                             </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-xs">
-                          {reset ? <span title={reset.absolute}>{reset.relative}<span className="block text-muted-foreground">{reset.absolute}</span></span> : <span className="text-muted-foreground">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {others.length ? (
-                            <button
-                              type="button"
-                              aria-expanded={open}
-                              onClick={() => toggleExpanded(group.key)}
-                              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                            <Button
+                              size="xs"
+                              variant="outline"
+                              disabled={applyingId === person.developerId}
+                              onClick={() => void applyDetected(person.developerId)}
                             >
-                              {others.length} more
-                              <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} aria-hidden />
-                            </button>
-                          ) : null}
-                        </td>
-                      </tr>
-                      {open ? (
-                        <tr className="border-b bg-muted/20 last:border-b-0">
-                          <td />
-                          <td colSpan={3} className="px-4 pb-3 pt-1">
-                            <ul className="grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
-                              {others.map((quota) => {
-                                const otherPercent = quotaPercent(quota);
-                                const secondary = isSecondaryQuotaWindow(quota.windowType);
-                                const otherReset = resetCopy(quota.resetAt, secondary ? "Expires" : "Resets");
-                                return (
-                                  <li key={`${quota.windowType}-${quota.deviceHostname ?? "org"}`} className="text-xs">
-                                    <div className="flex items-baseline justify-between gap-3">
-                                      <span className="text-foreground">{quotaWindowLabel(quota.windowType)}</span>
-                                      <span className="tabular-nums text-foreground">
-                                        {otherPercent != null ? `${Math.round(otherPercent)}%` : quotaRemainingLabel(quota.creditsRemaining, quota.windowType) ?? "—"}
-                                      </span>
-                                    </div>
-                                    {otherPercent != null ? <div className="mt-1"><QuotaMeter quota={quota} percent={otherPercent} /></div> : null}
-                                    {otherReset ? <p className="mt-1 text-muted-foreground" title={otherReset.absolute}>{otherReset.relative}</p> : null}
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
+                              {applyingId === person.developerId ? <Loader2 className="size-3 animate-spin" /> : "Use detected plan"}
+                            </Button>
+                          </div>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3">
+                        {windows.length ? (
+                          <div className="grid gap-x-10 gap-y-3 sm:grid-cols-2">
+                            {windows.map((quota) => {
+                              const pct = quotaPercent(quota);
+                              const tone = quotaTone(pct);
+                              const secondary = isSecondaryQuotaWindow(quota.windowType);
+                              const reset = resetCopy(quota.resetAt, secondary ? "Expires" : "Resets");
+                              return (
+                                <div key={`${quota.windowType}-${quota.deviceHostname ?? "org"}`} className="min-w-0">
+                                  <div className="flex items-baseline justify-between gap-3">
+                                    <span className="truncate">{quotaWindowLabel(quota.windowType)}</span>
+                                    <span className="tabular-nums whitespace-nowrap">
+                                      {pct != null ? (
+                                        <>
+                                          <span className="font-semibold">{Math.round(pct)}%</span>
+                                          <span className={cn("ml-2 text-xs", tone.text)}>{tone.label}</span>
+                                        </>
+                                      ) : (
+                                        quotaRemainingLabel(quota.creditsRemaining, quota.windowType) ?? "—"
+                                      )}
+                                    </span>
+                                  </div>
+                                  {pct != null ? <div className="mt-1.5"><QuotaMeter quota={quota} percent={pct} /></div> : null}
+                                  {reset ? (
+                                    <p className="mt-1 text-xs text-muted-foreground" title={reset.absolute}>
+                                      {reset.relative}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {planName
+                              ? "No live limits yet. They appear once the tool is signed in on this machine."
+                              : "No limits reported yet"}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>

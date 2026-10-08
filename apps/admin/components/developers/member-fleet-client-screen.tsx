@@ -58,6 +58,9 @@ export default function MemberFleetClientScreen() {
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Agent {device.agentVersion || "—"}
+                        {device.remoteSyncProtocol < 1 ? (
+                          <span className="font-medium text-warning"> · update needed</span>
+                        ) : null}
                         {lastSeen ? ` · seen ${lastSeen}` : ""}
                         {lastSync ? ` · usage sync ${lastSync}` : ""}
                       </p>

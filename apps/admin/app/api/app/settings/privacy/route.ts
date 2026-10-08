@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@usejunction/db";
 import { requireOrgRole, audit, rolesFor } from "@/lib/rbac";
-import { DEFAULT_USAGE_RETENTION_DAYS, isUsageRetentionDays } from "@/lib/legal/versions";
+import { DEFAULT_USAGE_RETENTION_DAYS, isUsageRetentionDays, USAGE_RETENTION_ENFORCEMENT_ENABLED } from "@/lib/legal/versions";
 import { PRIVACY_AUDIT_ACTIONS } from "@/lib/privacy/audit-actions";
 import { browserMutationGuard } from "@/lib/security/http";
 import { signalsAllowed } from "@/lib/region";
@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
     usageRetentionDays: org?.usageRetentionDays ?? DEFAULT_USAGE_RETENTION_DAYS,
     dataRegion: org?.dataRegion ?? "us",
     signalsAllowed: signalsAllowed(),
+    enforcementEnabled: USAGE_RETENTION_ENFORCEMENT_ENABLED,
   });
 }
 
@@ -47,5 +48,6 @@ export async function PATCH(req: NextRequest) {
     usageRetentionDays: org.usageRetentionDays,
     dataRegion: org.dataRegion,
     signalsAllowed: signalsAllowed(),
+    enforcementEnabled: USAGE_RETENTION_ENFORCEMENT_ENABLED,
   });
 }

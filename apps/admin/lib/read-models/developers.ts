@@ -87,6 +87,7 @@ export async function getDeveloperRoster(
         name: developer.name,
         email: developer.email,
         authUserId: developer.authUserId,
+        teamId: developer.teamId,
         role:
           developer.authUserId != null
             ? (roleByUserId.get(developer.authUserId) ?? developer.role)

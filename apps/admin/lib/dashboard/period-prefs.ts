@@ -1,6 +1,6 @@
 export const DASHBOARD_PERIOD_STORAGE_KEY = "uj.dashboard.rolling-period";
 
-export const PERIOD_PRESETS = [7, 14, 30] as const;
+export const PERIOD_PRESETS = [7, 14, 30, 90] as const;
 export type PeriodPresetDays = (typeof PERIOD_PRESETS)[number];
 
 export type PresetRollingPeriod = {
@@ -51,8 +51,57 @@ export function shortUtcDate(value: string) {
   }).format(new Date(`${value}T00:00:00Z`));
 }
 
+/** Calendar ranges budget and renewal reviews use; they resolve to fixed from/to dates. */
+export const CALENDAR_RANGES = [
+  { key: "this_month", label: "This month" },
+  { key: "last_month", label: "Last month" },
+  { key: "this_quarter", label: "This quarter" },
+  { key: "last_quarter", label: "Last quarter" },
+  { key: "year_to_date", label: "Year to date" },
+] as const;
+
+export type CalendarRangeKey = (typeof CALENDAR_RANGES)[number]["key"];
+
+function isoDay(year: number, month: number, day: number) {
+  return new Date(Date.UTC(year, month, day)).toISOString().slice(0, 10);
+}
+
+export function calendarRangePeriod(key: CalendarRangeKey, today: Date = new Date()): CustomRollingPeriod {
+  const year = today.getUTCFullYear();
+  const month = today.getUTCMonth();
+  const todayKey = isoDay(year, month, today.getUTCDate());
+  const quarterStart = month - (month % 3);
+  const range = (() => {
+    switch (key) {
+      case "this_month":
+        return { from: isoDay(year, month, 1), to: todayKey };
+      case "last_month":
+        return { from: isoDay(year, month - 1, 1), to: isoDay(year, month, 0) };
+      case "this_quarter":
+        return { from: isoDay(year, quarterStart, 1), to: todayKey };
+      case "last_quarter":
+        return { from: isoDay(year, quarterStart - 3, 1), to: isoDay(year, quarterStart, 0) };
+      case "year_to_date":
+        return { from: isoDay(year, 0, 1), to: todayKey };
+    }
+  })();
+  return { kind: "custom", id: `calendar:${key}`, ...range };
+}
+
+/** "This quarter" instead of "Jul 1 – Sep 30" when a custom range is exactly a calendar range. */
+export function calendarRangeLabel(period: RollingPeriod, today: Date = new Date()): string | null {
+  if (period.kind !== "custom") return null;
+  for (const range of CALENDAR_RANGES) {
+    const candidate = calendarRangePeriod(range.key, today);
+    if (candidate.from === period.from && candidate.to === period.to) return range.label;
+  }
+  return null;
+}
+
 export function rollingPeriodLabel(period: RollingPeriod): string {
   if (period.kind === "preset") return `Last ${period.days} days`;
+  const calendar = calendarRangeLabel(period);
+  if (calendar) return calendar;
   if (period.from === period.to) return shortUtcDate(period.from);
   return `${shortUtcDate(period.from)} – ${shortUtcDate(period.to)}`;
 }
@@ -74,7 +123,7 @@ export function rollingPeriodHref(
     typeof preserveSearch === "string"
       ? new URLSearchParams(preserveSearch.startsWith("?") ? preserveSearch.slice(1) : preserveSearch)
       : new URLSearchParams(preserveSearch);
-  for (const key of ["scope"] as const) {
+  for (const key of ["scope", "team"] as const) {
     const value = source.get(key);
     if (value) params.set(key, value);
   }
@@ -98,7 +147,7 @@ export function metricPeriodHref(
     typeof preserveSearch === "string"
       ? new URLSearchParams(preserveSearch.startsWith("?") ? preserveSearch.slice(1) : preserveSearch)
       : new URLSearchParams(preserveSearch);
-  for (const key of ["scope"] as const) {
+  for (const key of ["scope", "team"] as const) {
     const value = source.get(key);
     if (value) params.set(key, value);
   }
@@ -192,7 +241,7 @@ export function setActiveRollingPeriod(period: RollingPeriod): RollingPeriodPref
   const next: RollingPeriodPrefs = {
     active: period,
     saved:
-      period.kind === "custom"
+      period.kind === "custom" && !period.id.startsWith("calendar:")
         ? [
             period,
             ...current.saved.filter((item) => !(item.from === period.from && item.to === period.to)),

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname,
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("next/link", () => ({
@@ -96,11 +97,11 @@ test("sidebar clicks select the destination and show loading before the route co
     </WorkspaceShell>,
   );
 
-  fireEvent.click(screen.getByRole("link", { name: "Team" }));
+  fireEvent.click(screen.getByRole("link", { name: "People" }));
 
   expect(screen.getByLabelText("Loading page")).toBeTruthy();
   expect(screen.queryByText("Current page")).toBeNull();
-  expect(screen.getByRole("link", { name: "Team" }).getAttribute("aria-current")).toBe("page");
+  expect(screen.getByRole("link", { name: "People" }).getAttribute("aria-current")).toBe("page");
 
   mocks.pathname = "/team";
   view.rerender(
@@ -133,5 +134,5 @@ test("loading shell shows nav skeletons and page skeleton without role-specific 
   expect(screen.getByLabelText("Loading page")).toBeTruthy();
   expect(screen.queryByText("Current page")).toBeNull();
   expect(screen.queryByRole("link", { name: "Cost" })).toBeNull();
-  expect(screen.queryByRole("link", { name: "Team" })).toBeNull();
+  expect(screen.queryByRole("link", { name: "People" })).toBeNull();
 });

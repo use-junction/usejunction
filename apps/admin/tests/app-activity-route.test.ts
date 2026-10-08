@@ -81,6 +81,7 @@ test("GET /api/app/activity returns the activity page payload", async () => {
     from: null,
     to: null,
     scope: "team",
+    team: null,
   });
 });
 

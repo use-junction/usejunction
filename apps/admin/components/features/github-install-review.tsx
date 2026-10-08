@@ -67,7 +67,7 @@ export function GithubInstallReview({
 
   return (
     <div className="min-w-0 pb-6">
-      <PageHeader title="What did it produce?" />
+      <PageHeader title="Work." description="Where AI spend landed: repositories, pull requests and issues." />
 
       <Panel padded={false} className="grid min-w-0 grid-cols-[minmax(0,1fr)] xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
         <section className="flex flex-col justify-center p-5 sm:p-7 xl:border-r">

@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
   }
 
   let result:
-    | { orgId: string; role: string; created: boolean }
+    | { orgId: string; userId?: string; role: string; created: boolean }
     | undefined;
   if (session.user.orgId) {
     const membership = await prisma.organizationMembership.findUnique({
@@ -76,6 +76,12 @@ export async function POST(request: NextRequest) {
         );
       }
       throw error;
+    }
+    // resolveAuthUser reconciles a stale JWT user id by email (e.g. after a DB
+    // reset). The workspace then belongs to a different id than the session, so
+    // syncing would 403 forever; force a fresh sign-in instead.
+    if (result.userId && result.userId !== session.user.id) {
+      return NextResponse.json({ error: "session_expired" }, { status: 401 });
     }
   }
   const resolveMs = performance.now();

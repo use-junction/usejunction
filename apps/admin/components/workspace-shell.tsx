@@ -2,16 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppPageSkeleton } from "@/components/app-data-state";
 import { prefetchNavPage } from "@/lib/app-pages/nav-prefetch";
 import {
   Activity,
+  BarChart3,
   CircleDollarSign,
   Database,
-  Eye,
   GitPullRequest,
+  KeyRound,
+  LayoutDashboard,
+  Mail,
+  MonitorSmartphone,
+  Plug,
+  ScrollText,
   Settings,
   Users,
   type LucideIcon,
@@ -26,7 +32,7 @@ import { SignalsMark } from "@/components/signals/signals-mark";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { WorkspaceUserMenu } from "@/components/workspace-user-menu";
 import type { OrgBillingStatus } from "@/lib/saas-billing/status";
-import { canSeeOrgOverview } from "@/lib/rbac/permissions";
+import { canManageSettings, canSeeOrgOverview } from "@/lib/rbac/permissions";
 import type { OrganizationRole } from "@/lib/rbac/permissions";
 import { signalsProductEnabled } from "@/lib/region";
 import {
@@ -52,38 +58,73 @@ type NavItem = readonly [href: string, label: string, icon: NavIcon];
 type NavGroup = { label: string; items: NavItem[] };
 
 const discoverAdmin: NavItem[] = [
-  ["/dashboard", "Coverage", Eye],
+  ["/overview", "Overview", LayoutDashboard],
+  ["/dashboard", "Usage", BarChart3],
   ["/activity", "Adoption", Activity],
   ["/tools", "Cost", CircleDollarSign],
   ["/work-spend", "Work", GitPullRequest],
+  ["/reports", "Reports", Mail],
   ["/signals", "Signals", SignalsMark],
 ];
 
 const discoverMember: NavItem[] = [
-  ["/dashboard", "Coverage", Eye],
+  ["/dashboard", "Usage", BarChart3],
   ["/activity", "Adoption", Activity],
   ["/tools", "Cost", CircleDollarSign],
+  ["/reports", "Reports", Mail],
 ];
 
-const peopleGroup: NavItem[] = [["/team", "Team", Users]];
+const peopleGroup: NavItem[] = [
+  ["/team", "People", Users],
+  ["/team?tab=fleet", "Fleet", MonitorSmartphone],
+];
 const youGroup: NavItem[] = [["/me/data", "My data", Database]];
-const configureGroup: NavItem[] = [["/settings", "Settings", Settings]];
+const securityGroup: NavItem[] = [
+  ["/accounts", "Tool accounts", KeyRound],
+  ["/settings/audit", "Audit log", ScrollText],
+];
+const configureAdmin: NavItem[] = [
+  ["/settings", "Settings", Settings],
+  ["/settings/integrations", "Integrations", Plug],
+];
+const configureMember: NavItem[] = [["/settings", "Settings", Settings]];
 
 const adminNav: NavGroup[] = [
   { label: "Discover", items: discoverAdmin },
   { label: "People", items: peopleGroup },
   { label: "You", items: youGroup },
-  { label: "Configure", items: configureGroup },
+  { label: "Security", items: securityGroup },
+  { label: "Configure", items: configureAdmin },
+];
+
+/** Managers see the workspace but not settings, integrations, or security records. */
+const managerNav: NavGroup[] = [
+  { label: "Discover", items: discoverAdmin },
+  { label: "People", items: peopleGroup },
+  { label: "You", items: youGroup },
+  { label: "Configure", items: configureMember },
 ];
 
 const memberNav: NavGroup[] = [
   { label: "Discover", items: discoverMember },
   { label: "You", items: youGroup },
-  { label: "Configure", items: configureGroup },
+  { label: "Configure", items: configureMember },
 ];
 
-function navForRole(role: OrganizationRole | null) {
-  const groups = canSeeOrgOverview(role) ? adminNav : memberNav;
+/** Fleet is a tab of /team, so its active state depends on `?tab=`. */
+function isNavItemActive(href: string, path: string, tab: string | null) {
+  const [hrefPath, hrefQuery] = href.split("?");
+  if (hrefQuery) {
+    return path === hrefPath && new URLSearchParams(hrefQuery).get("tab") === tab;
+  }
+  if (href === "/team" && path === "/team" && tab === "fleet") return false;
+  if (href === "/dashboard") return path === href;
+  if (href === "/settings") return path === href;
+  return path === href || path.startsWith(`${href}/`);
+}
+
+export function navForRole(role: OrganizationRole | null) {
+  const groups = canManageSettings(role) ? adminNav : canSeeOrgOverview(role) ? managerNav : memberNav;
   if (signalsProductEnabled()) return groups;
   return groups
     .map((group) => ({
@@ -122,6 +163,9 @@ function AppSidebar({
 }) {
   const groups = navForRole(role);
   const { setOpenMobile } = useSidebar();
+  const searchParams = useSearchParams();
+  const [activePath, activeQuery] = active.split("?");
+  const activeTab = activeQuery !== undefined ? new URLSearchParams(activeQuery).get("tab") : searchParams.get("tab");
   const queryClient = useQueryClient();
   const hoverTimers = useRef(new Map<string, number>());
 
@@ -145,7 +189,7 @@ function AppSidebar({
     <Sidebar collapsible="offcanvas" variant="sidebar">
       <SidebarHeader className="h-14 justify-center border-b px-4 py-0">
         <Link
-          href="/dashboard"
+          href={canSeeOrgOverview(role) ? "/overview" : "/dashboard"}
           prefetch={false}
           className="flex h-full items-center gap-3 overflow-hidden"
           onClick={() => setOpenMobile(false)}
@@ -175,10 +219,7 @@ function AppSidebar({
               <SidebarGroupContent>
                 <SidebarMenu>
                   {group.items.map(([href, label, Icon]) => {
-                    const isActive =
-                      href === "/dashboard"
-                        ? active === href || active.startsWith(`${href}?`)
-                        : active === href || active.startsWith(`${href}/`) || active.startsWith(`${href}?`);
+                    const isActive = isNavItemActive(href, activePath ?? active, activeTab);
                     return (
                       <SidebarMenuItem key={href}>
                         <SidebarMenuButton asChild isActive={isActive} tooltip={label}>
@@ -244,7 +285,7 @@ export function WorkspaceShell({
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setPendingHref((current) => (current === pathname ? null : current));
+    setPendingHref((current) => (current?.split("?")[0] === pathname ? null : current));
   }, [pathname]);
 
   useEffect(() => {
@@ -267,7 +308,8 @@ export function WorkspaceShell({
         billing={billing}
         loading={loading}
         onNavigateStart={(href) => {
-          if (href !== pathname) {
+          // Same-page tab links (e.g. /team?tab=fleet from /team) never change the pathname.
+          if (href.split("?")[0] !== pathname) {
             setPendingHref(href);
             contentRef.current?.scrollTo?.({ top: 0 });
           }
@@ -278,9 +320,9 @@ export function WorkspaceShell({
           <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-3">
             <SidebarTrigger className="-ml-1 size-11 shrink-0 md:hidden" />
             <Link
-              href="/dashboard"
+              href={canSeeOrgOverview(role) ? "/overview" : "/dashboard"}
               prefetch={false}
-              aria-label="UseJunction dashboard"
+              aria-label="UseJunction home"
               className="flex shrink-0 items-center md:hidden"
             >
               <BrandLogo className="h-5 w-auto min-[360px]:h-6" />

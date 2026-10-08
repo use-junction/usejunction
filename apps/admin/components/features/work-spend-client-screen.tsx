@@ -191,7 +191,7 @@ export default function WorkSpendClientScreen() {
   const attentionCount = Number(githubNeedsAttention) + repositoryErrors.length + Number(projectsNeedAttention);
 
   return <div className="min-w-0 pb-8">
-      <PageHeader title="What did it produce?" actions={<div className="flex flex-wrap items-center gap-2">
+      <PageHeader title="Work." description="Where AI spend landed: repositories, pull requests and issues." actions={<div className="flex flex-wrap items-center gap-2">
         <Select value={selectedDays} onValueChange={setDays}><SelectTrigger aria-label="Date range" className="h-9 w-28 sm:w-36"><SelectValue><span className="sm:hidden">{selectedDays} days</span><span className="hidden sm:inline">Last {selectedDays} days</span></SelectValue></SelectTrigger><SelectContent><SelectItem value="30">Last 30 days</SelectItem><SelectItem value="90">Last 90 days</SelectItem></SelectContent></Select>
         <Button type="button" size="sm" variant="outline" onClick={() => void syncNow()} disabled={syncing || disconnecting || !!mappingLogin}><RefreshCw className={syncing ? "size-4 animate-spin" : "size-4"} aria-hidden />{syncing ? "Syncing…" : "Sync now"}</Button>
         <Button ref={connectionButton} type="button" size="sm" variant="outline" className="rounded-none border-brand-olive-border bg-brand-olive/5 hover:bg-brand-olive/10" onClick={() => setConnectionOpen(true)}><IntegrationProviderLogoStack />Integrations{attentionCount ? <span aria-label={`${attentionCount} items need attention`} className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-yellow-pale px-1.5 text-xs text-foreground">{attentionCount}</span> : null}</Button>

@@ -26,6 +26,7 @@ model Organization {
   createdAt                  DateTime  @default(now()) @map("created_at")
 
   developers                Developer[]
+  teams                     Team[]
   memberships               OrganizationMembership[]
   devices                   Device[]
   toolInstallations         ToolInstallation[]
@@ -94,10 +95,13 @@ model Developer {
   email      String
   authUserId String?   @map("auth_user_id")
   role       String    @default("user")
+  /// One team per person, so team rollups never double count.
+  teamId     String?   @map("team_id")
   removedAt  DateTime? @map("removed_at")
   createdAt  DateTime  @default(now()) @map("created_at")
 
   organization          Organization              @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  team                  Team?                     @relation(fields: [teamId], references: [id], onDelete: SetNull)
   devices               Device[]
   toolInstallations     ToolInstallation[]
   localModels           LocalModel[]
@@ -124,7 +128,25 @@ model Developer {
   @@unique([orgId, email])
   @@unique([orgId, authUserId])
   @@index([orgId, removedAt])
+  @@index([orgId, teamId])
   @@map("users")
+}
+
+/// A group of people (squad, department, cost centre) for rollups and filters.
+model Team {
+  id        String   @id @default(cuid())
+  orgId     String   @map("org_id")
+  name      String
+  color     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  members      Developer[]
+
+  @@unique([orgId, name])
+  @@index([orgId])
+  @@map("teams")
 }
 
 model Device {
@@ -457,6 +479,7 @@ model ToolAccount {
   accountKey         String   @default("") @map("account_key")
   email              String?
   plan               String?
+  vendorOrgId        String?  @map("vendor_org_id")
   loginMethod        String   @default("unknown") @map("login_method")
   authPresent        Boolean  @default(false) @map("auth_present")
   usageEnabled       Boolean  @default(true) @map("usage_enabled")
@@ -472,6 +495,7 @@ model ToolAccount {
 
   @@unique([deviceId, toolName, accountKey])
   @@index([orgId, toolName, email])
+  @@index([orgId, toolName, vendorOrgId])
   @@map("tool_accounts")
 }
 

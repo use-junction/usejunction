@@ -146,6 +146,9 @@ func runOnboard() error {
 			reportPanel.ToolFinish(message, true)
 		case "scan-tool-absent":
 			reportPanel.ToolAbsent(message)
+		case "scan":
+			// Replace the heartbeat label so a slow tool doesn't read as a stuck connection.
+			reportPanel.Update("Reading local usage")
 		default:
 			if label := humanizeCollectProgress(step, message); label != "" {
 				reportPanel.Update(label)

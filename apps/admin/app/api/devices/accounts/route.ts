@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
         accountKey: typeof row.accountKey === "string" ? row.accountKey : null,
         email: typeof row.email === "string" ? row.email : null,
         plan: typeof row.plan === "string" ? row.plan : null,
+        orgKey: typeof row.orgKey === "string" ? row.orgKey : null,
         loginMethod: typeof row.loginMethod === "string" ? row.loginMethod : "unknown",
         authPresent: Boolean(row.authPresent),
       };

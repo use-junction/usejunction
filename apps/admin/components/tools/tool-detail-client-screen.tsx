@@ -6,6 +6,9 @@ import { LocalSyncPanel } from "@/components/dashboard/local-sync-panel";
 import { ConnectionRepairBanner } from "@/components/dashboard/connection-repair-banner";
 import { DashboardPeriodRefreshing } from "@/components/dashboard/dashboard-period-refreshing";
 import { ToolProviderDetail } from "@/components/tools/tool-provider-detail";
+import Link from "next/link";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
+import { toolDisplayName } from "@/lib/tools/catalog";
 import {
   cycleViewPeriodLabel,
   cycleViewShortSuffix,
@@ -104,24 +107,39 @@ export default function ToolDetailClientScreen() {
   return (
     <>
       {syncContext?.deviceCount ? (
-        <>
-          <ConnectionRepairBanner
-            scope={kind === "personal" ? "you" : "team"}
-            recoveryDevices={syncContext.recoveryDevices}
-          />
-          <div className="mb-8">
-            <LocalSyncPanel
-              scope={kind === "personal" ? "you" : "team"}
-              lastSeenAt={syncContext.lastSeenAt}
-              lastUsageSyncAt={syncContext.lastUsageSyncAt}
-              lastAccountSyncAt={syncContext.lastAccountSyncAt}
-              dashboardReady={syncContext.dashboardReady}
-              dirtyDayCount={syncContext.dirtyDayCount}
-              staleDeviceCount={syncContext.staleDeviceCount}
-            />
-          </div>
-        </>
+        <ConnectionRepairBanner
+          scope={kind === "personal" ? "you" : "team"}
+          recoveryDevices={syncContext.recoveryDevices}
+        />
       ) : null}
+      {/* Breadcrumb and sync status sit outside the refreshing area so they stay put while a period loads. */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link href="/tools" prefetch={false}>{kind === "personal" ? "My tools" : "Cost"}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{metrics?.detail.name ?? toolDisplayName(toolKey)}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        {syncContext?.deviceCount ? (
+          <LocalSyncPanel
+            scope={kind === "personal" ? "you" : "team"}
+            compact
+            lastSeenAt={syncContext.lastSeenAt}
+            lastUsageSyncAt={syncContext.lastUsageSyncAt}
+            lastAccountSyncAt={syncContext.lastAccountSyncAt}
+            dashboardReady={syncContext.dashboardReady}
+            dirtyDayCount={syncContext.dirtyDayCount}
+            staleDeviceCount={syncContext.staleDeviceCount}
+          />
+        ) : null}
+      </div>
       <DashboardPeriodRefreshing refreshing={metricsRefreshing}>
         {metrics ? (
           <ToolProviderDetail
@@ -133,6 +151,7 @@ export default function ToolDetailClientScreen() {
             periodSuffix={cycleViewShortSuffix(metrics.cycleView, metrics.rollingPeriod)}
             periodBasePath={`/tools/${toolKey}`}
             cycleWindows={metrics.cycleWindows}
+            showBreadcrumb={false}
           />
         ) : (
           <AppPageSkeleton />

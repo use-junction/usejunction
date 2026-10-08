@@ -47,13 +47,16 @@ export function RosterPlanUsage({ plans }: { plans: RosterPlanUsagePlan[] }) {
 
   const { avgRatio, verdict, withSignal } = aggregateRosterPlanUsage(plans);
   const avgPercent = avgRatio != null ? avgRatio * 100 : null;
+  // "Within allowance" at 0% reads as fine; for a paid seat it means nobody used it.
+  const unused = withSignal.length > 0 && withSignal.every((plan) => (plan.primaryRatio ?? 0) <= 0);
+  const statusLabel = unused ? "No use yet" : verdict ? verdictLabel(verdict.code) : null;
   const meterLabel =
     avgPercent != null
-      ? `Average plan use ${avgPercent.toFixed(0)} percent${verdict ? `, ${verdictLabel(verdict.code)}` : ""}`
+      ? `Average plan use ${avgPercent.toFixed(0)} percent${statusLabel ? `, ${statusLabel}` : ""}`
       : "Plan use waiting for quota signal";
 
   const aggregatePercent =
-    avgPercent != null ? Math.min(100, Math.max(4, avgPercent)) : 0;
+    avgPercent != null && !unused ? Math.min(100, Math.max(4, avgPercent)) : 0;
 
   return (
     <div className="mt-2.5 max-w-md">
@@ -76,7 +79,7 @@ export function RosterPlanUsage({ plans }: { plans: RosterPlanUsagePlan[] }) {
           />
         </div>
         {avgPercent != null ? (
-          <p className={cn("shrink-0 text-xs font-semibold tabular-nums", verdictToneClass(verdict?.code ?? "UNKNOWN"))}>
+          <p className={cn("shrink-0 text-xs font-semibold tabular-nums", unused ? "text-warning" : verdictToneClass(verdict?.code ?? "UNKNOWN"))}>
             {avgPercent.toFixed(0)}%
           </p>
         ) : null}
@@ -86,7 +89,12 @@ export function RosterPlanUsage({ plans }: { plans: RosterPlanUsagePlan[] }) {
         {withSignal.length > 0 ? (
           <p className="text-xs text-muted-foreground">
             Plan use · avg across {withSignal.length} {withSignal.length === 1 ? "plan" : "plans"}
-            {verdict ? ` · ${verdictLabel(verdict.code)}` : ""}
+            {unused ? (
+              <>
+                {" · "}
+                <span className="font-medium text-warning">{statusLabel}</span>
+              </>
+            ) : statusLabel ? ` · ${statusLabel}` : ""}
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">Plan use · waiting for quota signal</p>

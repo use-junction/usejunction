@@ -60,7 +60,7 @@ export function DashboardMetricsSkeleton() {
  * while metrics skeleton in. No overlay, no "crunching" copy.
  */
 export function DashboardPageLoading({
-  title = "What's reporting?",
+  title = "Usage.",
   description,
   actions,
   children,

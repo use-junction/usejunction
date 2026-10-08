@@ -36,6 +36,12 @@ export function teamMemberKey(developerId: string, section: string, periodQuery 
   return ["app", "team", developerId, section, periodQuery] as const;
 }
 
+export function overviewKey(queryString = "") {
+  return ["app", "overview", queryString] as const;
+}
+
+export const teamsKey = ["app", "teams"] as const;
+
 export function toolsKey(queryString = "") {
   return ["app", "tools", queryString] as const;
 }

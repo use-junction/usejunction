@@ -25,6 +25,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  CALENDAR_RANGES,
+  calendarRangePeriod,
   DEFAULT_ROLLING_PERIOD,
   PERIOD_PRESETS,
   isValidCustomPeriod,
@@ -197,7 +199,7 @@ export function CycleViewPicker({
     return (
       <>
         <DropdownMenuLabel className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
-          Rolling period
+          Rolling
         </DropdownMenuLabel>
         {PERIOD_PRESETS.map((days) => {
           const option: RollingPeriod = { kind: "preset", days };
@@ -209,6 +211,21 @@ export function CycleViewPicker({
               onSelect={() => applyPeriod(option)}
             >
               <span className="flex-1">Last {days} days</span>
+              {selected ? <Check className="size-3.5 text-foreground" aria-hidden /> : null}
+            </DropdownMenuItem>
+          );
+        })}
+
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+          Calendar
+        </DropdownMenuLabel>
+        {CALENDAR_RANGES.map((range) => {
+          const option = calendarRangePeriod(range.key);
+          const selected = view === "last_30_days" && periodsEqual(prefs.active, option);
+          return (
+            <DropdownMenuItem key={range.key} className="rounded-none" onSelect={() => applyPeriod(option)}>
+              <span className="flex-1">{range.label}</span>
               {selected ? <Check className="size-3.5 text-foreground" aria-hidden /> : null}
             </DropdownMenuItem>
           );

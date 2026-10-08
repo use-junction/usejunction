@@ -9,6 +9,7 @@ import { formatMicrosAsCurrency } from "@/lib/format";
 import { toolDisplayName } from "@/lib/tools/catalog";
 import { cn } from "@/lib/utils";
 import { ToolBrandIcon } from "./tool-brand-icon";
+import { idleMicrosByTool, idleSeatMicros } from "@/lib/queries/tools/cost-idle";
 import type { CostOverview, CostTool, PriceTag } from "@/lib/queries/tools/cost-overview";
 
 const money = formatMicrosAsCurrency;
@@ -49,10 +50,11 @@ function ToolName({ tool, size = 18 }: { tool: string; size?: number }) {
   );
 }
 
-type ToolStatus = "unused" | "at_limit" | "over_allowance" | "in_use";
+type ToolStatus = "unused" | "unassigned" | "at_limit" | "over_allowance" | "in_use";
 
 const STATUS: Record<ToolStatus, { label: string; color: string; hatched?: boolean }> = {
   unused: { label: "No use in 30 days", color: "var(--brand-orange)", hatched: true },
+  unassigned: { label: "Assigned to no one", color: "var(--muted-foreground)", hatched: true },
   at_limit: { label: "Hitting its limit", color: "var(--brand-olive-accent)" },
   over_allowance: { label: "Past its allowance", color: "color-mix(in srgb, var(--brand-orange) 55%, var(--brand-olive-accent))" },
   in_use: { label: "In use", color: "var(--primary)" },
@@ -67,29 +69,27 @@ function statusFill(status: ToolStatus) {
 
 type Segment = { toolKey: string; status: ToolStatus; micros: bigint };
 
-/** Split each paid tool's monthly seat cost into used and unused parts, coloured by what needs doing. */
+/** Split each paid tool's monthly seat cost into used, unused and unassigned parts, coloured by what needs doing. */
 function segmentsFor(data: CostOverview): Segment[] {
-  const unusedByTool = new Map<string, bigint>();
-  for (const change of data.changes) {
-    if (change.kind === "unused_seats" && change.toolKey && change.monthlyMicros) {
-      unusedByTool.set(change.toolKey, (unusedByTool.get(change.toolKey) ?? 0n) + BigInt(change.monthlyMicros));
-    }
-  }
+  const idle = idleMicrosByTool(data);
   const segments: Segment[] = [];
   for (const tool of data.tools) {
     const seats = BigInt(tool.seatsMonthlyMicros);
     if (seats <= 0n) continue;
-    const unused = (unusedByTool.get(tool.toolKey) ?? 0n) > seats ? seats : unusedByTool.get(tool.toolKey) ?? 0n;
+    const unassigned = (idle.unassigned.get(tool.toolKey) ?? 0n) > seats ? seats : idle.unassigned.get(tool.toolKey) ?? 0n;
+    const remaining = seats - unassigned;
+    const unused = (idle.unused.get(tool.toolKey) ?? 0n) > remaining ? remaining : idle.unused.get(tool.toolKey) ?? 0n;
     const included = BigInt(tool.includedMonthlyMicros);
     const used: ToolStatus = tool.limits && tool.limits.hit > 0
       ? "at_limit"
       : tool.usageBasis === "within_plan" && included > 0n && BigInt(tool.usageToDateMicros) > included
         ? "over_allowance"
         : "in_use";
-    if (seats - unused > 0n) segments.push({ toolKey: tool.toolKey, status: used, micros: seats - unused });
+    if (remaining - unused > 0n) segments.push({ toolKey: tool.toolKey, status: used, micros: remaining - unused });
     if (unused > 0n) segments.push({ toolKey: tool.toolKey, status: "unused", micros: unused });
+    if (unassigned > 0n) segments.push({ toolKey: tool.toolKey, status: "unassigned", micros: unassigned });
   }
-  const order: ToolStatus[] = ["unused", "over_allowance", "at_limit", "in_use"];
+  const order: ToolStatus[] = ["unused", "unassigned", "over_allowance", "at_limit", "in_use"];
   return segments.sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) || (b.micros > a.micros ? 1 : -1));
 }
 
@@ -101,7 +101,7 @@ function names(keys: string[]) {
 
 function SpendBar({ segments, total }: { segments: Segment[]; total: bigint }) {
   if (!segments.length || total <= 0n) return null;
-  const present = (["unused", "over_allowance", "at_limit", "in_use"] as ToolStatus[]).filter((status) => segments.some((segment) => segment.status === status));
+  const present = (["unused", "unassigned", "over_allowance", "at_limit", "in_use"] as ToolStatus[]).filter((status) => segments.some((segment) => segment.status === status));
   return (
     <div className="space-y-2">
       <div className="flex h-11 w-full gap-0.5 overflow-hidden" role="list" aria-label="Monthly seat cost by tool">
@@ -227,9 +227,15 @@ function actionsFor(data: CostOverview): Action[] {
 function Changes({ data }: { data: CostOverview }) {
   const actions = actionsFor(data);
   if (!actions.length) return null;
+  const savings = idleSeatMicros(data);
   return (
     <Panel as="section" className="mb-10">
       <SignalsSectionHeader title="What to do." bordered={false} />
+      {savings > 0n ? (
+        <p className="-mt-2 mb-2 text-sm text-muted-foreground">
+          Up to <span className="font-semibold tabular-nums text-foreground">{money(savings)}/mo</span> is going to seats nobody used in the last 30 days.
+        </p>
+      ) : null}
       <ol className="divide-y divide-border/60">
         {actions.map((action) => (
           <li key={action.key} className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2 py-4">
@@ -272,7 +278,7 @@ function rowStatus(tool: CostTool, unusedMicros: bigint): RowStatus {
   const people = (count: number) => `${count} of ${tool.limits?.measured ?? 0} ${tool.limits?.measured === 1 ? "person" : "people"}`;
   if (tool.activePeople === 0) {
     return BigInt(tool.seatsMonthlyMicros) > 0n
-      ? { label: STATUS.unused.label, detail: "Paid seat sitting idle", fill: statusFill("unused") }
+      ? { label: STATUS.unused.label, detail: `${tool.seatsPaid === 1 ? "Paid seat" : "Paid seats"} sitting idle`, fill: statusFill("unused") }
       : { label: "No use in 30 days", fill: IDLE_FILL };
   }
   if (tool.limits && tool.limits.hit > 0) return { label: STATUS.at_limit.label, detail: `${people(tool.limits.hit)} hit it`, fill: statusFill("at_limit") };
@@ -322,12 +328,7 @@ function planLabel(plan: CostTool["plans"][number]) {
 function ToolCostTable({ data, action }: { data: CostOverview; action?: ReactNode }) {
   const canProject = data.totals.payAsYouGoProjectedMicros !== null;
   if (!data.tools.length) return null;
-  const unusedByTool = new Map<string, bigint>();
-  for (const change of data.changes) {
-    if (change.kind === "unused_seats" && change.toolKey && change.monthlyMicros) {
-      unusedByTool.set(change.toolKey, (unusedByTool.get(change.toolKey) ?? 0n) + BigInt(change.monthlyMicros));
-    }
-  }
+  const idle = idleMicrosByTool(data);
   return (
     <Panel as="section" className="mb-10">
       <SignalsSectionHeader title="By tool." bordered={false} action={action} />
@@ -347,7 +348,7 @@ function ToolCostTable({ data, action }: { data: CostOverview; action?: ReactNod
             {data.tools.map((tool) => {
               const nextRenewal = [...tool.plans].sort((a, b) => a.renewsOn.localeCompare(b.renewsOn))[0];
               const unassigned = tool.seatsPaid - tool.seatsAssigned;
-              const status = rowStatus(tool, unusedByTool.get(tool.toolKey) ?? 0n);
+              const status = rowStatus(tool, (idle.unused.get(tool.toolKey) ?? 0n) + (idle.unassigned.get(tool.toolKey) ?? 0n));
               const price = BigInt(tool.seatsMonthlyMicros) > 0n ? money(tool.seatsMonthlyMicros) : null;
               return (
                 <tr key={tool.toolKey} className="group relative border-b border-border/60 align-top last:border-b-0 hover:bg-muted/30">

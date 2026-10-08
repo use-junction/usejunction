@@ -197,7 +197,7 @@ describe("My data transparency surfaces", () => {
       refetch: vi.fn(),
     });
     withQuery(<MyDataClientScreen />);
-    expect(screen.getByRole("heading", { name: "What do we hold?" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "My data." })).toBeTruthy();
     expect(screen.getByRole("region", { name: "At a glance" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Tool logins" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Your rights" })).toBeTruthy();

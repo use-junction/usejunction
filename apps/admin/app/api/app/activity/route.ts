@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     from: query.get("from"),
     to: query.get("to"),
     scope: query.get("scope"),
+    team: query.get("team"),
   });
   const loaded = performance.now();
   return appData(data, {
