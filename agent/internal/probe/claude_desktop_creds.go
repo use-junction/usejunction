@@ -48,6 +48,8 @@ type claudeDesktopToken struct {
 	OrgUUID          string
 	Email            string
 	Plan             string
+	SubscriptionType string
+	RateLimitTier    string
 	AccessToken      string
 	ExpiresAtMs      int64
 }
@@ -183,9 +185,13 @@ func parseClaudeDesktopTokens(plaintext []byte) []claudeDesktopToken {
 	harvestClaudeTokens(root, "", byUUID)
 	var out []claudeDesktopToken
 	for _, t := range byUUID {
-		if t.AccessToken != "" {
-			out = append(out, *t)
+		if t.AccessToken == "" {
+			continue
 		}
+		// subscriptionType and rateLimitTier can arrive from separate nested
+		// objects, so derive the display plan only after the merge is complete.
+		t.Plan = claudePlanWithTier(t.SubscriptionType, t.RateLimitTier)
+		out = append(out, *t)
 	}
 	return out
 }
@@ -193,20 +199,28 @@ func parseClaudeDesktopTokens(plaintext []byte) []claudeDesktopToken {
 func harvestClaudeTokens(node any, keyHint string, byUUID map[string]*claudeDesktopToken) {
 	switch v := node.(type) {
 	case map[string]any:
-		if tok := claudeTokenFromObject(v); tok != nil {
-			if tok.AccountUUID == "" && looksLikeUUID(keyHint) {
-				tok.AccountUUID = keyHint
-			}
-			if tok.AccountUUID != "" {
-				if existing, ok := byUUID[tok.AccountUUID]; ok {
-					mergeClaudeToken(existing, tok)
-				} else {
-					byUUID[tok.AccountUUID] = tok
-				}
+		tok := claudeTokenFromObject(v)
+		if tok.AccountUUID == "" && looksLikeUUID(keyHint) {
+			tok.AccountUUID = keyHint
+		}
+		// Only record something that carries an account identity and at least
+		// one useful field; identity and token may live in sibling objects
+		// nested under the same account-uuid key, so they merge by uuid.
+		if tok.AccountUUID != "" && claudeTokenHasFields(tok) {
+			if existing, ok := byUUID[tok.AccountUUID]; ok {
+				mergeClaudeToken(existing, tok)
+			} else {
+				byUUID[tok.AccountUUID] = tok
 			}
 		}
 		for key, child := range v {
-			harvestClaudeTokens(child, key, byUUID)
+			childHint := key
+			// Carry the account uuid down to nested objects that are not
+			// themselves keyed by a uuid (e.g. "profile", "claudeAiOauth").
+			if looksLikeUUID(keyHint) && !looksLikeUUID(key) {
+				childHint = keyHint
+			}
+			harvestClaudeTokens(child, childHint, byUUID)
 		}
 	case []any:
 		for _, child := range v {
@@ -243,22 +257,24 @@ func claudeTokenFromObject(obj map[string]any) *claudeDesktopToken {
 		return 0
 	}
 
-	accessToken := pick("accessToken", "access_token")
-	if accessToken == "" {
-		return nil
-	}
-	plan := claudePlanWithTier(
-		normalizeClaudePlan(pick("subscriptionType", "subscription_type")),
-		pick("rateLimitTier", "rate_limit_tiers", "organizationRateLimitTier"),
-	)
+	// Return whatever this object carries; identity and token can be split
+	// across sibling objects, so callers merge partial results by account uuid.
 	return &claudeDesktopToken{
-		AccountUUID: pick("accountUuid", "accountUUID", "account_uuid"),
-		OrgUUID:     pick("organizationUuid", "orgUuid", "organization_uuid"),
-		Email:       pick("emailAddress", "email"),
-		Plan:        plan,
-		AccessToken: accessToken,
-		ExpiresAtMs: pickInt("expiresAt", "expires_at_ms", "expiresAtMs"),
+		AccountUUID:      pick("accountUuid", "accountUUID", "account_uuid"),
+		OrgUUID:          pick("organizationUuid", "orgUuid", "organization_uuid"),
+		Email:            pick("emailAddress", "email"),
+		SubscriptionType: pick("subscriptionType", "subscription_type"),
+		RateLimitTier:    pick("rateLimitTier", "rate_limit_tiers", "organizationRateLimitTier"),
+		AccessToken:      pick("accessToken", "access_token"),
+		ExpiresAtMs:      pickInt("expiresAt", "expires_at_ms", "expiresAtMs"),
 	}
+}
+
+// claudeTokenHasFields reports whether anything beyond a bare uuid was found,
+// so empty container objects do not create phantom entries.
+func claudeTokenHasFields(t *claudeDesktopToken) bool {
+	return t.AccessToken != "" || t.Email != "" || t.OrgUUID != "" ||
+		t.SubscriptionType != "" || t.RateLimitTier != "" || t.ExpiresAtMs != 0
 }
 
 func mergeClaudeToken(dst, src *claudeDesktopToken) {
@@ -271,8 +287,11 @@ func mergeClaudeToken(dst, src *claudeDesktopToken) {
 	if dst.OrgUUID == "" {
 		dst.OrgUUID = src.OrgUUID
 	}
-	if dst.Plan == "" {
-		dst.Plan = src.Plan
+	if dst.SubscriptionType == "" {
+		dst.SubscriptionType = src.SubscriptionType
+	}
+	if dst.RateLimitTier == "" {
+		dst.RateLimitTier = src.RateLimitTier
 	}
 	if dst.ExpiresAtMs == 0 {
 		dst.ExpiresAtMs = src.ExpiresAtMs

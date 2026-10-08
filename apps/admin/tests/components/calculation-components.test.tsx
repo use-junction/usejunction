@@ -219,6 +219,7 @@ describe("calculation-bearing components", () => {
           toolName: "cursor",
           aliases: [],
           sourceUrl: "https://example.com",
+          accounts: [],
           kpis: { devices: 0, people: 1, peopleInstallOnly: 0, seatsFree: 1, seatsPurchased: 2, seatsAssigned: 1, usageCost: 6, requests: 10, tokens: 1_500_000 },
           people: [],
           quotas: [],
@@ -247,6 +248,7 @@ describe("calculation-bearing components", () => {
           toolName: "codex",
           aliases: [],
           sourceUrl: "https://example.com",
+          accounts: [],
           kpis: { devices: 1, people: 1, peopleInstallOnly: 0, seatsFree: 0, seatsPurchased: 1, seatsAssigned: 1, usageCost: 0, requests: 0, tokens: 0 },
           people: [
             {
@@ -306,6 +308,7 @@ describe("calculation-bearing components", () => {
           toolName: "cursor",
           aliases: [],
           sourceUrl: "https://example.com",
+          accounts: [],
           kpis: { devices: 1, people: 1, peopleInstallOnly: 0, seatsFree: 0, seatsPurchased: 1, seatsAssigned: 1, usageCost: 12.5, requests: 30, tokens: 15_000 },
           people: [],
           quotas: [],
@@ -346,7 +349,7 @@ describe("calculation-bearing components", () => {
     renderWithQueryClient(
       <ToolProviderDetail
         data={{
-          toolKey: "cursor", name: "Cursor", shortName: "Cursor", provider: "cursor", product: "cursor", toolName: "cursor", aliases: [], sourceUrl: "https://example.com",
+          toolKey: "cursor", name: "Cursor", shortName: "Cursor", provider: "cursor", product: "cursor", toolName: "cursor", aliases: [], sourceUrl: "https://example.com", accounts: [],
           kpis: { devices: 2, people: 2, peopleInstallOnly: 0, seatsFree: 0, seatsPurchased: 2, seatsAssigned: 2, usageCost: 500, requests: 1000, tokens: 1_000_000 },
           people: [],
           quotas: [
@@ -372,7 +375,8 @@ describe("calculation-bearing components", () => {
     expect(rows[ada]).toMatch(/Plan59%OK/);
     expect(screen.getByText("Closest to a limit").parentElement?.parentElement?.textContent).toMatch(/93%.*Cy · Plan · resets in 1d 23h|93%.*Cy · Plan · resets in 2d/);
 
-    fireEvent.click(screen.getByRole("button", { name: /2 more/ }));
+    // Every window now shows inline (no "N more" collapse), so Ada's secondary
+    // api and bonus windows are visible without expanding.
     expect(screen.getByText("API models")).toBeInTheDocument();
     expect(screen.getByText("$272 left")).toBeInTheDocument();
 

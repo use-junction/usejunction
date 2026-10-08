@@ -64,6 +64,13 @@ vi.mock("@/components/team/team-syncs-panel", () => ({
   TeamSyncsPanel: () => <div>syncs</div>,
 }));
 
+// Avoid pulling the heavy @lobehub/ui icon set (which loads @emoji-mart data as
+// a raw JSON module) through the ghost-rows roster preview, matching the mock
+// used in calculation-components.test.tsx.
+vi.mock("@/components/tools/tool-brand-icon", () => ({
+  ToolLogoTile: ({ tool }: { tool: string }) => <span aria-label={`${tool} logo`} />,
+}));
+
 vi.mock("@/components/app-data-state", () => ({
   AppPageError: ({ error }: { error: Error }) => <div>{error.message}</div>,
   AppPageSkeleton: () => <div>page loading</div>,
