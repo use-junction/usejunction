@@ -5,17 +5,17 @@ import { cn } from "@/lib/utils";
 
 type AuthShellProps = {
   title: string;
-  description: string;
+  description?: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  accent?: "cyan" | "yellow";
+  accent?: "cyan";
   /** Optional mono label above the title (onboarding paths). */
   eyebrow?: string;
   /** Form column width. Login/signup stay `sm`; onboarding needs `md`. */
   size?: "sm" | "md";
   /** Vertical placement of the form block. Onboarding reads better top-aligned. */
   contentAlign?: "center" | "top";
-  /** Override the right-panel statement. Defaults by accent. */
+  /** Override the right-panel statement. */
   statement?: string;
 };
 
@@ -29,15 +29,12 @@ export function AuthShell({
   description,
   children,
   footer,
-  accent = "cyan",
   eyebrow,
   size = "sm",
   contentAlign = "center",
   statement,
 }: AuthShellProps) {
-  const panelCopy =
-    statement ??
-    (accent === "yellow" ? "Make model decisions based on evidence." : "Visibility before control.");
+  const panelCopy = statement ?? "Visibility before control.";
 
   return (
     <div className="auth-shell grid min-h-dvh bg-background lg:grid-cols-2">
@@ -65,7 +62,9 @@ export function AuthShell({
             >
               {title}
             </h1>
-            <p className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">{description}</p>
+            {description ? (
+              <div className="mt-3 max-w-sm text-sm leading-6 text-muted-foreground">{description}</div>
+            ) : null}
             <div className="mt-7 min-w-0 sm:mt-8">{children}</div>
           </div>
         </div>
@@ -75,9 +74,7 @@ export function AuthShell({
       <aside
         className={cn(
           "uj-grid-texture uj-grid-texture-strong relative hidden overflow-hidden border-l p-10 lg:block [--uj-grid-size:3rem]",
-          accent === "yellow"
-            ? "border-border bg-brand-yellow text-brand-yellow-dark [--uj-grid-opacity:0.12]"
-            : "border-primary-dark bg-primary text-primary-foreground [--uj-grid-opacity:0.12]",
+          "border-primary-dark bg-primary text-primary-foreground [--uj-grid-opacity:0.12]",
         )}
         aria-hidden="true"
       >

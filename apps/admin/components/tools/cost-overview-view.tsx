@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties, ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { Panel } from "@/components/panel";
 import { SignalsSectionHeader } from "@/components/signals/signals-ui";
@@ -143,44 +144,17 @@ function MonthTotal({ data }: { data: CostOverview }) {
   const { totals } = data;
   const seats = BigInt(totals.seatsMonthlyMicros);
   const segments = segmentsFor(data);
-  const unused = segments.filter((segment) => segment.status === "unused");
-  const unusedMicros = unused.reduce((sum, segment) => sum + segment.micros, 0n);
   const paidCount = data.tools.filter((tool) => BigInt(tool.seatsMonthlyMicros) > 0n).length;
-  const free = data.tools.filter((tool) => BigInt(tool.seatsMonthlyMicros) === 0n && tool.plans.length > 0);
   const payg = BigInt(totals.payAsYouGoToDateMicros);
 
   return (
     <section aria-label="Monthly AI spend" className="mb-10 space-y-5">
-      <div className="space-y-2">
-        <p className="text-4xl font-semibold tracking-tight tabular-nums">
-          {money(seats)}
-          <span className="ml-1.5 text-lg font-normal text-muted-foreground">/ month on {paidCount} paid {paidCount === 1 ? "plan" : "plans"}</span>
-        </p>
-        <p className="max-w-3xl text-base leading-7">
-          {unusedMicros > 0n ? (
-            <>
-              <span className="font-semibold tabular-nums">{money(unusedMicros)}</span> of it went to {names(unused.map((segment) => segment.toolKey))}, with no use recorded in the last 30 days.
-            </>
-          ) : (
-            "Every paid plan was used in the last 30 days."
-          )}
-        </p>
-        {totals.seatsHaveListPrices ? (
-          <p className="text-xs text-muted-foreground">Prices are vendor list prices unless you entered your own under Manage plans.</p>
-        ) : null}
-      </div>
+      <p className="text-4xl font-semibold tracking-tight tabular-nums">
+        {money(seats)}
+        <span className="ml-1.5 text-lg font-normal text-muted-foreground">/ month on {paidCount} paid {paidCount === 1 ? "plan" : "plans"}</span>
+      </p>
 
       <SpendBar segments={segments} total={seats} />
-
-      {free.length ? (
-        <p className="text-xs text-muted-foreground">
-          Also on free plans: {free.map((tool) => (
-            <span key={tool.toolKey} className="ml-1.5 inline-flex items-center gap-1 align-middle">
-              <ToolBrandIcon tool={tool.toolKey} size={12} />{toolDisplayName(tool.toolKey)}
-            </span>
-          ))}
-        </p>
-      ) : null}
 
       {payg > 0n ? (
         <p className="border-l-2 border-border pl-3 text-sm">
@@ -203,7 +177,7 @@ function actionsFor(data: CostOverview): Action[] {
       key: "unused",
       tools: unused.map((change) => change.toolKey!),
       title: `Cancel or reassign ${names(unused.map((change) => change.toolKey!))}`,
-      detail: "No use recorded in 30 days, counting only people whose agent is reporting.",
+      detail: "No use in the last 30 days.",
       micros,
       href: "/activity",
       cta: "See who holds them",
@@ -218,7 +192,7 @@ function actionsFor(data: CostOverview): Action[] {
         key: `allowance-${change.toolKey}`,
         tools: [change.toolKey],
         title: `${toolDisplayName(change.toolKey)} is past its included allowance`,
-        detail: `Usage this month is worth more than the plan includes. Extra usage may be billed or slowed; check the next invoice${renewal ? ` (renews ${dateLabel(renewal)})` : ""}.`,
+        detail: `Extra usage may be billed or slowed.${renewal ? ` Renews ${dateLabel(renewal)}.` : ""}`,
         micros: null,
         href: `/tools/${change.toolKey}`,
         cta: "Open tool",
@@ -228,7 +202,9 @@ function actionsFor(data: CostOverview): Action[] {
         key: `limit-${change.toolKey}`,
         tools: [change.toolKey],
         title: `${toolDisplayName(change.toolKey)} is hitting its limit`,
-        detail: `${change.text.replace(/ A higher tier may fit\.$/, "")} People get blocked until the window resets; a higher tier may fit${renewal ? ` before it renews ${dateLabel(renewal)}` : ""}.`,
+        detail: tool?.limits
+          ? `${tool.limits.hit} of ${tool.limits.measured} ${tool.limits.measured === 1 ? "person" : "people"} blocked in 30 days. A higher tier may fit.`
+          : change.text,
         micros: null,
         href: "/dashboard",
         cta: "See limits",
@@ -238,7 +214,7 @@ function actionsFor(data: CostOverview): Action[] {
         key: `${change.kind}-${change.toolKey}-${change.text}`,
         tools: [change.toolKey],
         title: `${toolDisplayName(change.toolKey)}: ${change.text}`,
-        detail: change.basis,
+        detail: "",
         micros: change.monthlyMicros ? BigInt(change.monthlyMicros) : null,
         href: change.href ?? `/tools/${change.toolKey}`,
         cta: "Open tool",
@@ -253,7 +229,7 @@ function Changes({ data }: { data: CostOverview }) {
   if (!actions.length) return null;
   return (
     <Panel as="section" className="mb-10">
-      <SignalsSectionHeader title="What to do." description="Biggest saving first." bordered={false} />
+      <SignalsSectionHeader title="What to do." bordered={false} />
       <ol className="divide-y divide-border/60">
         {actions.map((action) => (
           <li key={action.key} className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2 py-4">
@@ -265,7 +241,7 @@ function Changes({ data }: { data: CostOverview }) {
               </span>
               <span className="min-w-0">
                 <span className="block text-sm font-medium">{action.title}</span>
-                <span className="block text-xs leading-5 text-muted-foreground">{action.detail}</span>
+                {action.detail ? <span className="block text-xs leading-5 text-muted-foreground">{action.detail}</span> : null}
               </span>
             </span>
             <span className="flex shrink-0 items-center gap-4">
@@ -285,108 +261,139 @@ function Changes({ data }: { data: CostOverview }) {
   );
 }
 
-function LimitsCell({ limits }: { limits: CostTool["limits"] }) {
-  if (!limits) return <span className="text-muted-foreground">No limit data</span>;
-  const parts = [
-    limits.hit ? `${limits.hit} hit limit` : null,
-    limits.near ? `${limits.near} near` : null,
-    limits.light ? `${limits.light} under 10%` : null,
-  ].filter(Boolean);
-  return (
-    <span>
-      <span className={cn(limits.hit > 0 && "text-foreground")}>{parts.length ? parts.join(" · ") : "Within limits"}</span>
-      <span className="block text-muted-foreground">of {limits.measured} measured · 30 days</span>
-    </span>
-  );
+type RowStatus = { label: string; detail?: string; fill: CSSProperties };
+
+const LIGHT_FILL = { background: "var(--border-strong)" };
+const IDLE_FILL = { background: "var(--muted)", boxShadow: "inset 0 0 0 1px var(--border-strong)" };
+
+/** One plain-language state per tool, using the same colours as the spend bar above. */
+function rowStatus(tool: CostTool, unusedMicros: bigint): RowStatus {
+  const included = BigInt(tool.includedMonthlyMicros);
+  const people = (count: number) => `${count} of ${tool.limits?.measured ?? 0} ${tool.limits?.measured === 1 ? "person" : "people"}`;
+  if (tool.activePeople === 0) {
+    return BigInt(tool.seatsMonthlyMicros) > 0n
+      ? { label: STATUS.unused.label, detail: "Paid seat sitting idle", fill: statusFill("unused") }
+      : { label: "No use in 30 days", fill: IDLE_FILL };
+  }
+  if (tool.limits && tool.limits.hit > 0) return { label: STATUS.at_limit.label, detail: `${people(tool.limits.hit)} hit it`, fill: statusFill("at_limit") };
+  if (tool.usageBasis === "within_plan" && included > 0n && BigInt(tool.usageToDateMicros) > included) {
+    return { label: STATUS.over_allowance.label, detail: "Extra use may be billed", fill: statusFill("over_allowance") };
+  }
+  if (unusedMicros > 0n) return { label: "Some seats unused", detail: `${money(unusedMicros)}/mo idle`, fill: statusFill("unused") };
+  if (tool.limits && tool.limits.measured > 0 && tool.limits.light === tool.limits.measured) {
+    return { label: "Light use", detail: "Under 10% of the plan limit", fill: LIGHT_FILL };
+  }
+  return { label: STATUS.in_use.label, detail: tool.limits?.near ? `${people(tool.limits.near)} near the limit` : undefined, fill: statusFill("in_use") };
 }
 
 function UsageCell({ tool, canProject }: { tool: CostTool; canProject: boolean }) {
   const usage = BigInt(tool.usageToDateMicros);
-  if (usage === 0n) return <span className="text-muted-foreground">—</span>;
+  if (usage === 0n) return <span>—</span>;
   const estimated = usage > BigInt(tool.usageVerifiedToDateMicros);
   if (tool.usageBasis === "pay_as_you_go") {
     return (
       <span>
-        <span className="tabular-nums text-foreground">{estimated ? approx(usage) : money(usage)}</span> so far
-        <span className="block text-muted-foreground">
-          {canProject && tool.projectedSpendMicros ? `${approx(tool.projectedSpendMicros)} projected · ` : ""}billed on use
-        </span>
+        <span className="text-sm tabular-nums text-foreground">{estimated ? approx(usage) : money(usage)}</span> spent
+        {canProject && tool.projectedSpendMicros ? <span className="block">{approx(tool.projectedSpendMicros)} projected</span> : null}
       </span>
     );
   }
   const included = BigInt(tool.includedMonthlyMicros);
+  const over = included > 0n && usage > included;
   return (
-    <span>
-      <span className="tabular-nums">{approx(usage)}</span> value
-      <span className="block text-muted-foreground">
-        {included > 0n ? `${money(included)} included${usage > included ? " · past allowance" : ""}` : "covered by seats"}
-      </span>
+    <span className="block max-w-48">
+      <span className="text-sm tabular-nums text-foreground">{approx(usage)}</span> at API prices
+      {included > 0n ? (
+        <>
+          <span className="mt-1.5 block h-1 w-full bg-muted" aria-hidden>
+            <span className="block h-full" style={{ width: `${Math.min(100, Number((usage * 100n) / included))}%`, background: over ? "var(--brand-orange)" : "var(--primary)" }} />
+          </span>
+          <span className="mt-1 block">{money(included)} included{over ? ` · ${Math.round(Number(usage) / Number(included))}× over` : ""}</span>
+        </>
+      ) : null}
     </span>
   );
 }
 
-function ToolCostTable({ data }: { data: CostOverview }) {
+function planLabel(plan: CostTool["plans"][number]) {
+  return plan.cadence === "monthly" ? plan.name : `${plan.name} (${CADENCE_LABEL[plan.cadence]})`;
+}
+
+function ToolCostTable({ data, action }: { data: CostOverview; action?: ReactNode }) {
   const canProject = data.totals.payAsYouGoProjectedMicros !== null;
   if (!data.tools.length) return null;
+  const unusedByTool = new Map<string, bigint>();
+  for (const change of data.changes) {
+    if (change.kind === "unused_seats" && change.toolKey && change.monthlyMicros) {
+      unusedByTool.set(change.toolKey, (unusedByTool.get(change.toolKey) ?? 0n) + BigInt(change.monthlyMicros));
+    }
+  }
   return (
     <Panel as="section" className="mb-10">
-      <SignalsSectionHeader
-        title="By tool."
-        description="What each tool costs per month, how many seats are in use, and whether people run into its limits."
-        bordered={false}
-      />
+      <SignalsSectionHeader title="By tool." bordered={false} action={action} />
       <div className="overflow-x-auto">
         <table className="w-full min-w-[760px] text-left text-sm">
-          <thead className="border-b border-border/70 text-xs font-medium uppercase tracking-[0.06em] text-muted-foreground">
+          <thead className="border-b border-border/70 text-xs text-muted-foreground">
             <tr>
-              <th className="pb-3 pr-4 font-medium">Tool</th>
-              <th className="pb-3 pr-4 text-right font-medium">Seats / mo</th>
-              <th className="pb-3 pr-4 font-medium">Seats in use</th>
-              <th className="pb-3 pr-4 font-medium">Usage this month</th>
-              <th className="pb-3 pr-4 font-medium">Limits</th>
-              <th className="pb-3 font-medium">Renews</th>
+              <th className="pb-2.5 pr-4 font-medium">Tool</th>
+              <th className="pb-2.5 pr-4 font-medium">Status</th>
+              <th className="pb-2.5 pr-4 font-medium">Seats</th>
+              <th className="pb-2.5 pr-4 font-medium">Usage this month</th>
+              <th className="pb-2.5 pr-4 font-medium">Renews</th>
+              <th className="w-6 pb-2.5"><span className="sr-only">Open</span></th>
             </tr>
           </thead>
           <tbody className="text-xs text-muted-foreground">
             {data.tools.map((tool) => {
               const nextRenewal = [...tool.plans].sort((a, b) => a.renewsOn.localeCompare(b.renewsOn))[0];
+              const unassigned = tool.seatsPaid - tool.seatsAssigned;
+              const status = rowStatus(tool, unusedByTool.get(tool.toolKey) ?? 0n);
+              const price = BigInt(tool.seatsMonthlyMicros) > 0n ? money(tool.seatsMonthlyMicros) : null;
               return (
-                <tr key={tool.toolKey} className="border-b border-border/60 align-top last:border-b-0 hover:bg-muted/30">
-                  <td className="py-4 pr-4">
-                    <Link href={`/tools/${tool.toolKey}`} className="text-sm font-medium text-foreground hover:underline">
+                <tr key={tool.toolKey} className="group relative border-b border-border/60 align-top last:border-b-0 hover:bg-muted/30">
+                  <td className="py-3.5 pr-4">
+                    <Link href={`/tools/${tool.toolKey}`} className="text-sm font-medium text-foreground after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline focus-visible:after:outline-ring">
                       <ToolName tool={tool.toolKey} />
                     </Link>
-                    <span className="mt-1 block pl-7">
-                      {tool.plans.length
-                        ? tool.plans.map((plan) => `${plan.name} (${CADENCE_LABEL[plan.cadence]})`).join(" · ")
-                        : "No plan · pay as you go"}
+                    <span className="mt-0.5 block pl-7">
+                      {tool.plans.length ? tool.plans.map(planLabel).join(" · ") : "Pay as you go"}
                     </span>
                   </td>
-                  <td className="py-4 pr-4 text-right">
-                    <span className="block text-sm tabular-nums text-foreground">{BigInt(tool.seatsMonthlyMicros) > 0n ? money(tool.seatsMonthlyMicros) : "—"}</span>
-                    {tool.seatsPriceTag ? <span className="mt-1 inline-block"><Tag>{TAG_LABEL[tool.seatsPriceTag]}</Tag></span> : null}
+                  <td className="py-3.5 pr-4">
+                    <span className="inline-flex items-center gap-2 text-sm text-foreground">
+                      <span className="size-2.5 shrink-0" style={status.fill} aria-hidden />
+                      {status.label}
+                    </span>
+                    {status.detail ? <span className="mt-0.5 block pl-[1.125rem]">{status.detail}</span> : null}
                   </td>
-                  <td className="py-4 pr-4">
+                  <td className="py-3.5 pr-4">
                     {tool.seatsPaid ? (
-                      <>
-                        <span className="text-sm tabular-nums text-foreground">{Math.min(tool.activePeople, tool.seatsPaid)} of {tool.seatsPaid}</span>
-                        <span className="block">used in last 30 days{tool.seatsPaid > tool.seatsAssigned ? ` · ${tool.seatsPaid - tool.seatsAssigned} unassigned` : ""}</span>
-                      </>
+                      <span className="text-sm tabular-nums text-foreground">{Math.min(tool.activePeople, tool.seatsPaid)} of {tool.seatsPaid} used</span>
                     ) : (
-                      <span><span className="text-sm tabular-nums text-foreground">{tool.activePeople}</span> {tool.activePeople === 1 ? "person" : "people"} in last 30 days</span>
+                      <span><span className="text-sm tabular-nums text-foreground">{tool.activePeople}</span> {tool.activePeople === 1 ? "person" : "people"}</span>
                     )}
+                    {price || unassigned > 0 ? (
+                      <span className="mt-0.5 block tabular-nums">
+                        {[
+                          price ? `${price}/mo${tool.seatsPriceTag ? ` · ${TAG_LABEL[tool.seatsPriceTag].toLowerCase()}` : ""}` : null,
+                          unassigned > 0 ? `${unassigned} unassigned` : null,
+                        ].filter(Boolean).join(" · ")}
+                      </span>
+                    ) : null}
                   </td>
-                  <td className="py-4 pr-4"><UsageCell tool={tool} canProject={canProject} /></td>
-                  <td className="py-4 pr-4"><LimitsCell limits={tool.limits} /></td>
-                  <td className="py-4">
+                  <td className="py-3.5 pr-4"><UsageCell tool={tool} canProject={canProject} /></td>
+                  <td className="py-3.5 pr-4">
                     {nextRenewal ? (
                       <>
-                        <span className="text-foreground">{dateLabel(nextRenewal.renewsOn)}</span>
+                        <span className="text-sm text-foreground">{dateLabel(nextRenewal.renewsOn)}</span>
                         {nextRenewal.cadence !== "monthly" && BigInt(nextRenewal.renewalMicros) > 0n ? (
                           <span className="block">{money(nextRenewal.renewalMicros)} charged then</span>
                         ) : null}
                       </>
                     ) : "—"}
+                  </td>
+                  <td className="py-3.5 text-right">
+                    <ArrowRight className="mt-0.5 inline size-4 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" aria-hidden />
                   </td>
                 </tr>
               );
@@ -395,18 +402,18 @@ function ToolCostTable({ data }: { data: CostOverview }) {
         </table>
       </div>
       <p className="mt-3 text-xs leading-5 text-muted-foreground">
-        Annual and weekly plans are converted to a monthly amount; the full charge shows under Renews. Money is this calendar month. &quot;Seats in use&quot; and limits look at the last 30 days so a seat isn't called unused two days into a month.
+        Seat use and status cover the last 30 days. Usage is priced at API rates to compare against what&apos;s included. List prices apply until you enter your own on a tool&apos;s page.
       </p>
     </Panel>
   );
 }
 
-export function CostOverviewView({ data }: { data: CostOverview }) {
+export function CostOverviewView({ data, tableAction }: { data: CostOverview; tableAction?: ReactNode }) {
   return (
     <>
       <MonthTotal data={data} />
       <Changes data={data} />
-      <ToolCostTable data={data} />
+      <ToolCostTable data={data} action={tableAction} />
     </>
   );
 }

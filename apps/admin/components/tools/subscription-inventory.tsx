@@ -65,7 +65,8 @@ export function SubscriptionInventory({
   overview = null,
   hasLocalSync = false,
   title = "What are we paying for?",
-  description = "This month's AI bill, what moves it, and what each tool costs.",
+  description,
+  onChanged,
   children,
 }: {
   detected: DashboardToolsData | null;
@@ -75,6 +76,8 @@ export function SubscriptionInventory({
   hasLocalSync?: boolean;
   title?: string;
   description?: string;
+  /** Called after a plan is added so the cost overview can refetch. */
+  onChanged?: () => void;
   children?: ReactNode;
 }) {
   const [catalog, setCatalog] = useState<CatalogTool[]>(initialCatalog ?? []);
@@ -129,6 +132,15 @@ export function SubscriptionInventory({
     [groups.length, subscriptions],
   );
 
+  // The By tool table already lists every plan with its seats and cost, so the
+  // plan list below only shows when there is no overview to carry it.
+  const showPlanList = !overview?.tools.length || !groups.length;
+  const addButton = (
+    <Button size="sm" className="rounded-none" onClick={() => openAdd()}>
+      <Plus /> Add tool
+    </Button>
+  );
+
   function openAdd(toolKey?: string) {
     setAddToolKey(toolKey ?? null);
     setError(null);
@@ -141,8 +153,9 @@ export function SubscriptionInventory({
         {children}
       </PageHeader>
 
-      {overview ? <CostOverviewView data={overview} /> : null}
+      {overview ? <CostOverviewView data={overview} tableAction={showPlanList ? undefined : addButton} /> : null}
 
+      {showPlanList ? (
         <div className="space-y-10">
           <div className={cn("grid items-start gap-y-8 sm:grid-cols-2 xl:grid-cols-4", overview && "hidden")}>
             <SignalsKpi
@@ -177,11 +190,7 @@ export function SubscriptionInventory({
               title="Manage plans."
               description="Plans and seats your team pays for. Edit a plan to enter your real price."
               bordered
-              action={
-                <Button size="sm" className="rounded-none" onClick={() => openAdd()}>
-                  <Plus /> Add tool
-                </Button>
-              }
+              action={addButton}
             />
             {error ? (
               <Alert variant="destructive" className="mb-4 rounded-none">
@@ -274,12 +283,16 @@ export function SubscriptionInventory({
             )}
           </Panel>
         </div>
+      ) : null}
 
       <AddSubscriptionSheet
         open={addOpen}
         onOpenChange={setAddOpen}
         initialToolKey={addToolKey}
-        onCreated={load}
+        onCreated={async () => {
+          onChanged?.();
+          await load();
+        }}
       />
     </>
   );

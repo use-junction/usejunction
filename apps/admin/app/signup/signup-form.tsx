@@ -90,7 +90,23 @@ export function SignupForm() {
         </Alert>
       )}
       <RegionPicker />
-      <OAuthProviderButtons callbackUrl={oauthCallbackUrl} showEmailDivider />
+      <OAuthProviderButtons
+        callbackUrl={oauthCallbackUrl}
+        showEmailDivider
+        notice={
+          <p className="text-center text-xs leading-5 text-muted-foreground">
+            By continuing with a provider, you agree to the{" "}
+            <a href="/terms" className="font-medium text-foreground underline underline-offset-4">
+              Terms of Service
+            </a>{" "}
+            and{" "}
+            <a href="/privacy" className="font-medium text-foreground underline underline-offset-4">
+              Privacy Policy
+            </a>
+            .
+          </p>
+        }
+      />
       <form onSubmit={submit} className="space-y-4" aria-busy={loading}>
         <div className="space-y-2">
           <Label htmlFor="name">Full name</Label>

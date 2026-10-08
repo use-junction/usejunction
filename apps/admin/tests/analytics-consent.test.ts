@@ -2,19 +2,24 @@ import { describe, expect, it } from "vitest";
 import {
   ANALYTICS_CONSENT_COOKIE,
   hasAnalyticsConsent,
-  hasResolvedAnalyticsConsent,
   readConsentCookie,
   serializeAnalyticsConsent,
 } from "@/lib/consent/analytics-consent";
 import { ANALYTICS_CONSENT_VERSION } from "@/lib/legal/versions";
 
 describe("analytics consent cookie", () => {
-  it("treats missing or stale cookies as no consent", () => {
-    expect(hasAnalyticsConsent(null)).toBe(false);
-    expect(hasResolvedAnalyticsConsent(null)).toBe(false);
+  it("defaults to analytics on when no choice is stored", () => {
+    expect(hasAnalyticsConsent(null)).toBe(true);
     expect(readConsentCookie("")).toBeNull();
     expect(
       hasAnalyticsConsent({ analytics: true, version: "old", at: new Date().toISOString() }),
+    ).toBe(true);
+  });
+
+  it("honours an explicit opt-out from any policy version", () => {
+    expect(hasAnalyticsConsent(serializeAnalyticsConsent(false))).toBe(false);
+    expect(
+      hasAnalyticsConsent({ analytics: false, version: "old", at: new Date().toISOString() }),
     ).toBe(false);
   });
 

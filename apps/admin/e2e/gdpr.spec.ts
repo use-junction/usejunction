@@ -1,20 +1,16 @@
 import { expect, test } from "@playwright/test";
 import path from "node:path";
 
-test.describe("cookie banner and signup acceptance", () => {
+test.describe("signup acceptance", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("cookie banner records a choice", async ({ page }) => {
+  test("no cookie banner is shown", async ({ page }) => {
     await page.goto("/signup");
-    const banner = page.getByRole("dialog", { name: "Cookie consent" });
-    await expect(banner).toBeVisible();
-    await banner.getByRole("button", { name: "Necessary only" }).click();
-    await expect(banner).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Cookie consent" })).toHaveCount(0);
   });
 
   test("signup requires terms and privacy acceptance", async ({ page }) => {
     await page.goto("/signup");
-    await page.getByRole("dialog", { name: "Cookie consent" }).getByRole("button", { name: "Necessary only" }).click();
     await page.getByLabel("Full name").fill("Casey Example");
     await page.getByLabel("Work email").fill("casey@example.com");
     await page.getByLabel("Password", { exact: true }).fill("super-secret-12");

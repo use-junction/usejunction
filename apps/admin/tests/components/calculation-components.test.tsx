@@ -216,9 +216,10 @@ describe("calculation-bearing components", () => {
       />,
     );
 
-    expect(screen.getByText("Usage cost (current)")).toBeInTheDocument();
+    expect(screen.getByText("Usage at API prices")).toBeInTheDocument();
     expect(screen.getByText("$6.00")).toBeInTheDocument();
-    expect(screen.getByText(/10 requests · verified \+ estimated/)).toBeInTheDocument();
+    expect(screen.getByText(/not a bill/)).toBeInTheDocument();
+    expect(screen.getByText("You pay")).toBeInTheDocument();
     expect(screen.getByLabelText("Subscription view")).toBeInTheDocument();
   });
 
@@ -276,7 +277,7 @@ describe("calculation-bearing components", () => {
 
     expect(screen.queryByText("Tools used.")).not.toBeInTheDocument();
     expect(screen.getByText("Plus")).toBeInTheDocument();
-    expect(screen.getByText("Detected plan")).toBeInTheDocument();
+    expect(screen.getByText(/Detected plan/)).toBeInTheDocument();
     expect(screen.getByText("Near limit")).toBeInTheDocument();
     expect(screen.getByRole("meter", { name: "Weekly usage" })).toHaveAttribute("aria-valuenow", "92");
   });
@@ -319,11 +320,50 @@ describe("calculation-bearing components", () => {
       />,
     );
 
-    expect(screen.getByText(/2 rows · 30 requests/)).toBeInTheDocument();
+    expect(screen.getByText(/2 models · 30 requests/)).toBeInTheDocument();
     expect(screen.getAllByText("Ada Lovelace").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("gpt-5").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("composer-2").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/10[\u00a0,]?000/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/5[\u00a0,]?000/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("10K")).toBeInTheDocument();
+    expect(screen.getByText("5K")).toBeInTheDocument();
+  });
+  test("ToolProviderDetail leads each person with their tightest limit and flags pricey models", () => {
+    const quota = (developerId: string, developerName: string, windowType: string, usedPercent: number | null, creditsRemaining: number | null = null) => ({
+      toolName: "cursor", windowType, usedPercent, creditsRemaining, resetAt: new Date(Date.now() + 2 * 86_400_000), deviceHostname: `${developerId}-mac`, developerId, developerName,
+    });
+    renderWithQueryClient(
+      <ToolProviderDetail
+        data={{
+          toolKey: "cursor", name: "Cursor", shortName: "Cursor", provider: "cursor", product: "cursor", toolName: "cursor", aliases: [], sourceUrl: "https://example.com",
+          kpis: { devices: 2, people: 2, peopleInstallOnly: 0, seatsFree: 0, seatsPurchased: 2, seatsAssigned: 2, usageCost: 500, requests: 1000, tokens: 1_000_000 },
+          people: [],
+          quotas: [
+            quota("ada", "Ada", "api", 40),
+            quota("ada", "Ada", "plan", 59),
+            quota("ada", "Ada", "bonus", null, 272),
+            quota("cy", "Cy", "plan", 93),
+          ],
+          plans: [],
+          modelsByDeveloper: [
+            { developerId: "ada", developerName: "Ada", model: "cheap-model", requests: 900, tokens: 500_000, cost: 100 },
+            { developerId: "ada", developerName: "Ada", model: "pricey-model", requests: 100, tokens: 500_000, cost: 400 },
+          ],
+        }}
+      />,
+    );
+
+    const rows = screen.getAllByRole("row").map((row) => row.textContent ?? "");
+    const cy = rows.findIndex((text) => text.startsWith("Cy"));
+    const ada = rows.findIndex((text) => text.startsWith("Ada"));
+    expect(cy).toBeLessThan(ada);
+    expect(rows[cy]).toMatch(/Plan93%Near limit/);
+    expect(rows[ada]).toMatch(/Plan59%OK/);
+    expect(screen.getByText("Closest to a limit").parentElement?.parentElement?.textContent).toMatch(/93%.*Cy · Plan · resets in 1d 23h|93%.*Cy · Plan · resets in 2d/);
+
+    fireEvent.click(screen.getByRole("button", { name: /2 more/ }));
+    expect(screen.getByText("API models")).toBeInTheDocument();
+    expect(screen.getByText("$272 left")).toBeInTheDocument();
+
+    expect(screen.getByText("80% of cost from 10% of requests")).toBeInTheDocument();
   });
 });

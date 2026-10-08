@@ -371,7 +371,6 @@ export default function ActivityClientScreen() {
       ) : null}
       <ActivityPageHeader
         title={isYou ? "How are you using it?" : "Adoption."}
-        description={isYou ? undefined : "Who has made AI part of how they work, who hasn't started, and who needs help getting set up."}
         actions={
           allowDeveloperPeriodControls ? (
             <CycleViewPicker
@@ -388,7 +387,7 @@ export default function ActivityClientScreen() {
       {payload.kind === "personal" && (payload.youUnlinked || !payload.personal) ? (
         <DashboardSetupPanel canInvite={false} />
       ) : payload.kind === "organization" ? (
-        <TeamAdoptionView data={payload.adoption} periodLabel={periodLabel}>
+        <TeamAdoptionView data={payload.adoption}>
           <DeviceActivityFeed feed={payload.deviceFeed} showDeveloper />
           <SentReportsSection audience="team" />
         </TeamAdoptionView>

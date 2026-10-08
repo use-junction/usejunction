@@ -182,7 +182,7 @@ export default function WorkSpendClientScreen() {
     finally { operation.current = false; setMappingLogin(null); }
   }
 
-  if (data.connection.state === "none") return <GithubInstallReview installHref="/api/integrations/github/connect?returnTo=/work-spend" installations={githubInstalls?.installations ?? []} canManage={canManage} loading={installsLoading} loadError={installsError} onRetry={() => setInstallAttempt((value) => value + 1)} />;
+  if (data.connection.state === "none") return <GithubInstallReview installHref="/api/integrations/github/connect?returnTo=/work-spend" installations={githubInstalls?.installations ?? []} canManage={canManage} loading={installsLoading} loadError={installsError} onRetry={() => setInstallAttempt((value) => value + 1)} spendMicros={data.coverage?.eligibleMicros ?? null} days={data.days} />;
 
   const hasWork = data.repositories.some((repo) => repo.commitCount || repo.pullRequestCount);
   const repositoryErrors = data.repositories.filter((repo) => repo.lastError || ["error", "failed"].includes(repo.syncStatus));
@@ -256,7 +256,7 @@ export default function WorkSpendClientScreen() {
         <Panel as="section" className="min-w-0">
           <WorkSpendMix data={data} />
         </Panel>
-        <div className="relative min-h-0 max-xl:min-h-[22rem]">
+        <div className="relative min-h-0 max-xl:min-h-[22rem] xl:min-h-[12rem]">
           <Panel as="section" className="flex min-h-0 flex-col overflow-hidden max-xl:max-h-[28rem] xl:absolute xl:inset-0">
             <WorkSpendDestinations data={data} workState={workState} projectId={projectId} developerId={developerId} onExplore={() => setViewParams({ explore: "1", sort: "cost" })} onSync={() => void syncNow()} selectedItem={selectedItem} onSelectedItem={setSelectedItem} />
           </Panel>

@@ -108,7 +108,7 @@ export function MyDataCollection({
             Tool logins
           </h2>
           <p className="mt-1.5 text-xs text-muted-foreground">
-            Choose which logins share usage. Turning one off stops new uploads; days already stored stay until retention removes them.
+            Turning a login off stops new uploads. Stored days stay until retention removes them.
           </p>
         </div>
         {accounts.length ? (
@@ -172,21 +172,21 @@ export function MyDataCollection({
         <ul className="divide-y border-t">
           {visible.map((account) => {
             const label = `${account.displayName} ${accountLabel(account)} on ${account.hostname || "device"}`;
-            const meta = [account.displayName, account.hostname, account.plan, account.authPresent ? "signed in" : null]
-              .filter(Boolean)
-              .join(" · ");
+            const meta = [account.hostname, account.plan, account.authPresent ? null : "signed out"].filter(Boolean).join(" · ");
             return (
-              <li key={account.id} className="flex items-center gap-4 px-4 py-4 sm:px-5">
+              <li key={account.id} className="flex items-center gap-3 px-4 py-3 sm:px-5">
                 <ToolLogoTile tool={account.toolName} size="sm" light />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{accountLabel(account)}</p>
-                  <p className="truncate text-xs text-muted-foreground">{meta}</p>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {account.usageAdminLocked ? "Locked off by a workspace admin" : usageStorageCopy(account)}
+                  <p className="truncate text-sm">
+                    <span className="font-medium">{accountLabel(account)}</span>
+                    <span className="text-muted-foreground"> · {account.displayName}</span>
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {meta ? <>{meta} · </> : null}
+                    <span>{account.usageAdminLocked ? "Locked off by a workspace admin" : usageStorageCopy(account)}</span>
                   </p>
                 </div>
-                <label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-                  <span>Usage</span>
+                <label className="flex min-h-11 shrink-0 cursor-pointer items-center">
                   <Switch
                     checked={account.usageEnabled && !account.usageAdminLocked}
                     disabled={pending || account.usageAdminLocked}

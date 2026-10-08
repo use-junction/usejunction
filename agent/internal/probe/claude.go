@@ -429,9 +429,9 @@ func ClaudeAccountFromClaudeJSON(home string) (*types.ToolAccount, error) {
 		return nil, fmt.Errorf("claude.json missing oauthAccount.emailAddress")
 	}
 	return &types.ToolAccount{
-		ToolName:    "claude",
-		Email:       email,
-		Plan:        claudePlanFromOAuthAccount(*doc.OAuthAccount),
+		ToolName: "claude",
+		Email:    email,
+		Plan:     claudePlanFromOAuthAccount(*doc.OAuthAccount),
 		// Plan metadata only — live quota windows still need Code OAuth tokens.
 		LoginMethod: "desktop",
 		AuthPresent: false,
@@ -645,12 +645,17 @@ func ClaudeAccountFromCredentials(dir string) (*types.ToolAccount, error) {
 func ProbeClaudeQuota(ctx context.Context, dir string) ([]types.QuotaSnapshot, *types.ToolAccount, error) {
 	bundle, err := LoadClaudeCredentialBundle(dir)
 	if err != nil {
-		home, homeErr := os.UserHomeDir()
-		if homeErr != nil {
-			return nil, nil, err
+		// No Claude Code OAuth token on this machine. Fall back to the desktop
+		// app's cached usage so plan-detected-but-signed-out machines still
+		// report live quota windows.
+		var account *types.ToolAccount
+		if home, homeErr := os.UserHomeDir(); homeErr == nil {
+			account, _ = ClaudeAccountFromClaudeJSON(home)
 		}
-		account, jsonErr := ClaudeAccountFromClaudeJSON(home)
-		if jsonErr != nil {
+		if snaps := ClaudeDesktopUsageSnapshots(); len(snaps) > 0 {
+			return snaps, account, nil
+		}
+		if account == nil {
 			return nil, nil, err
 		}
 		return nil, account, fmt.Errorf("claude credentials not found")
@@ -675,13 +680,24 @@ func ProbeClaudeQuota(ctx context.Context, dir string) ([]types.QuotaSnapshot, *
 	}
 	if usageErr != nil {
 		_ = revitalizeClaudeCredentialPlan(bundle, account.Plan)
+		// The token is present but the live usage call failed (offline, expired
+		// refresh, rate limit). Fall back to the desktop app's cached windows.
+		if snaps := ClaudeDesktopUsageSnapshots(); len(snaps) > 0 {
+			return snaps, account, nil
+		}
 		return nil, account, usageErr
 	}
 
 	account = enrichClaudeAccountPlan(account, claudePlanFromUsageRaw(raw))
 	_ = revitalizeClaudeCredentialPlan(bundle, account.Plan)
 
-	return claudeUsageSnapshots(raw), account, nil
+	snaps := claudeUsageSnapshots(raw)
+	if len(snaps) == 0 {
+		if desktop := ClaudeDesktopUsageSnapshots(); len(desktop) > 0 {
+			return desktop, account, nil
+		}
+	}
+	return snaps, account, nil
 }
 
 func claudeUsageSnapshots(raw map[string]json.RawMessage) []types.QuotaSnapshot {

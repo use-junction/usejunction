@@ -29,6 +29,7 @@ vi.mock("@/components/auth/auth-shell", () => ({
 
 vi.mock("@/components/onboarding/device-connect-card", () => ({
   DeviceConnectCard: () => <div>Connect card</div>,
+  CollectionNoticeLink: () => null,
 }));
 
 vi.mock("@/components/onboarding/invite-team-form", () => ({

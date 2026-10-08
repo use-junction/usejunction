@@ -49,7 +49,7 @@ export function WorkSpendDestinations({
     ? data.attention.developers.find((developer) => developer.id === developerId)?.name ?? "This person"
     : null;
   const description = [
-    workState ? `${WORK_STATE_LABELS[workState]} work` : `Highest spend on work · last ${data.days} days`,
+    workState ? `${WORK_STATE_LABELS[workState]} work` : null,
     projectTitle,
     personName,
   ].filter(Boolean).join(" · ");
@@ -58,14 +58,14 @@ export function WorkSpendDestinations({
     <div className="mb-3 flex min-w-0 shrink-0 items-baseline justify-between gap-3">
       <div className="min-w-0">
         <h2 className="text-lg font-semibold tracking-tight">Biggest items.</h2>
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        {description ? <p className="mt-1 text-xs text-muted-foreground">{description}</p> : null}
       </div>
       <button type="button" onClick={onExplore} className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">See all work <ArrowRight className="size-3.5" aria-hidden /></button>
     </div>
     {!data.allocationCurrent ? <div role="status" className="py-8 text-sm"><p className="font-medium">Cost rankings need refreshing</p><p className="mt-1 text-muted-foreground">Sync GitHub to recalculate work allocations.</p><Button variant="outline" size="sm" className="mt-3" onClick={onSync}>Sync now</Button></div> : null}
     {data.allocationCurrent && work.isPending ? <p role="status" className="flex items-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />Loading work…</p> : null}
     {data.allocationCurrent && work.error ? <p role="alert" className="py-8 text-sm text-destructive">Couldn’t load this ranking. <Button variant="ghost" size="sm" onClick={() => void work.refetch()}>Retry</Button></p> : null}
-    {data.allocationCurrent && !work.isPending && !work.error && !rows.length ? <div className="py-8 text-sm"><p className="font-medium">No work in this period</p><p className="mt-1 text-muted-foreground">Try the longer date range or sync GitHub.</p></div> : null}
+    {data.allocationCurrent && !work.isPending && !work.error && !rows.length ? <p className="py-8 text-sm text-muted-foreground">No work in this period.</p> : null}
     {data.allocationCurrent && !work.isPending && !work.error && shown.length ? (
       <ul className="uj-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {shown.map((row) => {
@@ -86,7 +86,7 @@ export function WorkSpendDestinations({
                     <StateChip state={row.state} workState={row.workState} activityAt={row.activityAt} />
                     {row.originalTitle ? <span className="font-mono text-muted-foreground/80">{row.originalTitle}</span> : null}
                   </span>
-                  <span className="mt-1 block text-xs text-muted-foreground">{projectLine(row)} · {share}% of spend on work · last {data.days} days{row.commitCount > 0 ? ` · ${row.commitCount} ${row.commitCount === 1 ? "commit" : "commits"}` : ""}</span>
+                  <span className="mt-1 block text-xs text-muted-foreground">{projectLine(row)} · {share}%{row.commitCount > 0 ? ` · ${row.commitCount} ${row.commitCount === 1 ? "commit" : "commits"}` : ""}</span>
                 </span>
               </button>
             </li>
@@ -94,7 +94,7 @@ export function WorkSpendDestinations({
         })}
       </ul>
     ) : null}
-    <p className="mt-3 text-xs text-muted-foreground">{count} {count === 1 ? "work item" : "work items"}{count > TOP_COUNT ? ` · top ${TOP_COUNT} shown` : ""}</p>
+    {count > TOP_COUNT ? <p className="mt-3 text-xs text-muted-foreground">Top {TOP_COUNT} of {count}</p> : null}
     <WorkSpendSheet item={selected} days={data.days} allocationCurrent={data.allocationCurrent} onClose={() => { setLocal(null); onSelectedItem(null); }} onReturnFocus={() => openedBy.current?.focus()} />
   </section>;
 }

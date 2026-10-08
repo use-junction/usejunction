@@ -283,7 +283,7 @@ function buildChanges(tools: CostTool[], idleSeats: CostOverviewInput["idleSeats
         changes.push({
           kind: "unassigned_seats",
           toolKey: tool.toolKey,
-          text: `${free} ${plan.name} ${free === 1 ? "seat is" : "seats are"} paid for but assigned to no one`,
+          text: `${free} ${plan.name} ${free === 1 ? "seat" : "seats"} assigned to no one`,
           monthlyMicros: (perSeat * BigInt(free)).toString(),
           basis: plan.priceTag === "entered" ? "your price" : "list price",
           href: `/tools/${tool.toolKey}`,
@@ -295,7 +295,7 @@ function buildChanges(tools: CostTool[], idleSeats: CostOverviewInput["idleSeats
         changes.push({
           kind: "annual_renewal",
           toolKey: tool.toolKey,
-          text: `${plan.name} renews on ${plan.renewsOn} as one annual charge`,
+          text: `${plan.name} renews ${renews.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })} as one annual charge`,
           monthlyMicros: null,
           basis: `${plan.priceTag === "entered" ? "your price" : "list price"} · full charge at renewal`,
           href: `/tools/${tool.toolKey}`,

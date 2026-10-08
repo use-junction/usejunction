@@ -47,6 +47,29 @@ test("asks about new tools and accounts, and records Not now", async () => {
   await waitFor(() => expect(screen.queryByText("me@x.com · Pro · MacBook")).not.toBeInTheDocument());
 });
 
+test("stacks a long list until it is expanded", async () => {
+  const pending = ["Antigravity", "Claude", "ChatGPT", "Copilot", "Cursor"].map((name, index) =>
+    account({
+      id: `a${index}`,
+      toolName: name.toLowerCase(),
+      displayName: name,
+      accountKey: `${name}@x.com`,
+      email: `${name.toLowerCase()}@x.com`,
+      newProvider: true,
+    }),
+  );
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ pending }), { status: 200 })));
+
+  render(<NewCollectionBanner />);
+  expect(await screen.findByRole("button", { name: /5 logins/ })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByRole("button", { name: "Not now" })).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole("button", { name: /Expand/ }));
+  expect(screen.getByRole("button", { name: /Show less/ })).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getAllByRole("button", { name: "Not now" })).toHaveLength(5);
+  expect(screen.getByText("antigravity@x.com · Pro · MacBook")).toBeInTheDocument();
+});
+
 test("renders nothing when the only login has no email", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
     pending: [account({ toolName: "claude", displayName: "Claude", accountKey: "claude:uuid", email: null })],

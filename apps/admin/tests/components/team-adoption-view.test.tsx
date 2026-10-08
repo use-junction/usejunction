@@ -17,7 +17,7 @@ vi.mock("@/components/tools/tool-brand-icon", () => ({
 }));
 
 vi.mock("next/link", () => ({
-  default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
+  default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => <a href={href} {...props}>{children}</a>,
 }));
 import { TeamAdoptionView } from "@/components/activity/team-adoption-view";
 import { buildTeamAdoption } from "@/lib/queries/activity/adoption";
@@ -42,14 +42,16 @@ const data = buildTeamAdoption({
 });
 
 test("adoption view leads with regular use and lists nudges without volume", () => {
-  render(<TeamAdoptionView data={data} periodLabel="last 28 days" />);
+  render(<TeamAdoptionView data={data} />);
   expect(screen.queryByText(/enrolled people use AI most weeks/)).not.toBeInTheDocument();
-  expect(screen.getByText(/up to today/)).toBeInTheDocument();
+  expect(screen.queryByText(/up to today/)).toBeNull();
   expect(screen.getAllByText("$40.00").length).toBeGreaterThan(0);
 
-  for (const name of ["Everyone 3", "Regular 1", "Occasional 0", "Not using yet 1", "No data 1"]) {
+  for (const name of ["Everyone 3", "Regular 1", "Not using yet 1", "No data 1"]) {
     expect(screen.getByRole("radio", { name })).toBeInTheDocument();
   }
+  expect(screen.queryByRole("radio", { name: /Occasional/ })).not.toBeInTheDocument();
+  expect(within(screen.getByRole("list", { name: "Legend" })).getByText("Agent not reporting")).toBeInTheDocument();
   expect(screen.getByText(/Daily activity/)).toBeInTheDocument();
   expect(screen.getAllByRole("img", { name: /: used AI$/ }).length).toBe(4);
   fireEvent.click(screen.getByRole("radio", { name: "No data 1" }));
@@ -67,4 +69,24 @@ test("adoption view leads with regular use and lists nudges without volume", () 
   expect(screen.getAllByTestId("logo-cursor").length).toBeGreaterThan(0);
   expect(screen.queryByText("cursor")).not.toBeInTheDocument();
   expect(screen.queryByText(/tokens|requests/i)).not.toBeInTheDocument();
+});
+
+test("a team with nothing to chase skips the nudge list and the one-option filter", () => {
+  const settled = buildTeamAdoption({
+    window: { from: new Date("2026-09-04T00:00:00Z"), to: new Date("2026-10-01T00:00:00Z") },
+    developers: [{ id: "ada", name: "Ada", devices: [device()] }],
+    activity: ["2026-09-05", "2026-09-12", "2026-09-20", "2026-09-30"].map((date) => ({ developerId: "ada", toolName: "Cursor", date })),
+    plans: [],
+  });
+  render(<TeamAdoptionView data={settled} />);
+  expect(screen.getByText("everyone is set up")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Needs a nudge." })).not.toBeInTheDocument();
+  expect(screen.queryByRole("radiogroup", { name: "Filter by habit" })).not.toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Spread by tool." })).toBeInTheDocument();
+  expect(screen.queryByText("no change")).not.toBeInTheDocument();
+});
+
+test("each tool in the spread links to that tool's usage page", () => {
+  render(<TeamAdoptionView data={data} />);
+  expect(screen.getByRole("link", { name: /^Cursor usage · / })).toHaveAttribute("href", "/tools/cursor");
 });

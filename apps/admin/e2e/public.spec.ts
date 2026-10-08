@@ -113,10 +113,6 @@ test("login form rejects bad credentials and links to recovery", async ({ page }
 
 test("signup form validates password confirmation", async ({ page }) => {
   await page.goto("/signup");
-  const banner = page.getByRole("dialog", { name: "Cookie consent" });
-  if (await banner.isVisible().catch(() => false)) {
-    await banner.getByRole("button", { name: "Necessary only" }).click();
-  }
   await expect(page.getByLabel("Full name")).toBeVisible();
   await page.getByLabel("Full name").fill("E2E Signup");
   await page.getByLabel("Work email").fill("signup-e2e@example.com");

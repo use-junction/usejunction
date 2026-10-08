@@ -27,26 +27,18 @@ export function WorkSpendPeoplePanel({
   );
   const unmatched = data.attention.unmappedAuthors.length;
   const people = (query.data?.people ?? []).slice(0, MAX_PEOPLE);
-  const cycleCount = Math.max(1, Math.round(data.days / 30));
-  const cycleLabel = cycleCount === 1 ? "1 cycle" : `${cycleCount} cycles`;
 
   return (
     <section aria-label="Spend by person" className="min-w-0">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold tracking-tight">Spend by person.</h2>
-        <p className="mt-1.5 text-xs text-muted-foreground">Who the AI cost on this work belongs to over the last {data.days} days. Click a person to see their biggest items.</p>
-      </div>
+      <h2 className="mb-4 text-lg font-semibold tracking-tight">Spend by person.</h2>
       {query.isPending ? (
         <p role="status" className="py-8 text-sm text-muted-foreground">Loading people…</p>
       ) : query.error ? (
         <p role="alert" className="py-8 text-sm text-destructive">Couldn’t load spend by person. <Button variant="ghost" size="sm" onClick={() => void query.refetch()}>Retry</Button></p>
       ) : !people.length ? (
         <div className="border bg-muted/30 px-4 py-5">
-          <p className="text-sm font-medium">No people spend in this period.</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {unmatched
-              ? "Match GitHub authors to workspace members so their AI usage can be assigned."
-              : "Sync GitHub after people land commits, or widen the date range."}
+          <p className="text-sm font-medium">
+            {unmatched ? "Match GitHub authors to see spend by person." : "No spend by person in this period."}
           </p>
           {unmatched ? (
             <div className="mt-3">
@@ -81,8 +73,8 @@ export function WorkSpendPeoplePanel({
                   </span>
                   <span className="text-base font-semibold tabular-nums">{formatMicrosAsCurrency(total)}</span>
                   <span className="text-[0.7rem] text-muted-foreground">
-                    {share}% of spend on work · last {data.days} days · {row.workCount} {row.workCount === 1 ? "item" : "items"}
-                    {BigInt(row.estimatedMicros) > 0n ? ` · estimated · across ${cycleLabel}` : ""}
+                    {share}% · {row.workCount} {row.workCount === 1 ? "item" : "items"}
+                    {BigInt(row.estimatedMicros) > 0n ? " · estimated" : ""}
                   </span>
                 </button>
               </li>
@@ -90,13 +82,6 @@ export function WorkSpendPeoplePanel({
           })}
         </ul>
       )}
-      {people.length > 0 && unmatched > 0 ? (
-        <div className="mt-4">
-          <Button type="button" variant="ghost" size="sm" onClick={onAuthors}>
-            <Users className="size-4" aria-hidden />Match authors ({unmatched})
-          </Button>
-        </div>
-      ) : null}
     </section>
   );
 }

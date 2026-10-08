@@ -65,7 +65,7 @@ for (const width of [1440, 390]) {
     await expect(page.getByRole("heading", { name: "Spend by person." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "By repository." })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Commit types." })).toBeVisible();
-    await expect(page.getByText("3 items · 70% of recorded · last 90 days")).toBeVisible();
+    await expect(page.getByText("3 items · 70% of recorded")).toBeVisible();
     await expect(page.getByRole("button", { name: "Sync now" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Integrations/ })).toBeVisible();
     await page.getByRole("button", { name: "More options" }).click();
@@ -195,7 +195,7 @@ test("chart tabs, see all work, and cancelling disconnect make no mutation", asy
   await expect(page.getByRole("heading", { name: "Spend by week." })).toBeVisible();
   await page.getByRole("button", { name: "Projects", exact: true }).click();
   await expect(page).toHaveURL(/trendBy=project/);
-  await expect(page.getByText(/these totals can add up to more than spend on work/)).toBeVisible();
+  await expect(page.getByText(/Work on two projects counts in both/)).toBeVisible();
   await page.getByRole("button", { name: "See all work" }).click();
   await expect(page).toHaveURL(/explore=1/);
   await expect(page.getByRole("searchbox", { name: "Search work" })).toBeVisible();

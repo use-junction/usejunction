@@ -255,7 +255,8 @@ test("settings mutations rename workspace and toggle team visibility", async ({ 
 test("seeded usage totals stay consistent across owner calculation views", async ({ page }) => {
   await page.goto("/tools");
   await expect(page.getByText("$40.00").first()).toBeVisible();
-  await expect(page.getByText("2 Cursor Pro")).toBeVisible();
+  await expect(page.getByRole("table").getByText("Cursor Pro")).toBeVisible();
+  await expect(page.getByRole("table").getByText("0 of 2")).toBeVisible();
 
   await page.goto("/tools/cursor");
   await expect(page.getByText(/Usage cost \(/)).toBeVisible();

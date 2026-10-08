@@ -43,7 +43,7 @@ export function subprocessorsForDeployment(eu = isEuDeployment()): Subprocessor[
     },
     {
       name: "PostHog",
-      purpose: "Product analytics (only after cookie consent)",
+      purpose: "Product analytics (unless the user opts out)",
       location: eu ? "EU Cloud" : "US Cloud",
       transfer: eu ? "EU hosting" : "DPF / SCCs",
     },
@@ -95,8 +95,8 @@ export function subprocessorsPage(eu = isEuDeployment()): ContentPage {
     ],
     faq: [
       {
-        question: "Does PostHog run without consent?",
-        answer: "No. PostHog loads only after analytics consent in the cookie banner or Settings → Privacy.",
+        question: "Can I turn PostHog off?",
+        answer: "Yes. PostHog is on by default; turn analytics off in Settings → Privacy and it stops capturing.",
       },
     ],
     relatedPaths: ["/dpa", "/privacy", "/security"],

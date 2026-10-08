@@ -50,7 +50,6 @@ export function WorkSpendTrend({
     <Panel as="section" aria-label="Spend by week" className="flex min-h-[17.5rem] min-w-0 flex-col">
       <WorkSpendSectionHeader
         title="Spend by week."
-        description={by === "person" ? "AI cost on their commits" : "Weekly spend on work"}
         action={tabs.length > 1 ? (
           <div role="group" aria-label="Group spend by" className="flex gap-3 overflow-x-auto text-sm">
             {tabs.map(([value, label]) => (
@@ -94,7 +93,7 @@ function TrendChart({ data, isMobile, allocatedMicros }: { data: WorkSpendTrend;
   if (data.by === "project") {
     return (
       <div>
-        <p className="mb-4 text-xs text-muted-foreground">The same work can sit on two projects, so these totals can add up to more than spend on work ({formatMicrosAsCurrency(allocatedMicros)}).</p>
+        <p className="mb-4 text-xs text-muted-foreground">Work on two projects counts in both, so totals can exceed spend on work ({formatMicrosAsCurrency(allocatedMicros)}).</p>
         <div className="grid gap-4 sm:grid-cols-2">
           {data.series.filter((series) => series.id !== "__other__").map((series, index) => (
             <figure key={series.id} className="border border-border/70 p-4">

@@ -82,6 +82,8 @@ type OAuthProviderButtonsProps = {
   /** Shown under the provider buttons when an email form follows. */
   showEmailDivider?: boolean;
   emailDividerLabel?: string;
+  /** Rendered directly under the provider buttons, above the email divider. */
+  notice?: React.ReactNode;
 };
 
 export function OAuthProviderButtons({
@@ -89,6 +91,7 @@ export function OAuthProviderButtons({
   className,
   showEmailDivider = false,
   emailDividerLabel = "or continue with email",
+  notice,
 }: OAuthProviderButtonsProps) {
   const providers = getEnabledOAuthProviders();
   const [pendingProvider, setPendingProvider] = useState<OAuthProviderId | null>(null);
@@ -121,6 +124,7 @@ export function OAuthProviderButtons({
           </Button>
         ))}
       </div>
+      {notice}
       {showEmailDivider ? (
         <div className="flex items-center gap-3">
           <Separator className="flex-1" />

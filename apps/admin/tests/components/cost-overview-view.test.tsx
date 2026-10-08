@@ -55,15 +55,15 @@ const data = buildCostOverview({
   ],
 });
 
-test("cost hero leads with the seat bill and names the unused tools", () => {
+test("cost hero leads with the seat bill and leaves the unused saving to the action list", () => {
   render(<CostOverviewView data={data} />);
   expect(screen.getByText("$84.99")).toBeInTheDocument();
   expect(screen.getByText(/on 4 paid plans/)).toBeInTheDocument();
-  expect(screen.getAllByText("$44.99")).toHaveLength(2);
-  expect(screen.getByText(/of it went to Claude and Antigravity/)).toBeInTheDocument();
+  expect(screen.getAllByText("$44.99")).toHaveLength(1);
+  expect(screen.queryByText(/of it went to/)).not.toBeInTheDocument();
   expect(screen.queryByText(/53%/)).not.toBeInTheDocument();
   expect(screen.queryByText(/pay-as-you-go/i)).not.toBeInTheDocument();
-  expect(screen.getByText(/Also on free plans/)).toBeInTheDocument();
+  expect(screen.queryByText(/Also on free plans/)).not.toBeInTheDocument();
   expect(screen.getByRole("listitem", { name: /Claude \$25\.00 · No use in 30 days/ })).toBeInTheDocument();
   expect(screen.getByRole("listitem", { name: /Cursor \$20\.00 · Past its allowance/ })).toBeInTheDocument();
 });
@@ -75,4 +75,16 @@ test("actions are ordered by saving, with limits and allowance after", () => {
   expect(titles).toContain("Cursor is past its included allowance");
   expect(titles.some((title) => /is hitting its limit/.test(title ?? ""))).toBe(true);
   expect(screen.getByText(/^Save/)).toHaveTextContent("Save $44.99/mo");
+});
+
+test("the tool table gives each tool one plain status and links to its page", () => {
+  render(<CostOverviewView data={data} />);
+  const row = (tool: string) => screen.getByRole("link", { name: new RegExp(`^${tool}$`) }).closest("tr")!;
+  expect(row("Cursor")).toHaveTextContent("Past its allowance");
+  expect(row("Cursor")).toHaveTextContent("~$139 at API prices");
+  expect(row("Cursor")).toHaveTextContent("7× over");
+  expect(row("Claude")).toHaveTextContent("No use in 30 days");
+  expect(row("Claude")).toHaveTextContent("$25.00/mo · list price");
+  expect(screen.getByRole("link", { name: /^Cursor$/ })).toHaveAttribute("href", "/tools/cursor");
+  expect(screen.queryByText(/under 10%/)).not.toBeInTheDocument();
 });

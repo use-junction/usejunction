@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Fragment, useState } from "react";
+import { ChevronDown, Loader2, Plus, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -24,31 +24,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CycleViewPicker } from "@/components/dashboard/cycle-view-picker";
-import { SignalsKpi } from "@/components/signals/signals-ui";
+import { WorkSpendKpi } from "@/components/features/work-spend-ui";
+import { Panel } from "@/components/panel";
 import { Empty, EmptyDescription } from "@/components/ui/empty";
-import { MobileDataCard, MobileDataField, MobileDataList } from "@/components/ui/mobile-data";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { AddSubscriptionSheet } from "./add-subscription-sheet";
 import { ToolLogoTile } from "./tool-brand-icon";
 import type { ToolDetailData } from "@/lib/queries/dashboard/tool-detail";
 import type { CycleView, CycleViewWindows } from "@/lib/dashboard/cycle-view";
 import { DEFAULT_ROLLING_PERIOD, type RollingPeriod } from "@/lib/dashboard/period-prefs";
-import { formatMicrosAsCurrency, formatUsd } from "@/lib/format";
+import { formatCompactNumber, formatMicrosAsCurrency, formatUsd } from "@/lib/format";
 import { browserMutationInit, useInvalidateAppData } from "@/lib/api/client";
-import {
-  isSecondaryQuotaWindow,
-  quotaRemainingLabel,
-  quotaResetLabel,
-  quotaWindowLabel,
-} from "@/lib/quotas/display";
-import { peopleKpiSubline } from "@/lib/queries/dashboard/tool-detail-kpi";
+import { isSecondaryQuotaWindow, quotaRemainingLabel, quotaWindowLabel } from "@/lib/quotas/display";
+import { cn } from "@/lib/utils";
 import { USAGE_WINDOW_PREFERENCES, usageWindowPreferenceLabel, type UsageWindowPreference } from "@/lib/quotas/usage-window";
 
 type PlanRow = ToolDetailData["plans"][number] & {
@@ -60,34 +47,64 @@ type DetailProps = Omit<ToolDetailData, "plans"> & {
   plans: PlanRow[];
 };
 
-function quotaStatus(percent: number | null) {
-  if (percent == null) {
-    return {
-      label: "Reported",
-      badge: "border-border bg-muted text-muted-foreground",
-      bar: "bg-primary",
-    };
-  }
-  if (percent >= 90) {
-    return {
-      label: "Near limit",
-      badge: "border-destructive/30 bg-destructive/10 text-destructive",
-      bar: "bg-destructive",
-    };
-  }
-  if (percent >= 75) {
-    return {
-      label: "Watch",
-      badge: "border-warning/30 bg-warning/10 text-[#9a5f0d]",
-      bar: "bg-warning",
-    };
-  }
-  return {
-    label: "Available",
-    badge: "border-primary/30 bg-primary/10 text-primary",
-    bar: "bg-primary",
-  };
+type Quota = DetailProps["quotas"][number];
+
+function quotaPercent(quota: Quota): number | null {
+  if (quota.usedPercent == null || Number.isNaN(quota.usedPercent)) return null;
+  return Math.min(100, Math.max(0, quota.usedPercent));
 }
+
+/** Plain-language pressure: only the top two bands get colour. */
+function quotaTone(percent: number | null) {
+  if (percent != null && percent >= 90) return { label: "Near limit", text: "text-brand-orange-dark", bar: "var(--brand-orange)" };
+  if (percent != null && percent >= 75) return { label: "Watch", text: "text-brand-yellow-dark", bar: "var(--brand-yellow-dark)" };
+  return { label: "OK", text: "text-muted-foreground", bar: "var(--primary)" };
+}
+
+/** The window most likely to block someone: highest % among plan windows, ignoring bonuses and grants. */
+function tightestWindow(windows: Quota[]): Quota | null {
+  let best: Quota | null = null;
+  for (const quota of windows) {
+    if (isSecondaryQuotaWindow(quota.windowType)) continue;
+    const percent = quotaPercent(quota);
+    if (percent == null) continue;
+    const bestPercent = best ? quotaPercent(best) ?? -1 : -1;
+    // On a tie, the overall plan allowance is the one people recognise.
+    if (!best || percent > bestPercent || (percent === bestPercent && quota.windowType === "plan")) best = quota;
+  }
+  return best;
+}
+
+/** "Resets in 1d 18h" plus the local date and time, instead of a UTC timestamp. */
+function resetCopy(resetAt: Date | string | null, verb = "Resets") {
+  if (!resetAt) return null;
+  const date = resetAt instanceof Date ? resetAt : new Date(resetAt);
+  if (Number.isNaN(date.getTime())) return null;
+  const absolute = date.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const minutes = Math.round((date.getTime() - Date.now()) / 60_000);
+  if (minutes <= 0) return { relative: `${verb} now`, absolute };
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const relative = days ? `${days}d ${hours}h` : hours ? `${hours}h ${minutes % 60}m` : `${minutes}m`;
+  return { relative: `${verb} in ${relative}`, absolute };
+}
+
+function QuotaMeter({ quota, percent }: { quota: Quota; percent: number }) {
+  return (
+    <div
+      className="h-1.5 w-full bg-muted"
+      role="meter"
+      aria-label={`${quotaWindowLabel(quota.windowType)} usage`}
+      aria-valuenow={Math.round(percent)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+    >
+      <span className="block h-full" style={{ width: `${percent}%`, background: quotaTone(percent).bar }} />
+    </div>
+  );
+}
+
+const MODEL_PREVIEW = 6;
 
 export function ToolProviderDetail({
   data,
@@ -95,7 +112,6 @@ export function ToolProviderDetail({
   cycleView = "current_cycles",
   period = DEFAULT_ROLLING_PERIOD,
   periodLabel = "current billing cycles",
-  periodSuffix = "current",
   periodBasePath,
   cycleWindows,
 }: {
@@ -115,6 +131,9 @@ export function ToolProviderDetail({
   const [addOpen, setAddOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PlanRow | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [modelView, setModelView] = useState<"model" | "person">("model");
+  const [showAllModels, setShowAllModels] = useState(false);
   const basePath = periodBasePath ?? `/tools/${data.toolKey}`;
   const isSelf = scope === "self";
 
@@ -253,11 +272,20 @@ export function ToolProviderDetail({
       windows: [],
     });
   }
-  const quotaGroups = Array.from(quotaGroupMap.values()).sort((a, b) =>
-    a.developerName.localeCompare(b.developerName),
-  );
+  // Worst first: whoever is closest to a limit leads; people with nothing reported sink.
+  const quotaGroups = Array.from(quotaGroupMap.values())
+    .map((group) => {
+      const tightest = tightestWindow(group.windows);
+      return { ...group, tightest, tightestPercent: tightest ? quotaPercent(tightest) : null };
+    })
+    .sort((a, b) => (b.tightestPercent ?? -1) - (a.tightestPercent ?? -1) || a.developerName.localeCompare(b.developerName));
   const peopleReporting = quotaGroups.filter((group) => group.windows.length > 0).length;
-  const peopleKpiSub = peopleKpiSubline(data.kpis.people, data.kpis.peopleInstallOnly);
+  const closest = quotaGroups.find((group) => group.tightest) ?? null;
+  const closestReset = closest?.tightest ? resetCopy(closest.tightest.resetAt) : null;
+
+  const seatMicros = data.plans.reduce((sum, plan) => sum + BigInt(plan.estimatedCycleMicros), 0n);
+  const seatDollars = Number(seatMicros) / 1_000_000;
+  const valueMultiple = seatDollars > 0 ? data.kpis.usageCost / seatDollars : null;
 
   const modelTotals = data.modelsByDeveloper.reduce(
     (acc, row) => {
@@ -267,6 +295,85 @@ export function ToolProviderDetail({
       return acc;
     },
     { requests: 0, tokens: 0, cost: 0 },
+  );
+  const byModel = Array.from(
+    data.modelsByDeveloper
+      .reduce((map, row) => {
+        const entry = map.get(row.model) ?? { key: row.model, label: row.model, requests: 0, tokens: 0, cost: 0, people: new Set<string>() };
+        entry.requests += row.requests;
+        entry.tokens += row.tokens;
+        entry.cost += row.cost;
+        entry.people.add(row.developerId);
+        return map.set(row.model, entry);
+      }, new Map<string, { key: string; label: string; requests: number; tokens: number; cost: number; people: Set<string> }>())
+      .values(),
+  ).sort((a, b) => b.cost - a.cost || b.requests - a.requests);
+  const byPerson = Array.from(
+    data.modelsByDeveloper
+      .reduce((map, row) => {
+        const entry = map.get(row.developerId) ?? { key: row.developerId, label: row.developerName, requests: 0, tokens: 0, cost: 0, top: row };
+        entry.requests += row.requests;
+        entry.tokens += row.tokens;
+        entry.cost += row.cost;
+        if (row.cost > entry.top.cost) entry.top = row;
+        return map.set(row.developerId, entry);
+      }, new Map<string, { key: string; label: string; requests: number; tokens: number; cost: number; top: (typeof data.modelsByDeveloper)[number] }>())
+      .values(),
+  ).sort((a, b) => b.cost - a.cost);
+  const personView = modelView === "person" && !isSelf;
+  const modelRows = personView
+    ? byPerson.map((row) => ({ key: row.key, label: row.label, requests: row.requests, tokens: row.tokens, cost: row.cost, detail: `mostly ${row.top.model}` }))
+    : byModel.map((row) => ({ key: row.key, label: row.label, requests: row.requests, tokens: row.tokens, cost: row.cost, detail: isSelf ? null : `${row.people.size} ${row.people.size === 1 ? "person" : "people"}` }));
+  const visibleModelRows = showAllModels ? modelRows : modelRows.slice(0, MODEL_PREVIEW);
+  const share = (part: number, whole: number) => (whole > 0 ? part / whole : 0);
+  const pct = (value: number) => `${Math.round(value * 100)}%`;
+
+  function toggleExpanded(key: string) {
+    setExpanded((old) => {
+      const next = new Set(old);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  const planFor = (developerId: string | null) => {
+    const person = developerId ? peopleByDeveloperId.get(developerId) ?? null : null;
+    if (person?.assignment) return { person, name: person.assignment.planName, source: person.assignment.source === "detected" ? "Detected plan" : "Assigned plan" };
+    if (person?.vendorPlan) return { person, name: person.vendorPlan, source: "Reported plan" };
+    if (person?.detected) return { person, name: null, source: "Plan unknown" };
+    return { person, name: null, source: "No plan signal" };
+  };
+  const selfPlan = isSelf ? planFor(quotaGroups[0]?.developerId ?? data.people[0]?.developerId ?? null) : null;
+
+  const closestCell = (
+    <WorkSpendKpi
+      label="Closest to a limit"
+      accent={isSelf}
+      compactMobile
+      className="h-full px-4 sm:px-5"
+      value={closest?.tightest && closest.tightestPercent != null
+        ? <span className={cn((closest.tightestPercent ?? 0) >= 75 && quotaTone(closest.tightestPercent).text)}>{Math.round(closest.tightestPercent)}%</span>
+        : "—"}
+      sub={closest?.tightest ? (
+        <span title={closestReset?.absolute}>
+          {isSelf ? "" : `${closest.developerName} · `}{quotaWindowLabel(closest.tightest.windowType)}{closestReset ? ` · ${closestReset.relative.toLowerCase()}` : ""}
+        </span>
+      ) : "No limits reported yet"}
+    />
+  );
+  const usageCell = (
+    <WorkSpendKpi
+      label="Usage at API prices"
+      compactMobile
+      className="h-full px-4 sm:px-5"
+      value={formatUsd(data.kpis.usageCost)}
+      sub={
+        <span title="What this usage would cost at the vendor's API rates. It is not what you are billed.">
+          {valueMultiple && valueMultiple >= 1.5 ? `${Math.round(valueMultiple)}× what you pay · ` : ""}not a bill · {periodLabel}
+        </span>
+      }
+    />
   );
 
   return (
@@ -285,71 +392,65 @@ export function ToolProviderDetail({
         </BreadcrumbList>
       </Breadcrumb>
 
-      <div className="mb-10 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex items-start gap-4">
+      <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex items-center gap-4">
           <ToolLogoTile tool={data.toolKey} size="lg" />
           <div>
             <h1 className="text-3xl font-semibold tracking-tight sm:text-[2.15rem]">{data.name}</h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
-              {isSelf
-                ? "Your quotas, usage, and models for this tool."
-                : "Plans your team runs, who uses them, and live quota pressure."}
+            <p className="mt-1 text-sm text-muted-foreground">
+              {isSelf ? "Your limits and the models you use." : "What you pay, who's near a limit, and where the usage goes."}
             </p>
           </div>
         </div>
-        <CycleViewPicker
-          view={cycleView}
-          period={period}
-          basePath={basePath}
-          cycleWindows={cycleWindows}
-        />
+        <CycleViewPicker view={cycleView} period={period} basePath={basePath} cycleWindows={cycleWindows} />
       </div>
-      <div className="grid items-start gap-y-8 sm:grid-cols-2 xl:grid-cols-4">
-        <SignalsKpi
-          label="Devices"
-          hero
-          className="pl-5"
-          value={data.kpis.devices}
-          sub={isSelf ? "Where this tool is installed for you" : "With this tool installed"}
-        />
-        {isSelf ? (
-          <SignalsKpi
-            label="Requests"
-            className="sm:border-l sm:border-border sm:pl-8"
-            value={data.kpis.requests.toLocaleString()}
-            sub={`In ${periodLabel}`}
-          />
-        ) : (
-          <SignalsKpi
-            label="People"
-            className="sm:border-l sm:border-border sm:pl-8"
-            value={data.kpis.people}
-            sub={peopleKpiSub}
-          />
-        )}
-        {isSelf ? (
-          <SignalsKpi
-            label="Tokens"
-            className="xl:border-l xl:border-border xl:pl-8"
-            value={data.kpis.tokens.toLocaleString()}
-            sub={`In ${periodLabel}`}
-          />
-        ) : (
-          <SignalsKpi
-            label="Seats free"
-            className="xl:border-l xl:border-border xl:pl-8"
-            value={data.kpis.seatsFree}
-            sub={`${data.kpis.seatsAssigned}/${data.kpis.seatsPurchased} assigned`}
-          />
-        )}
-        <SignalsKpi
-          label={`Usage cost (${periodSuffix})`}
-          accent
-          className="sm:pl-8"
-          value={formatUsd(data.kpis.usageCost)}
-          sub={`${data.kpis.requests.toLocaleString()} requests · verified + estimated · ${periodLabel}`}
-        />
-      </div>
+
+      <Panel padded={false} className="overflow-hidden">
+        <div className="-mb-px -mr-px grid grid-cols-2 lg:grid-cols-4 [&>*]:border-b [&>*]:border-r">
+          {isSelf ? (
+            <>
+              {closestCell}
+              {usageCell}
+              <WorkSpendKpi
+                label="Requests"
+                compactMobile
+                className="h-full px-4 sm:px-5"
+                value={formatCompactNumber(data.kpis.requests)}
+                sub={`${formatCompactNumber(data.kpis.tokens)} tokens · ${periodLabel}`}
+              />
+              <WorkSpendKpi
+                label="Your plan"
+                compactMobile
+                className="h-full px-4 sm:px-5"
+                value={<span className="text-2xl">{selfPlan?.name ?? "Unknown"}</span>}
+                sub={selfPlan?.source}
+              />
+            </>
+          ) : (
+            <>
+              <WorkSpendKpi
+                label="You pay"
+                accent
+                compactMobile
+                className="h-full px-4 sm:px-5"
+                value={seatMicros > 0n ? <span className="whitespace-nowrap">{formatMicrosAsCurrency(seatMicros)}<span className="ml-1 text-base font-normal text-muted-foreground">/ cycle</span></span> : "—"}
+                sub={data.kpis.seatsPurchased
+                  ? `${data.kpis.seatsAssigned} of ${data.kpis.seatsPurchased} ${data.kpis.seatsPurchased === 1 ? "seat" : "seats"} assigned${data.kpis.seatsFree ? ` · ${data.kpis.seatsFree} free` : ""}`
+                  : "No plan recorded yet"}
+              />
+              {usageCell}
+              <WorkSpendKpi
+                label="People"
+                compactMobile
+                className="h-full px-4 sm:px-5"
+                value={data.kpis.people}
+                sub={`${peopleReporting} reporting limits · ${data.kpis.devices} ${data.kpis.devices === 1 ? "device" : "devices"}${data.kpis.peopleInstallOnly ? ` · ${data.kpis.peopleInstallOnly} installed, unused` : ""}`}
+              />
+              {closestCell}
+            </>
+          )}
+        </div>
+      </Panel>
 
       {error ? (
         <Alert variant="destructive" className="mt-8 rounded-none">
@@ -358,239 +459,223 @@ export function ToolProviderDetail({
       ) : null}
 
       <section className="mt-12">
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">
-              {isSelf ? "Your live quotas." : "Live quotas."}
-            </h2>
+            <h2 className="text-lg font-semibold tracking-tight">{isSelf ? "Your limits." : "Limits."}</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              {isSelf
-                ? "Current allowance pressure reported by your connected machines."
-                : "Current allowance pressure reported by connected machines."}
+              {isSelf ? "Your tightest allowance right now, from your machine." : "Each person's tightest allowance right now, closest to the limit first."}
             </p>
           </div>
           {quotaGroups.length && !isSelf ? (
-            <Badge variant="outline" className="w-fit bg-card text-muted-foreground">
-              {peopleReporting} {peopleReporting === 1 ? "person" : "people"} reporting
-            </Badge>
+            <p className="text-xs text-muted-foreground">{peopleReporting} of {quotaGroups.length} reporting</p>
           ) : null}
         </div>
         {quotaGroups.length ? (
-          <div className="divide-y border bg-card">
-            {quotaGroups.map((group) => {
-              const person = group.developerId ? peopleByDeveloperId.get(group.developerId) ?? null : null;
-              return (
-                <div
-                  key={group.key}
-                  className="grid gap-5 p-4 md:grid-cols-[minmax(12rem,0.7fr)_minmax(0,2fr)] lg:p-5"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold">{group.developerName}</p>
-                    {group.deviceHostname ? (
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{group.deviceHostname}</p>
-                    ) : null}
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      {person?.assignment ? (
-                        <>
-                          <Badge className="border-brand-yellow-dark/20 bg-brand-yellow-pale px-2.5 py-1 text-brand-yellow-dark">
-                            {person.assignment.planName}
-                          </Badge>
-                          <Badge variant="outline" className="bg-background text-muted-foreground">
-                            {person.assignment.source === "detected" ? "Detected plan" : "Assigned plan"}
-                          </Badge>
-                        </>
-                      ) : person?.vendorPlan ? (
-                        <>
-                          <Badge className="border-brand-yellow-dark/20 bg-brand-yellow-pale px-2.5 py-1 text-brand-yellow-dark">
-                            {person.vendorPlan}
-                          </Badge>
-                          <Badge variant="outline" className="bg-background text-muted-foreground">
-                            Reported plan
-                          </Badge>
-                        </>
-                      ) : person?.detected ? (
-                        <Badge variant="outline" className="border-warning/30 bg-warning/10 text-[#9a5f0d]">
-                          Plan unknown
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-background text-muted-foreground">
-                          Usage only · no plan signal
-                        </Badge>
-                      )}
-                    </div>
-                    {person?.planMismatch && person?.mappedCatalogPlanKey && !isSelf ? (
-                      <div className="mt-3 space-y-2">
-                        <p className="text-xs leading-5 text-muted-foreground">
-                          Reported plan maps to {person.mappedCatalogPlanKey}; the company assignment is{" "}
-                          {person.assignment?.catalogPlanKey ?? "different"}.
-                        </p>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={applyingId === person.developerId}
-                          onClick={() => void applyDetected(person.developerId)}
-                        >
-                          {applyingId === person.developerId ? (
-                            <Loader2 className="size-3.5 animate-spin" />
-                          ) : (
-                            "Use detected plan"
-                          )}
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-                  {group.windows.length ? (
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      {group.windows.map((quota) => {
-                        const hasPercent =
-                          quota.usedPercent != null && !Number.isNaN(quota.usedPercent);
-                        const percent = hasPercent
-                          ? Math.min(100, Math.max(0, quota.usedPercent as number))
-                          : null;
-                        const remaining = quotaRemainingLabel(
-                          quota.creditsRemaining,
-                          quota.windowType,
-                        );
-                        const reset = quotaResetLabel(quota.resetAt);
-                        const resetCopy =
-                          reset && isSecondaryQuotaWindow(quota.windowType)
-                            ? reset.replace(/^resets /, "expires ")
-                            : reset;
-                        const status = quotaStatus(percent);
-                        return (
-                          <div
-                            key={`${quota.windowType}-${quota.deviceHostname ?? "org"}`}
-                            className="border bg-background p-3"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <p className="text-xs font-medium text-muted-foreground">
-                                  {quotaWindowLabel(quota.windowType)}
-                                </p>
-                                <p className="mt-1 text-xl font-semibold tracking-tight tabular-nums">
-                                  {percent != null ? `${percent.toFixed(0)}%` : (remaining ?? "—")}
-                                </p>
-                                {percent != null ? (
-                                  <p className="text-[0.65rem] text-muted-foreground">used</p>
-                                ) : null}
-                              </div>
-                              <Badge
+          <Panel padded={false} className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead className="border-b text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">{isSelf ? "Plan" : "Person"}</th>
+                  <th className="px-4 py-2.5 font-medium">Tightest limit</th>
+                  <th className="w-40 px-4 py-2.5 font-medium">Resets</th>
+                  <th className="w-28 px-4 py-2.5 text-right font-medium"><span className="sr-only">Other limits</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {quotaGroups.map((group) => {
+                  const { person, name: planName, source } = planFor(group.developerId);
+                  const tight = group.tightest;
+                  const percent = group.tightestPercent;
+                  const tone = quotaTone(percent);
+                  const reset = tight ? resetCopy(tight.resetAt) : null;
+                  const others = group.windows.filter((quota) => quota !== tight);
+                  const open = expanded.has(group.key);
+                  return (
+                    <Fragment key={group.key}>
+                      <tr className={cn("align-top", open ? "" : "border-b last:border-b-0")}>
+                        <td className="px-4 py-3">
+                          {isSelf ? null : <p className="font-medium">{group.developerName}</p>}
+                          <p className={cn("text-xs text-muted-foreground", isSelf && "text-sm text-foreground")}>
+                            {planName ? <span className="font-medium text-foreground">{planName}</span> : null}
+                            {planName ? " · " : ""}{source}
+                            {group.deviceHostname && !isSelf ? <span className="block truncate">{group.deviceHostname}</span> : null}
+                          </p>
+                          {person?.planMismatch && person.mappedCatalogPlanKey && !isSelf ? (
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                              <span className="bg-brand-orange-pale px-1.5 py-0.5 text-brand-orange-dark">
+                                Reports {person.mappedCatalogPlanKey}, assigned {person.assignment?.catalogPlanKey ?? "another plan"}
+                              </span>
+                              <Button
+                                size="xs"
                                 variant="outline"
-                                className={`text-[0.65rem] uppercase tracking-[0.06em] ${status.badge}`}
+                                disabled={applyingId === person.developerId}
+                                onClick={() => void applyDetected(person.developerId)}
                               >
-                                {status.label}
-                              </Badge>
+                                {applyingId === person.developerId ? <Loader2 className="size-3 animate-spin" /> : "Use detected plan"}
+                              </Button>
                             </div>
-                            {percent != null ? (
-                              <div
-                                className="relative mt-3 h-1.5 w-full overflow-hidden bg-muted"
-                                role="meter"
-                                aria-label={`${quotaWindowLabel(quota.windowType)} usage`}
-                                aria-valuenow={Math.round(percent)}
-                                aria-valuemin={0}
-                                aria-valuemax={100}
-                              >
-                                <span
-                                  className={`absolute inset-y-0 left-0 ${status.bar}`}
-                                  style={{ width: `${percent}%` }}
-                                />
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-3">
+                          {tight && percent != null ? (
+                            <div className="max-w-sm">
+                              <div className="flex items-baseline justify-between gap-3">
+                                <span>{quotaWindowLabel(tight.windowType)}</span>
+                                <span className="tabular-nums">
+                                  <span className="font-semibold">{Math.round(percent)}%</span>
+                                  <span className={cn("ml-2 text-xs", tone.text)}>{tone.label}</span>
+                                </span>
                               </div>
-                            ) : null}
-                            {resetCopy ? (
-                              <p className="mt-2 text-[0.65rem] text-muted-foreground">{resetCopy}</p>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <Empty className="min-h-24 gap-1 border bg-background p-4 md:p-4">
-                      <EmptyDescription className="text-xs">
-                        {person?.vendorPlan || person?.assignment
-                          ? "Plan detected, but no live quota windows yet. Sign in with Claude Code on this machine so the agent can read usage windows."
-                          : "No quota windows reported yet."}
-                      </EmptyDescription>
-                    </Empty>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                              <div className="mt-1.5"><QuotaMeter quota={tight} percent={percent} /></div>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              {group.windows.length
+                                ? "Only balances reported"
+                                : planName
+                                  ? "No live limits yet. They appear once the tool is signed in on this machine."
+                                  : "No limits reported yet"}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs">
+                          {reset ? <span title={reset.absolute}>{reset.relative}<span className="block text-muted-foreground">{reset.absolute}</span></span> : <span className="text-muted-foreground">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {others.length ? (
+                            <button
+                              type="button"
+                              aria-expanded={open}
+                              onClick={() => toggleExpanded(group.key)}
+                              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              {others.length} more
+                              <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} aria-hidden />
+                            </button>
+                          ) : null}
+                        </td>
+                      </tr>
+                      {open ? (
+                        <tr className="border-b bg-muted/20 last:border-b-0">
+                          <td />
+                          <td colSpan={3} className="px-4 pb-3 pt-1">
+                            <ul className="grid gap-x-8 gap-y-2.5 sm:grid-cols-2">
+                              {others.map((quota) => {
+                                const otherPercent = quotaPercent(quota);
+                                const secondary = isSecondaryQuotaWindow(quota.windowType);
+                                const otherReset = resetCopy(quota.resetAt, secondary ? "Expires" : "Resets");
+                                return (
+                                  <li key={`${quota.windowType}-${quota.deviceHostname ?? "org"}`} className="text-xs">
+                                    <div className="flex items-baseline justify-between gap-3">
+                                      <span className="text-foreground">{quotaWindowLabel(quota.windowType)}</span>
+                                      <span className="tabular-nums text-foreground">
+                                        {otherPercent != null ? `${Math.round(otherPercent)}%` : quotaRemainingLabel(quota.creditsRemaining, quota.windowType) ?? "—"}
+                                      </span>
+                                    </div>
+                                    {otherPercent != null ? <div className="mt-1"><QuotaMeter quota={quota} percent={otherPercent} /></div> : null}
+                                    {otherReset ? <p className="mt-1 text-muted-foreground" title={otherReset.absolute}>{otherReset.relative}</p> : null}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Panel>
         ) : (
           <Empty className="min-h-0 gap-1 border-0 p-6 md:p-6">
-            <EmptyDescription>No quota windows yet — they appear after the agent reports.</EmptyDescription>
+            <EmptyDescription>No limits yet. They appear after the agent reports.</EmptyDescription>
           </Empty>
         )}
       </section>
 
       <section className="mt-12">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
           <div>
             <h2 className="text-lg font-semibold tracking-tight">{isSelf ? "Your models." : "Models."}</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              {isSelf ? `Model usage · ${periodLabel}` : `Model usage by person · ${periodLabel}`}
+              {byModel.length
+                ? `${byModel.length} ${byModel.length === 1 ? "model" : "models"} · ${modelTotals.requests.toLocaleString()} requests · ${formatUsd(modelTotals.cost)} at API prices · ${periodLabel}`
+                : `Where the usage went · ${periodLabel}`}
             </p>
           </div>
-          {data.modelsByDeveloper.length ? (
-            <p className="text-xs text-muted-foreground">
-              {data.modelsByDeveloper.length} row{data.modelsByDeveloper.length === 1 ? "" : "s"} ·{" "}
-              {modelTotals.requests.toLocaleString()} requests · {formatUsd(modelTotals.cost)}
-            </p>
+          {!isSelf && byPerson.length > 1 ? (
+            <div role="group" aria-label="Group models" className="flex gap-3 text-sm">
+              {(["model", "person"] as const).map((view) => (
+                <button
+                  key={view}
+                  type="button"
+                  aria-pressed={modelView === view}
+                  onClick={() => { setModelView(view); setShowAllModels(false); }}
+                  className={modelView === view ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}
+                >
+                  {view === "model" ? "By model" : "By person"}
+                </button>
+              ))}
+            </div>
           ) : null}
         </div>
-        {data.modelsByDeveloper.length ? (
-          <>
-            <MobileDataList>
-              {data.modelsByDeveloper.map((m) => (
-                <MobileDataCard key={`${m.developerId}-${m.model}`}>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{m.model}</p>
-                    {!isSelf ? (
-                      <p className="mt-1 truncate text-xs text-muted-foreground">{m.developerName}</p>
-                    ) : null}
-                  </div>
-                  <dl className="mt-4 grid grid-cols-3 gap-3">
-                    <MobileDataField label="Requests" value={m.requests.toLocaleString()} />
-                    <MobileDataField label="Tokens" value={m.tokens.toLocaleString()} />
-                    <MobileDataField label="Cost" value={formatUsd(m.cost)} />
-                  </dl>
-                </MobileDataCard>
-              ))}
-            </MobileDataList>
-            <div className="hidden max-h-[28rem] overflow-auto border md:block">
-            <Table className="w-full text-sm">
-              <TableHeader className="sticky top-0 z-10 bg-card">
-                <TableRow className="border-b hover:bg-transparent">
-                  {!isSelf ? <TableHead className="h-9 px-3 font-medium">Person</TableHead> : null}
-                  <TableHead className="h-9 px-3 font-medium">Model</TableHead>
-                  <TableHead className="h-9 px-3 text-right font-medium">Requests</TableHead>
-                  <TableHead className="h-9 px-3 text-right font-medium">Tokens</TableHead>
-                  <TableHead className="h-9 px-3 text-right font-medium">Cost</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.modelsByDeveloper.map((m) => (
-                  <TableRow
-                    key={`${m.developerId}-${m.model}`}
-                    className="border-b last:border-0 hover:bg-muted/40"
-                  >
-                    {!isSelf ? (
-                      <TableCell className="px-3 py-2 text-muted-foreground">{m.developerName}</TableCell>
-                    ) : null}
-                    <TableCell className="px-3 py-2 font-medium">{m.model}</TableCell>
-                    <TableCell className="px-3 py-2 text-right tabular-nums">
-                      {m.requests.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="px-3 py-2 text-right tabular-nums">
-                      {m.tokens.toLocaleString()}
-                    </TableCell>
-                    <TableCell className="px-3 py-2 text-right tabular-nums">{formatUsd(m.cost)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            </div>
-          </>
+        {modelRows.length ? (
+          <Panel padded={false} className="overflow-x-auto">
+            <table className="w-full min-w-[600px] text-sm">
+              <thead className="border-b text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">{personView ? "Person" : "Model"}</th>
+                  <th className="w-1/4 px-4 py-2.5 font-medium">Share of cost</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Requests</th>
+                  <th className="hidden px-4 py-2.5 text-right font-medium sm:table-cell">Tokens</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Cost</th>
+                  <th className="hidden px-4 py-2.5 text-right font-medium md:table-cell">Per request</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleModelRows.map((row) => {
+                  const costShare = share(row.cost, modelTotals.cost);
+                  const requestShare = share(row.requests, modelTotals.requests);
+                  const pricey = !personView && costShare >= 0.15 && costShare >= requestShare * 2;
+                  return (
+                    <tr key={row.key} className="border-b last:border-b-0">
+                      <td className="px-4 py-2.5">
+                        <span className={cn("font-medium", !personView && "font-mono text-[13px]")}>{row.label}</span>
+                        {row.detail ? <span className="block text-[11px] text-muted-foreground">{row.detail}</span> : null}
+                        {pricey ? (
+                          <span className="mt-0.5 block text-[11px] text-brand-orange-dark">{pct(costShare)} of cost from {pct(requestShare)} of requests</span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 flex-1 bg-muted" aria-hidden>
+                            <div className="h-full" style={{ width: `${costShare * 100}%`, background: pricey ? "var(--brand-orange)" : "var(--primary)" }} />
+                          </div>
+                          <span className="w-9 text-right text-xs tabular-nums text-muted-foreground">{pct(costShare)}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{row.requests.toLocaleString()}</td>
+                      <td className="hidden px-4 py-2.5 text-right tabular-nums text-muted-foreground sm:table-cell">{formatCompactNumber(row.tokens)}</td>
+                      <td className="px-4 py-2.5 text-right font-medium tabular-nums">{formatUsd(row.cost)}</td>
+                      <td className="hidden px-4 py-2.5 text-right tabular-nums text-muted-foreground md:table-cell">
+                        {row.requests ? formatUsd(row.cost / row.requests) : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {modelRows.length > MODEL_PREVIEW ? (
+              <button
+                type="button"
+                onClick={() => setShowAllModels((value) => !value)}
+                className="w-full border-t px-4 py-2.5 text-left text-xs text-muted-foreground hover:bg-muted/30 hover:text-foreground"
+              >
+                {showAllModels ? "Show fewer" : `Show all ${modelRows.length}`}
+              </button>
+            ) : null}
+          </Panel>
         ) : (
           <Empty className="min-h-0 gap-1 border-0 p-6 md:p-6">
             <EmptyDescription>No model usage reported for this period yet.</EmptyDescription>
@@ -600,10 +685,12 @@ export function ToolProviderDetail({
 
       {!isSelf ? (
       <section className="mt-12">
-        <div className="mb-6 flex items-end justify-between gap-4">
+        <div className="mb-4 flex items-end justify-between gap-4">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Plans.</h2>
-            <p className="mt-1 text-xs text-muted-foreground">What&apos;s bought and ready to assign.</p>
+            <h2 className="text-lg font-semibold tracking-tight">Plans and seats.</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              What you&apos;ve recorded buying. Changes here update UseJunction&apos;s records, not your {data.name} account.
+            </p>
           </div>
           <Button size="sm" onClick={() => setAddOpen(true)}>
             <Plus /> Add plan
@@ -611,9 +698,9 @@ export function ToolProviderDetail({
         </div>
 
         {data.plans.length ? (
-          <div>
+          <Panel padded={false} className="divide-y">
             {data.plans.map((plan) => (
-              <div key={plan.id} className="py-5">
+              <div key={plan.id} className="p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -626,7 +713,7 @@ export function ToolProviderDetail({
                       <span className="capitalize">{plan.billingCadence}</span> billing
                     </p>
                     <label className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                      Usage window
+                      Limit to track
                       <select
                         value={plan.usageWindowPreference as UsageWindowPreference}
                         disabled={saving}
@@ -690,7 +777,7 @@ export function ToolProviderDetail({
                 </div>
               </div>
             ))}
-          </div>
+          </Panel>
         ) : (
           <Empty className="min-h-0 gap-1 border-0 p-6 md:p-6">
             <EmptyDescription>

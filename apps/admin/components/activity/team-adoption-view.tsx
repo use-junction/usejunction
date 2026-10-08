@@ -25,19 +25,28 @@ const HATCH = (color: string): CSSProperties => ({
 const PREVIOUS_RANK = { inactive: 0, occasional: 1, regular: 2 } as const;
 const BAND_RANK: Record<AdoptionBand, number | null> = { not_started: 0, occasional: 1, regular: 2, no_data: null };
 
-function ToolName({ tool, size = 14, className }: { tool: string; size?: number; className?: string }) {
-  return (
-    <span className={cn("inline-flex min-w-0 items-center gap-1", className)}>
+function toolHref(tool: string) {
+  return `/tools/${encodeURIComponent(tool)}`;
+}
+
+function ToolName({ tool, size = 14, className, linked = false }: { tool: string; size?: number; className?: string; linked?: boolean }) {
+  const content = (
+    <>
       <ToolBrandIcon tool={tool} size={size} />
       <span className="truncate">{toolDisplayName(tool)}</span>
-    </span>
+    </>
+  );
+  return linked ? (
+    <Link href={toolHref(tool)} className={cn("inline-flex min-w-0 items-center gap-1 underline-offset-4 hover:underline", className)}>{content}</Link>
+  ) : (
+    <span className={cn("inline-flex min-w-0 items-center gap-1", className)}>{content}</span>
   );
 }
 
 function ToolNames({ tools }: { tools: string[] }) {
   return (
     <span className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-0.5">
-      {tools.map((tool) => <ToolName key={tool} tool={tool} size={12} />)}
+      {tools.map((tool) => <ToolName key={tool} tool={tool} size={12} linked />)}
     </span>
   );
 }
@@ -75,13 +84,12 @@ function rangeLabel(from: string, to: string) {
   return from === to ? format(from) : `${format(from)} – ${format(to)}`;
 }
 
-function AdoptionSummary({ data, periodLabel }: { data: TeamAdoption; periodLabel: string }) {
+function AdoptionSummary({ data }: { data: TeamAdoption }) {
   const { counts, idleSeats } = data;
   const nudges = counts.notStarted + counts.noData + data.notEnrolled.length;
   return (
-    <section aria-label="Adoption summary" className="mb-10 space-y-3">
-      <p className="text-sm text-muted-foreground">{rangeLabel(data.from, data.to)} · {periodLabel}, up to today</p>
-      <div className="grid gap-y-8 border-y border-border/60 py-2 sm:grid-cols-3">
+    <section aria-label="Adoption summary" className="mb-10">
+      <div className="grid gap-y-8 py-2 sm:grid-cols-3">
         <SignalsKpi
           label="Tried it this period"
           hero
@@ -98,20 +106,23 @@ function AdoptionSummary({ data, periodLabel }: { data: TeamAdoption; periodLabe
         <SignalsKpi
           label="Paid seats not used"
           className="sm:border-l sm:border-border sm:pl-8"
-          value={idleSeats.count ? formatMicrosAsCurrency(idleSeats.cycleMicros) : "None"}
+          value={idleSeats.count ? (
+            <span className="tabular-nums">
+              {formatMicrosAsCurrency(idleSeats.cycleMicros)}
+              <span className="ml-1 text-base font-normal text-muted-foreground">/ cycle</span>
+            </span>
+          ) : "None"}
           sub={idleSeats.count ? (
-            <span className="block space-y-1">
-              <span className="flex flex-wrap gap-x-3 gap-y-1 text-foreground/80">
-                {idleSeats.tools.map((tool) => (
-                  <span key={tool.toolName} className="inline-flex items-center gap-1">
-                    <ToolName tool={tool.toolName} size={13} />
-                    {idleSeats.tools.length > 1 || tool.count > 1 ? (
-                      <span className="tabular-nums text-muted-foreground">{formatMicrosAsCurrency(tool.cycleMicros)}{tool.count > 1 ? ` ×${tool.count}` : ""}</span>
-                    ) : null}
-                  </span>
-                ))}
-              </span>
-              <span className="block">per cycle · <Link href="/tools" className="underline underline-offset-4">Review in Tools</Link></span>
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              {idleSeats.tools.map((tool) => (
+                <span key={tool.toolName} className="inline-flex items-center gap-1 text-foreground/80">
+                  <ToolName tool={tool.toolName} size={13} linked />
+                  {idleSeats.tools.length > 1 || tool.count > 1 ? (
+                    <span className="tabular-nums text-muted-foreground">{formatMicrosAsCurrency(tool.cycleMicros)}{tool.count > 1 ? ` ×${tool.count}` : ""}</span>
+                  ) : null}
+                </span>
+              ))}
+              <Link href="/tools" className="inline-flex items-center gap-0.5 hover:underline">Review in Cost <ArrowRight className="size-3" aria-hidden /></Link>
             </span>
           ) : "every paid seat saw use"}
         />
@@ -275,41 +286,68 @@ function RosterRow({ person, data }: { person: AdoptionPerson; data: TeamAdoptio
   );
 }
 
+function StripLegend({ data, daily }: { data: TeamAdoption; daily: boolean }) {
+  const items: Array<{ cell: AdoptionCell; label: string }> = [
+    { cell: "active", label: "Used AI" },
+    { cell: "inactive", label: "No use" },
+  ];
+  if (data.people.some((person) => person.enrolledAt > data.from)) items.push({ cell: "before", label: "Before enrolling" });
+  if (data.people.some((person) => person.band === "no_data")) items.push({ cell: "no_data", label: "Agent not reporting" });
+  return (
+    <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground" aria-label="Legend">
+      {items.map((item) => (
+        <li key={item.cell} className="inline-flex items-center gap-1.5">
+          <span
+            aria-hidden
+            className={cn(
+              daily ? "h-3 w-2" : "size-3",
+              item.cell === "active" && "bg-primary",
+              item.cell === "inactive" && (daily ? "bg-muted" : "border border-border bg-background"),
+              item.cell === "before" && "border border-dashed border-border/70",
+            )}
+            style={item.cell === "no_data" ? HATCH("var(--muted-foreground)") : undefined}
+          />
+          {item.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function PeopleGrid({ data }: { data: TeamAdoption }) {
   const [band, setBand] = useState<AdoptionBand | "all">("all");
   const order = new Map(BANDS.map((row, index) => [row.key, index]));
   const people = data.people
     .filter((person) => band === "all" || person.band === band)
     .sort((a, b) => order.get(a.band)! - order.get(b.band)! || a.name.localeCompare(b.name));
-  const options = [{ key: "all" as const, label: "Everyone", count: data.people.length }, ...BANDS.map((row) => ({
+  const bands = BANDS.map((row) => ({
     key: row.key, label: row.label, count: data.people.filter((person) => person.band === row.key).length,
-  }))];
+  })).filter((row) => row.count > 0);
+  const options = [{ key: "all" as const, label: "Everyone", count: data.people.length }, ...bands];
   const daily = eachDay(data.from, data.to).length <= DAILY_MAX_DAYS;
 
   return (
     <Panel as="section" className="mb-10">
-      <SignalsSectionHeader
-        title="Who uses AI, day by day."
-        description={`Each square is ${daily ? "a day" : "a week"}; filled means any AI tool was used. Grouped by habit, alphabetical — no volume, no ranking.`}
-        bordered={false}
-      />
-      <div role="radiogroup" aria-label="Filter by habit" className="mb-4 flex flex-wrap gap-1.5">
-        {options.map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            role="radio"
-            aria-checked={band === option.key}
-            onClick={() => setBand(option.key)}
-            className={cn(
-              "border px-2.5 py-1 text-xs tabular-nums",
-              band === option.key ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {option.label} {option.count}
-          </button>
-        ))}
-      </div>
+      <SignalsSectionHeader title={daily ? "Who uses AI, day by day." : "Who uses AI, week by week."} bordered={false} />
+      {bands.length > 1 ? (
+        <div role="radiogroup" aria-label="Filter by habit" className="mb-4 flex flex-wrap gap-1.5">
+          {options.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              role="radio"
+              aria-checked={band === option.key}
+              onClick={() => setBand(option.key)}
+              className={cn(
+                "border px-2.5 py-1 text-xs tabular-nums",
+                band === option.key ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {option.label} {option.count}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className="overflow-x-auto">
         <div className="min-w-[44rem]">
           <div className={cn("grid gap-x-6 pb-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground", ROSTER_COLUMNS)}>
@@ -325,9 +363,7 @@ function PeopleGrid({ data }: { data: TeamAdoption }) {
           )}
         </div>
       </div>
-      <p className="mt-3 text-xs leading-5 text-muted-foreground">
-        A day counts when any enrolled machine reports AI-tool use for that person. Weekends are lighter; dashed squares are before they enrolled; striped means the agent wasn&apos;t reporting.
-      </p>
+      <StripLegend data={data} daily={daily} />
     </Panel>
   );
 }
@@ -336,25 +372,32 @@ function ToolSpread({ data }: { data: TeamAdoption }) {
   const enrolled = Math.max(1, data.counts.enrolled);
   return (
     <Panel as="section">
-      <SignalsSectionHeader title="Spread by tool." description="How many people used each tool, against the previous period." bordered={false} />
+      <SignalsSectionHeader title="Spread by tool." bordered={false} />
       {data.tools.length ? (
         <ul className="divide-y divide-border/60">
           {data.tools.map((tool) => {
             const diff = tool.people - tool.previousPeople;
             return (
-              <li key={tool.toolName} className="py-3">
-                <div className="flex items-baseline justify-between gap-3 text-sm">
-                  <ToolName tool={tool.toolName} size={18} className="gap-2 font-medium" />
-                  <span className="tabular-nums">
-                    {tool.people} {tool.people === 1 ? "person" : "people"}
-                    <span className={cn("ml-2 text-xs", diff === 0 ? "text-muted-foreground" : "text-foreground")}>
-                      {diff === 0 ? "no change" : `${diff > 0 ? "+" : "−"}${Math.abs(diff)}`}
+              <li key={tool.toolName}>
+                <Link
+                  href={toolHref(tool.toolName)}
+                  aria-label={`${toolDisplayName(tool.toolName)} usage · ${tool.people} ${tool.people === 1 ? "person" : "people"}`}
+                  className="group -mx-2 block px-2 py-3 hover:bg-muted/40 focus-visible:outline focus-visible:outline-ring"
+                >
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <ToolName tool={tool.toolName} size={18} className="gap-2 font-medium group-hover:underline group-hover:underline-offset-4" />
+                    <span className="inline-flex items-center gap-2 tabular-nums">
+                      {tool.people} {tool.people === 1 ? "person" : "people"}
+                      {diff !== 0 ? (
+                        <span className="text-xs" title="vs previous period">{`${diff > 0 ? "+" : "−"}${Math.abs(diff)}`}</span>
+                      ) : null}
+                      <ArrowRight className="size-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" aria-hidden />
                     </span>
-                  </span>
-                </div>
-                <div className="mt-1.5 h-1.5 w-full bg-muted" aria-hidden>
-                  <div className="h-full bg-primary" style={{ width: `${Math.min(100, (tool.people / enrolled) * 100)}%` }} />
-                </div>
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-full bg-muted" aria-hidden>
+                    <div className="h-full bg-primary" style={{ width: `${Math.min(100, (tool.people / enrolled) * 100)}%` }} />
+                  </div>
+                </Link>
               </li>
             );
           })}
@@ -385,54 +428,53 @@ function nudgesFor(data: TeamAdoption): Nudge[] {
   return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function NudgeList({ data }: { data: TeamAdoption }) {
-  const rows = nudgesFor(data);
+function NudgeList({ rows }: { rows: Nudge[] }) {
   return (
     <Panel as="section">
-      <SignalsSectionHeader title="Needs a nudge." description="An onboarding to-do list, not a scorecard. Alphabetical." bordered={false} />
-      {rows.length ? (
-        <ul className="divide-y divide-border/60">
-          {rows.map((row) => (
-            <li key={row.id} className="flex items-start justify-between gap-3 py-3">
-              <span className="min-w-0 space-y-1">
-                <span className="block truncate text-sm font-medium">{row.name}</span>
-                <span className="block text-xs text-muted-foreground">
-                  {row.reason}{row.detail ? ` · ${row.detail}` : ""}
-                </span>
-                <SeatTags seats={row.seats} />
+      <SignalsSectionHeader title="Needs a nudge." bordered={false} />
+      <ul className="divide-y divide-border/60">
+        {rows.map((row) => (
+          <li key={row.id} className="flex items-start justify-between gap-3 py-3">
+            <span className="min-w-0 space-y-1">
+              <span className="block truncate text-sm font-medium">{row.name}</span>
+              <span className="block text-xs text-muted-foreground">
+                {row.reason}{row.detail ? ` · ${row.detail}` : ""}
               </span>
-              <span className="shrink-0 text-xs">{row.action}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="py-4 text-sm text-muted-foreground">Everyone enrolled is using AI and reporting. Nothing to chase.</p>
-      )}
+              <SeatTags seats={row.seats} />
+            </span>
+            <span className="shrink-0 text-xs">{row.action}</span>
+          </li>
+        ))}
+      </ul>
     </Panel>
   );
 }
 
 export function TeamAdoptionView({
-  data, periodLabel, children,
+  data, children,
 }: {
   data: TeamAdoption;
-  periodLabel: string;
   /** Collection diagnostics, rendered folded at the bottom. */
   children?: ReactNode;
 }) {
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const nudges = nudgesFor(data);
   useEffect(() => {
     // Report links land on #reports; open the fold so the anchor is visible.
     if (window.location.hash === "#reports") setDiagnosticsOpen(true);
   }, []);
   return (
     <>
-      <AdoptionSummary data={data} periodLabel={periodLabel} />
+      <AdoptionSummary data={data} />
       <PeopleGrid data={data} />
-      <div className="grid gap-6 lg:grid-cols-2">
-        <NudgeList data={data} />
+      {nudges.length ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <NudgeList rows={nudges} />
+          <ToolSpread data={data} />
+        </div>
+      ) : (
         <ToolSpread data={data} />
-      </div>
+      )}
       {children ? (
         <details
           className="group mt-10 border-t border-border/60 pt-4"

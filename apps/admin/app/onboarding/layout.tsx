@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import type { OnboardingStatus } from "@/components/onboarding/onboarding-experience";
-import { LegalAcceptanceGate } from "@/components/legal/legal-acceptance-gate";
 import { OnboardingStatusProvider } from "@/components/onboarding/onboarding-status-provider";
 import {
   buildOnboardingStatus,
@@ -63,7 +62,7 @@ export default async function OnboardingLayout({
       status={serializeStatus(status)}
       needsSessionSync={Boolean(status.configured && !session.user.orgId)}
     >
-      <LegalAcceptanceGate>{children}</LegalAcceptanceGate>
+      {children}
     </OnboardingStatusProvider>
   );
 }

@@ -11,7 +11,7 @@ import {
 } from "@/lib/consent/analytics-consent";
 
 export function AnalyticsConsentCard() {
-  const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(true);
 
   useEffect(() => {
     setEnabled(hasAnalyticsConsent());
@@ -32,8 +32,8 @@ export function AnalyticsConsentCard() {
         Analytics cookies
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Optional PostHog product analytics. Necessary sign-in cookies are always on. You can change
-        this any time.
+        PostHog product analytics are on by default. Necessary sign-in cookies are always on. You can
+        turn analytics off any time.
       </p>
       <Button type="button" variant="outline" className="mt-4 rounded-none" onClick={toggle}>
         {enabled ? "Disable analytics cookies" : "Enable analytics cookies"}

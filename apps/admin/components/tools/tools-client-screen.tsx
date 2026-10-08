@@ -382,6 +382,7 @@ export default function ToolsClientScreen() {
         initialSubscriptions={query.data.subscriptions}
         overview={costOverview}
         hasLocalSync={Boolean(syncContext?.deviceCount)}
+        onChanged={() => void query.refetch()}
       >
         {syncContext?.deviceCount ? (
           <LocalSyncPanel

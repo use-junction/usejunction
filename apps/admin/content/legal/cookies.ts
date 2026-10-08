@@ -6,12 +6,12 @@ export const cookiesPage: ContentPage = {
   slug: "cookies",
   path: "/cookies",
   title: "Cookie Policy",
-  description: "Cookies and similar technologies UseJunction uses, including strictly necessary session cookies and optional PostHog analytics.",
+  description: "Cookies and similar technologies UseJunction uses, including strictly necessary session cookies and PostHog analytics.",
   primaryKeyword: "UseJunction cookies",
-  secondaryKeywords: ["UseJunction cookie banner", "PostHog consent"],
+  secondaryKeywords: ["UseJunction cookie settings", "PostHog analytics"],
   updatedAt: LEGAL_PRIVACY_VERSION,
   indexable: false,
-  answer: "UseJunction uses strictly necessary cookies to keep you signed in and remember workspace state. Optional PostHog analytics cookies load only after you opt in from the cookie banner or Settings → Privacy.",
+  answer: "UseJunction uses strictly necessary cookies to keep you signed in and remember workspace state. PostHog analytics cookies are on by default; you can turn them off in Settings → Privacy.",
   sections: [
     {
       heading: "Strictly necessary",
@@ -23,24 +23,24 @@ export const cookiesPage: ContentPage = {
       ],
     },
     {
-      heading: "Analytics (consent required)",
+      heading: "Analytics (on by default)",
       body: [
-        "uj_consent: stores your analytics choice and policy version for up to 12 months.",
-        "PostHog cookies (ph_*) are set only after you accept analytics. They measure product usage. Host: us.i.posthog.com on the US deployment, eu.i.posthog.com on the EU deployment.",
-        "Refusing analytics does not affect sign-in or the observability product.",
+        "uj_consent: stores your analytics opt-out choice for up to 12 months.",
+        "PostHog cookies (ph_*) are set unless you turn analytics off. They measure product usage. Host: us.i.posthog.com on the US deployment, eu.i.posthog.com on the EU deployment.",
+        "Turning analytics off does not affect sign-in or the observability product.",
       ],
     },
     {
       heading: "Managing cookies",
       body: [
-        "Use the cookie banner, Settings → Privacy, or your browser controls. Blocking strictly necessary cookies will sign you out.",
+        "Use Settings → Privacy or your browser controls. Blocking strictly necessary cookies will sign you out.",
       ],
     },
   ],
   faq: [
     {
       question: "Can I use the product without PostHog?",
-      answer: "Yes. Choose necessary cookies only. Self-hosted deployments leave PostHog unset unless you configure it.",
+      answer: "Yes. Turn analytics off in Settings → Privacy. Self-hosted deployments leave PostHog unset unless you configure it.",
     },
   ],
   relatedPaths: ["/privacy", "/gdpr"],

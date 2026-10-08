@@ -5,9 +5,9 @@ import type { MyDataSummary } from "@/lib/privacy/my-data-types";
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0">
-      <dt className="text-[0.65rem] uppercase tracking-[0.08em] text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-sm">{value}</dd>
+    <div className="flex min-w-0 items-baseline gap-1.5">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd>{value}</dd>
     </div>
   );
 }
@@ -27,12 +27,12 @@ export function MyDataSummary({
   const requests = summary.storedRequests ?? 0;
 
   return (
-    <section aria-label="At a glance">
-      <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-        {summary.usageCollectingCount} of {summary.accountCount} logins are sharing usage.
-        Stored usage is daily totals, not live activity.
+    <section aria-label="At a glance" className="border-y py-3">
+      <p className="text-sm">
+        <span className="font-medium">{summary.usageCollectingCount} of {summary.accountCount} logins are sharing usage.</span>{" "}
+        <span className="text-muted-foreground">Stored as daily totals, not live activity.</span>
       </p>
-      <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-4">
+      <dl className="mt-1.5 flex flex-wrap gap-x-6 gap-y-1 text-xs">
         <Fact
           label="Devices"
           value={`${summary.deviceCount} enrolled · last heard ${lastHeard}`}

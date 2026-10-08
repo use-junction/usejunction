@@ -17,9 +17,9 @@ export function WorkSpendStates({
 }) {
   const allocated = data.coverage.attributedMicros;
   const cards = [
-    { key: "shipped" as const, label: WORK_STATE_LABELS.shipped, bucket: data.states.shipped, color: WORK_STATE_COLORS.shipped, sub: null as string | null },
-    { key: "in_flight" as const, label: WORK_STATE_LABELS.in_flight, bucket: data.states.inFlight, color: WORK_STATE_COLORS.in_flight, sub: null },
-    { key: "stalled" as const, label: WORK_STATE_LABELS.stalled, bucket: data.states.stalled, color: WORK_STATE_COLORS.stalled, sub: "Closed without merging, or no updates for 14 days" },
+    { key: "shipped" as const, label: WORK_STATE_LABELS.shipped, bucket: data.states.shipped, color: WORK_STATE_COLORS.shipped, hint: undefined as string | undefined },
+    { key: "in_flight" as const, label: WORK_STATE_LABELS.in_flight, bucket: data.states.inFlight, color: WORK_STATE_COLORS.in_flight, hint: undefined },
+    { key: "stalled" as const, label: WORK_STATE_LABELS.stalled, bucket: data.states.stalled, color: WORK_STATE_COLORS.stalled, hint: "Closed without merging, or no updates for 14 days" },
   ];
 
   return (
@@ -33,7 +33,7 @@ export function WorkSpendStates({
         accent
         compactMobile
         className="h-full px-3 sm:px-4"
-        sub={`${data.workCount} ${data.workCount === 1 ? "item" : "items"} · ${Math.round(data.coverage.attributedPct)}% of recorded · last ${data.days} days`}
+        sub={`${data.workCount} ${data.workCount === 1 ? "item" : "items"} · ${Math.round(data.coverage.attributedPct)}% of recorded`}
       />
       {cards.map((card) => {
         const share = microsSharePct(card.bucket.micros, allocated);
@@ -44,6 +44,7 @@ export function WorkSpendStates({
             type="button"
             aria-pressed={active}
             aria-label={`${card.label} · ${card.bucket.count}`}
+            title={card.hint}
             onClick={() => onSelect(active ? null : card.key)}
             className={cn("h-full text-left focus-visible:outline focus-visible:outline-ring", active && "bg-muted/40")}
           >
@@ -57,7 +58,7 @@ export function WorkSpendStates({
               value={data.allocationCurrent ? formatMicrosAsCurrency(card.bucket.micros) : "Updating"}
               compactMobile
               className="h-full px-3 sm:px-4"
-              sub={card.sub ?? `${card.bucket.count} ${card.bucket.count === 1 ? "item" : "items"} · ${share}% of spend on work · last ${data.days} days`}
+              sub={`${card.bucket.count} ${card.bucket.count === 1 ? "item" : "items"} · ${share}%`}
               footer={
                 <WorkSpendMeter
                   size="sm"

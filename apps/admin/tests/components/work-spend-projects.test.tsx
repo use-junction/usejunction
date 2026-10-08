@@ -35,7 +35,7 @@ test("connected boards render a spend ledger and a not-on-a-project row", () => 
   expect(screen.getByText("Product roadmap")).toBeInTheDocument();
   expect(screen.getByText("Launch readiness")).toBeInTheDocument();
   expect(screen.getByText("Not on a project")).toBeInTheDocument();
-  expect(screen.getByText(/The same work can sit on two projects/)).toBeInTheDocument();
+  expect(screen.getByText(/Work on two projects counts in both/)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /Product roadmap · Merged · \$2\.50/ })).toBeInTheDocument();
 });
 
