@@ -145,7 +145,7 @@ test("owner Activity shows Team adoption and You usage with Reports", async ({ p
   await expect(page.getByRole("heading", { name: "Who uses AI, day by day." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Needs a nudge." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Spread by tool." })).toBeVisible();
-  await page.getByText("Collection health", { exact: true }).click();
+  await page.locator("summary", { hasText: "Collection health" }).click();
   await expect(page.getByRole("heading", { name: "Reports." })).toBeVisible();
 
   const audience = page.getByRole("tablist", { name: "Audience" });
@@ -258,13 +258,13 @@ test("seeded usage totals stay consistent across owner calculation views", async
   await expect(page.getByRole("table").getByText("1 of 2 used")).toBeVisible();
 
   await page.goto("/tools/cursor");
-  await expect(page.getByText(/Usage cost \(/)).toBeVisible();
-  await expect(page.getByText("verified + estimated")).toBeVisible();
+  await expect(page.getByText("Usage at API prices")).toBeVisible();
+  await expect(page.getByText(/not a bill/)).toBeVisible();
   await expect(page.getByText("$6.00").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Adjust rolling period" })).toBeVisible();
 
   await page.goto("/tools/cursor?view=last_30_days&days=7");
-  await expect(page.getByText("Usage cost (7d)")).toBeVisible();
+  await expect(page.getByText("Last 7 days").first()).toBeVisible();
 
   await page.goto("/team/e2e-developer");
   await expect(page.getByText("Verified usage").first()).toBeVisible();
