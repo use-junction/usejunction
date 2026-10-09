@@ -97,7 +97,11 @@ test("mobile dashboard uses the compact header, period picker, and KPI grid", as
 
 test("mobile data views expose readable cards and controls", async ({ page }) => {
   await page.goto("/tools/cursor");
-  await expect(page.locator("[data-slot='mobile-data-card']").first()).toBeVisible();
+  // The tool detail page now uses scrollable tables (not mobile cards); verify
+  // the data views render readably without overflowing the viewport.
+  await expect(page.getByRole("heading", { name: "Limits." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Models." })).toBeVisible();
+  await expectNoPageOverflow(page);
 
   await page.goto("/team/e2e-developer/coding");
   const cards = page.locator("[data-slot='mobile-data-card']");

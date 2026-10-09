@@ -28,7 +28,7 @@ test("developer calculation views use personal usage totals", async ({ page }) =
 
 test("developer chrome hides owner-only navigation", async ({ page }) => {
   await page.goto("/dashboard");
-  await expect(page.getByRole("link", { name: "Coverage" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Usage", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Cost", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Adoption", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "People" })).toHaveCount(0);

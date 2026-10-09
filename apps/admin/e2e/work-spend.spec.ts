@@ -86,7 +86,8 @@ for (const width of [1440, 390]) {
     await expect(sheet).toBeVisible();
     await expect(sheet.getByText("feat: create invitation flow ↗")).toBeVisible();
     expect(await sheet.evaluate((el) => el.contains(document.activeElement))).toBe(true);
-    if (width === 390) expect((await sheet.boundingBox())?.width).toBe(390);
+    // Browsers can report a sub-pixel bounding box (e.g. 390.00003), so round.
+    if (width === 390) expect(Math.round((await sheet.boundingBox())?.width ?? 0)).toBe(390);
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();
     await expect(row).toBeFocused();
@@ -195,7 +196,7 @@ test("chart tabs, see all work, and cancelling disconnect make no mutation", asy
   await expect(page.getByRole("heading", { name: "Spend by week." })).toBeVisible();
   await page.getByRole("button", { name: "Projects", exact: true }).click();
   await expect(page).toHaveURL(/trendBy=project/);
-  await expect(page.getByText(/Work on two projects counts in both/)).toBeVisible();
+  await expect(page.getByText(/Work on two projects counts in both/).first()).toBeVisible();
   await page.getByRole("button", { name: "See all work" }).click();
   await expect(page).toHaveURL(/explore=1/);
   await expect(page.getByRole("searchbox", { name: "Search work" })).toBeVisible();

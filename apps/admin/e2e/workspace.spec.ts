@@ -92,7 +92,7 @@ test("unknown routes show branded 404 recovery", async ({ page }) => {
 
 test("owner chrome exposes nav, active-plan badge, and workspace switcher", async ({ page }) => {
   await page.goto("/dashboard");
-  await expect(page.getByRole("link", { name: "Coverage" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Usage", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "People" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Signals" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Cost", exact: true })).toBeVisible();
@@ -145,7 +145,7 @@ test("owner Activity shows Team adoption and You usage with Reports", async ({ p
   await expect(page.getByRole("heading", { name: "Who uses AI, day by day." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Needs a nudge." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Spread by tool." })).toBeVisible();
-  await page.getByText("Collection health and sent reports").click();
+  await page.getByText("Collection health", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Reports." })).toBeVisible();
 
   const audience = page.getByRole("tablist", { name: "Audience" });
@@ -167,7 +167,7 @@ test("dashboard exposes seeded calculation output and all period controls", asyn
   await page.goto("/dashboard");
   await expect(page.getByRole("heading", { name: "Usage." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Requests." })).toBeVisible();
-  await expect(page.getByText("Subscription commitment")).toBeVisible();
+  await expect(page.getByText("Seat commitment")).toBeVisible();
   await expect(
     page.getByText(/All tracked plans on track|Purchased seats · run-out from allowance pace|Earliest run-out/i),
   ).toBeVisible();
@@ -255,7 +255,7 @@ test("seeded usage totals stay consistent across owner calculation views", async
   await page.goto("/tools");
   await expect(page.getByText("$40.00").first()).toBeVisible();
   await expect(page.getByRole("table").getByText("Cursor Pro")).toBeVisible();
-  await expect(page.getByRole("table").getByText("0 of 2")).toBeVisible();
+  await expect(page.getByRole("table").getByText("1 of 2 used")).toBeVisible();
 
   await page.goto("/tools/cursor");
   await expect(page.getByText(/Usage cost \(/)).toBeVisible();
@@ -295,7 +295,7 @@ test("team roster lists seeded members and opens invite dialog", async ({ page }
   await page.goto("/team");
   await expect(page.getByRole("heading", { name: "People.", exact: true, level: 1 })).toBeVisible();
   await expect(page.getByText("E2E Developer").first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Edit E2E Developer" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^E2E Developer/ }).first()).toBeVisible();
   await expect(page.getByText("1 machine · 66 requests · current")).toBeVisible();
   await expect(page.getByRole("meter", { name: /Average plan use/i })).toBeVisible();
   await page.getByRole("button", { name: "Invite teammates" }).click();
@@ -319,11 +319,12 @@ test("member hub tabs expose coding and fleet", async ({ page }) => {
   await page.goto("/team/e2e-developer/work");
   await expect(page).toHaveURL(/\/team\/e2e-developer(?:\?|$)/);
 
-  await page.getByRole("link", { name: "Coding", exact: true }).click();
+  const memberSections = page.getByRole("navigation", { name: "Member sections" });
+  await memberSections.getByRole("link", { name: "Coding", exact: true }).click();
   await expect(page).toHaveURL(/\/team\/e2e-developer\/coding/);
   await expect(page.getByRole("heading", { name: "AI coding." })).toBeVisible();
 
-  await page.getByRole("link", { name: "Fleet", exact: true }).click();
+  await memberSections.getByRole("link", { name: "Fleet", exact: true }).click();
   await expect(page).toHaveURL(/\/team\/e2e-developer\/fleet/);
   await expect(page.getByRole("heading", { name: "Fleet." })).toBeVisible();
   await expect(page.getByText("e2e-laptop")).toBeVisible();
