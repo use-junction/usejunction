@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { ChevronRight, Loader2, Plus, Users } from "lucide-react";
+import { ChevronRight, Loader2, Plus } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Panel } from "@/components/panel";
@@ -12,10 +12,34 @@ import { cn } from "@/lib/utils";
 import { formatMicrosAsCurrency } from "@/lib/format";
 import { AddSubscriptionSheet } from "./add-subscription-sheet";
 import { CostOverviewView } from "./cost-overview-view";
+import { CostGhostRows } from "./cost-ghost-rows";
 import type { CostOverview } from "@/lib/queries/tools/cost-overview";
 import { ToolLogoTile } from "./tool-brand-icon";
 import { subscriptionToolKeys } from "@/lib/tools/catalog";
 import type { DashboardToolsData } from "@/lib/queries/dashboard/tools";
+import { ExportCsvButton } from "@/components/export-csv-button";
+import { TeamFilter } from "@/components/team-filter";
+import { microsToDollarsCell, type CsvCell } from "@/lib/csv";
+import { toolDisplayName } from "@/lib/tools/catalog";
+
+/** One row per tool, matching the "By tool" table, for spreadsheets and finance reviews. */
+function costCsvRows(overview: CostOverview): CsvCell[][] {
+  return overview.tools.map((tool) => {
+    const renewal = [...tool.plans].sort((a, b) => a.renewsOn.localeCompare(b.renewsOn))[0];
+    return [
+      toolDisplayName(tool.toolKey),
+      tool.plans.map((plan) => plan.name).join("; ") || "Pay as you go",
+      tool.seatsPaid,
+      tool.seatsAssigned,
+      tool.activePeople,
+      microsToDollarsCell(tool.seatsMonthlyMicros),
+      tool.seatsPriceTag ?? "",
+      microsToDollarsCell(tool.usageToDateMicros),
+      tool.usageBasis === "pay_as_you_go" ? "pay as you go (billed)" : "within plan (usage value, not billed)",
+      renewal?.renewsOn ?? "",
+    ];
+  });
+}
 
 // API Credits UI intentionally omitted; ApiCreditPool + /api/tools/api-credit-pools remain frozen.
 
@@ -63,18 +87,24 @@ export function SubscriptionInventory({
   initialCatalog,
   initialSubscriptions,
   overview = null,
+  team = null,
   hasLocalSync = false,
-  title = "What are we paying for?",
-  description = "This month's AI bill, what moves it, and what each tool costs.",
+  title = "Cost.",
+  description = "What you pay for this month, what sits idle, and what to change.",
+  onChanged,
   children,
 }: {
   detected: DashboardToolsData | null;
   initialCatalog?: CatalogTool[];
   initialSubscriptions?: Subscription[];
   overview?: CostOverview | null;
+  /** Set when the page is scoped to one team's seats. */
+  team?: { id: string; name: string } | null;
   hasLocalSync?: boolean;
   title?: string;
   description?: string;
+  /** Called after a plan is added so the cost overview can refetch. */
+  onChanged?: () => void;
   children?: ReactNode;
 }) {
   const [catalog, setCatalog] = useState<CatalogTool[]>(initialCatalog ?? []);
@@ -129,6 +159,17 @@ export function SubscriptionInventory({
     [groups.length, subscriptions],
   );
 
+  // The By tool table already lists every plan with its seats and cost, so the
+  // plan list below only shows when there is no overview to carry it.
+  const showPlanList = !overview?.tools.length || !groups.length;
+  // Nothing bought and nothing used yet: draw sample plans so the empty panel shows what will land there.
+  const showSample = !loading && !error && !groups.length && !overview?.tools.length;
+  const addButton = (
+    <Button size="sm" className="rounded-none" onClick={() => openAdd()}>
+      <Plus /> Add tool
+    </Button>
+  );
+
   function openAdd(toolKey?: string) {
     setAddToolKey(toolKey ?? null);
     setError(null);
@@ -137,12 +178,28 @@ export function SubscriptionInventory({
 
   return (
     <>
-      <PageHeader title={title} description={description}>
+      <PageHeader
+        title={team ? `Cost · ${team.name}.` : title}
+        description={team ? `Seats held by ${team.id === "none" ? "people with no team" : team.name} and their usage this month. Unassigned seats belong to the whole workspace, so they are not shown here.` : description}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <TeamFilter />
+            {overview?.tools.length ? (
+              <ExportCsvButton
+                name={team ? `cost-${team.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : "cost"}
+                header={["Tool", "Plans", "Seats paid", "Seats assigned", "People using it (30d)", "Seats per month (USD)", "Price basis", "Usage this month (USD)", "Usage basis", "Next renewal"]}
+                rows={() => costCsvRows(overview)}
+              />
+            ) : null}
+          </div>
+        }
+      >
         {children}
       </PageHeader>
 
-      {overview ? <CostOverviewView data={overview} /> : null}
+      {overview ? <CostOverviewView data={overview} tableAction={showPlanList ? undefined : addButton} /> : null}
 
+      {showPlanList ? (
         <div className="space-y-10">
           <div className={cn("grid items-start gap-y-8 sm:grid-cols-2 xl:grid-cols-4", overview && "hidden")}>
             <SignalsKpi
@@ -177,11 +234,7 @@ export function SubscriptionInventory({
               title="Manage plans."
               description="Plans and seats your team pays for. Edit a plan to enter your real price."
               bordered
-              action={
-                <Button size="sm" className="rounded-none" onClick={() => openAdd()}>
-                  <Plus /> Add tool
-                </Button>
-              }
+              action={addButton}
             />
             {error ? (
               <Alert variant="destructive" className="mb-4 rounded-none">
@@ -249,37 +302,36 @@ export function SubscriptionInventory({
                 })}
               </ul>
             ) : (
-              <div className="px-2 py-10 text-center">
-                <div className="mx-auto mb-3 flex size-10 items-center justify-center bg-muted/40">
-                  <Users className="size-5" />
-                </div>
-                <h3 className="font-medium">
+              <div>
+                <h3 className="text-sm font-medium">
                   {detected?.tools.some((tool) => tool.installedOn > 0)
                     ? hasLocalSync
                       ? "No seats yet"
                       : "Waiting for plan reports"
                     : "Add your first team tool"}
                 </h3>
-                <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+                <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
                   {detected?.tools.some((tool) => tool.installedOn > 0)
                     ? hasLocalSync
                       ? "Use Sync now above to pull plans from this machine, or wait for teammates' agents to report vendor plans."
                       : "Detected tools need a vendor plan from a connected agent before seats appear. Open this page on a linked machine or wait for the next agent report."
                     : "Choose a familiar plan and tell us how many seats you own. Pricing and provider details are filled in for you."}
                 </p>
-                <Button className="mt-5 rounded-none" onClick={() => openAdd()}>
-                  <Plus /> Add tool
-                </Button>
+                {showSample ? <CostGhostRows /> : null}
               </div>
             )}
           </Panel>
         </div>
+      ) : null}
 
       <AddSubscriptionSheet
         open={addOpen}
         onOpenChange={setAddOpen}
         initialToolKey={addToolKey}
-        onCreated={load}
+        onCreated={async () => {
+          onChanged?.();
+          await load();
+        }}
       />
     </>
   );

@@ -48,6 +48,13 @@ type Config struct {
 	// LastCollectCompletedAt is when the most recent collect finished (RFC3339Nano).
 	// Used to skip the daemon's immediate post-onboard duplicate collect.
 	LastCollectCompletedAt string `json:"lastCollectCompletedAt,omitempty"`
+	// ClaudeDesktopUsageConsent records that the user explicitly opted in to let
+	// the agent read the Claude desktop app's encrypted credential store (one
+	// macOS Keychain "Always Allow" grant) to fetch live limits for the account
+	// they are actively using but which the Claude Code CLI is not signed into.
+	// Off by default; only a user-initiated `claude-desktop connect` sets it, and
+	// the keychain is never touched while it is false.
+	ClaudeDesktopUsageConsent bool `json:"claudeDesktopUsageConsent,omitempty"`
 }
 
 const DefaultLocalSyncPort = 47832

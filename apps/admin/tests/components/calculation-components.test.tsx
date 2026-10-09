@@ -80,7 +80,7 @@ describe("calculation-bearing components", () => {
 
     expect(screen.getByText(/100 suggested · 25% accept/)).toBeInTheDocument();
     expect(screen.getByText("$3.00")).toBeInTheDocument();
-    expect(screen.getByText("26 usage models with no truncation")).toBeInTheDocument();
+    expect(screen.getByText("All 26 models used in this period")).toBeInTheDocument();
     expect(screen.queryByText("Productivity attribution")).not.toBeInTheDocument();
     expect(screen.queryByText("productivity-row")).not.toBeInTheDocument();
     expect(screen.getByText("Showing 1–25 of 26")).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe("calculation-bearing components", () => {
 
     expect(screen.queryByText(/accept$/)).not.toBeInTheDocument();
     expect(screen.getByText("No token breakdown yet.")).toBeInTheDocument();
-    expect(screen.getByText("0 usage models with no truncation")).toBeInTheDocument();
+    expect(screen.getByText("Models appear once usage reports")).toBeInTheDocument();
   });
 
   test("RosterPlanUsage averages signaled plans, clamps the visual meter, and chooses the worst verdict", () => {
@@ -137,6 +137,18 @@ describe("calculation-bearing components", () => {
     expect(meter).toHaveAttribute("aria-label", "Average plan use 85 percent, Over quota");
     expect(screen.getByText("85%")).toBeInTheDocument();
     expect(screen.getByText(/avg across 2 plans · Over quota/)).toBeInTheDocument();
+  });
+
+  test("RosterPlanUsage calls a paid seat at 0% unused instead of within allowance", () => {
+    render(
+      <RosterPlanUsage
+        plans={[{ toolName: "cursor", toolKey: "cursor", planName: "Pro", primaryRatio: 0, verdict: { code: "LIGHT_USE", severity: "info", reasons: [], policyVersion: "plan-utilization-v1" } }]}
+      />,
+    );
+
+    expect(screen.getByRole("meter")).toHaveAttribute("aria-label", "Average plan use 0 percent, No use yet");
+    expect(screen.getByText("No use yet")).toBeInTheDocument();
+    expect(screen.queryByText(/Within allowance/)).not.toBeInTheDocument();
   });
 
   test("RosterPlanUsage reports no signal without inventing a percentage", () => {
@@ -207,6 +219,7 @@ describe("calculation-bearing components", () => {
           toolName: "cursor",
           aliases: [],
           sourceUrl: "https://example.com",
+          accounts: [],
           kpis: { devices: 0, people: 1, peopleInstallOnly: 0, seatsFree: 1, seatsPurchased: 2, seatsAssigned: 1, usageCost: 6, requests: 10, tokens: 1_500_000 },
           people: [],
           quotas: [],
@@ -216,9 +229,10 @@ describe("calculation-bearing components", () => {
       />,
     );
 
-    expect(screen.getByText("Usage cost (current)")).toBeInTheDocument();
+    expect(screen.getByText("Usage at API prices")).toBeInTheDocument();
     expect(screen.getByText("$6.00")).toBeInTheDocument();
-    expect(screen.getByText(/10 requests · verified \+ estimated/)).toBeInTheDocument();
+    expect(screen.getByText(/not a bill/)).toBeInTheDocument();
+    expect(screen.getByText("You pay")).toBeInTheDocument();
     expect(screen.getByLabelText("Subscription view")).toBeInTheDocument();
   });
 
@@ -234,6 +248,7 @@ describe("calculation-bearing components", () => {
           toolName: "codex",
           aliases: [],
           sourceUrl: "https://example.com",
+          accounts: [],
           kpis: { devices: 1, people: 1, peopleInstallOnly: 0, seatsFree: 0, seatsPurchased: 1, seatsAssigned: 1, usageCost: 0, requests: 0, tokens: 0 },
           people: [
             {
@@ -276,7 +291,7 @@ describe("calculation-bearing components", () => {
 
     expect(screen.queryByText("Tools used.")).not.toBeInTheDocument();
     expect(screen.getByText("Plus")).toBeInTheDocument();
-    expect(screen.getByText("Detected plan")).toBeInTheDocument();
+    expect(screen.getByText(/Detected plan/)).toBeInTheDocument();
     expect(screen.getByText("Near limit")).toBeInTheDocument();
     expect(screen.getByRole("meter", { name: "Weekly usage" })).toHaveAttribute("aria-valuenow", "92");
   });
@@ -293,6 +308,7 @@ describe("calculation-bearing components", () => {
           toolName: "cursor",
           aliases: [],
           sourceUrl: "https://example.com",
+          accounts: [],
           kpis: { devices: 1, people: 1, peopleInstallOnly: 0, seatsFree: 0, seatsPurchased: 1, seatsAssigned: 1, usageCost: 12.5, requests: 30, tokens: 15_000 },
           people: [],
           quotas: [],
@@ -319,11 +335,51 @@ describe("calculation-bearing components", () => {
       />,
     );
 
-    expect(screen.getByText(/2 rows · 30 requests/)).toBeInTheDocument();
+    expect(screen.getByText(/2 models · 30 requests/)).toBeInTheDocument();
     expect(screen.getAllByText("Ada Lovelace").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("gpt-5").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("composer-2").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/10[\u00a0,]?000/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText(/5[\u00a0,]?000/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("10K")).toBeInTheDocument();
+    expect(screen.getByText("5K")).toBeInTheDocument();
+  });
+  test("ToolProviderDetail leads each person with their tightest limit and flags pricey models", () => {
+    const quota = (developerId: string, developerName: string, windowType: string, usedPercent: number | null, creditsRemaining: number | null = null) => ({
+      toolName: "cursor", windowType, usedPercent, creditsRemaining, resetAt: new Date(Date.now() + 2 * 86_400_000), deviceHostname: `${developerId}-mac`, developerId, developerName,
+    });
+    renderWithQueryClient(
+      <ToolProviderDetail
+        data={{
+          toolKey: "cursor", name: "Cursor", shortName: "Cursor", provider: "cursor", product: "cursor", toolName: "cursor", aliases: [], sourceUrl: "https://example.com", accounts: [],
+          kpis: { devices: 2, people: 2, peopleInstallOnly: 0, seatsFree: 0, seatsPurchased: 2, seatsAssigned: 2, usageCost: 500, requests: 1000, tokens: 1_000_000 },
+          people: [],
+          quotas: [
+            quota("ada", "Ada", "api", 40),
+            quota("ada", "Ada", "plan", 59),
+            quota("ada", "Ada", "bonus", null, 272),
+            quota("cy", "Cy", "plan", 93),
+          ],
+          plans: [],
+          modelsByDeveloper: [
+            { developerId: "ada", developerName: "Ada", model: "cheap-model", requests: 900, tokens: 500_000, cost: 100 },
+            { developerId: "ada", developerName: "Ada", model: "pricey-model", requests: 100, tokens: 500_000, cost: 400 },
+          ],
+        }}
+      />,
+    );
+
+    const rows = screen.getAllByRole("row").map((row) => row.textContent ?? "");
+    const cy = rows.findIndex((text) => text.startsWith("Cy"));
+    const ada = rows.findIndex((text) => text.startsWith("Ada"));
+    expect(cy).toBeLessThan(ada);
+    expect(rows[cy]).toMatch(/Plan93%Near limit/);
+    expect(rows[ada]).toMatch(/Plan59%OK/);
+    expect(screen.getByText("Closest to a limit").parentElement?.parentElement?.textContent).toMatch(/93%.*Cy · Plan · resets in 1d 23h|93%.*Cy · Plan · resets in 2d/);
+
+    // Every window now shows inline (no "N more" collapse), so Ada's secondary
+    // api and bonus windows are visible without expanding.
+    expect(screen.getByText("API models")).toBeInTheDocument();
+    expect(screen.getByText("$272 left")).toBeInTheDocument();
+
+    expect(screen.getByText("80% of cost from 10% of requests")).toBeInTheDocument();
   });
 });

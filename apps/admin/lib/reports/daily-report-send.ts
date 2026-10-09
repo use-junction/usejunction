@@ -1,11 +1,12 @@
 import { prisma } from "@usejunction/db";
-import { sendDailyReportEmail } from "@/lib/email/daily-report";
+import { sendDailyReportEmail, sendTeamReminderEmail } from "@/lib/email/daily-report";
 import {
   UndeliverableEmailRecipientError,
   isUndeliverableEmailRecipient,
 } from "@/lib/email/recipient";
 import {
   getDailyReportPayload,
+  isEmptyReport,
   type DailyReportKind,
   type DailyReportPeriod,
 } from "@/lib/reports/daily-report";
@@ -23,10 +24,15 @@ import { logServerError } from "@/lib/errors/public";
 
 const ADMIN_ROLES = new Set(["owner", "admin"]);
 
+/** Delivery-log kinds: the two report kinds plus the empty-week team reminder. */
+type DeliveryKind = DailyReportKind | "org_reminder";
+
 export type DailyReportSendResult = {
   scanned: number;
   due: number;
   sent: number;
+  /** Team admins nudged with a reminder because the team week had no usage. */
+  reminded: number;
   skipped: number;
   failed: number;
   utcHour?: number;
@@ -35,7 +41,7 @@ export type DailyReportSendResult = {
 async function alreadyDelivered(input: {
   userId: string;
   orgId: string;
-  kind: DailyReportKind;
+  kind: DeliveryKind;
   localDate: string;
 }) {
   const row = await prisma.dailyReportDelivery.findUnique({
@@ -55,7 +61,7 @@ async function alreadyDelivered(input: {
 async function recordDelivery(input: {
   userId: string;
   orgId: string;
-  kind: DailyReportKind;
+  kind: DeliveryKind;
   localDate: string;
   status: "success" | "failed";
   error?: string;
@@ -124,6 +130,11 @@ async function sendOne(input: {
       localDate: input.localDate,
       period: input.period,
     });
+    if (isEmptyReport(report)) {
+      // Never send an empty report. Team admins get a nudge instead.
+      if (input.kind !== "org") return "skipped" as const;
+      return await sendTeamReminder({ ...input, localDate: report.localDate, report });
+    }
     await sendDailyReportEmail({
       to: input.email,
       report,
@@ -160,6 +171,37 @@ async function sendOne(input: {
     });
     return "failed" as const;
   }
+}
+
+async function sendTeamReminder(input: {
+  userId: string;
+  orgId: string;
+  email: string;
+  name: string | null;
+  localDate: string;
+  report: { weekStart?: string; weekEnd?: string; localDate: string };
+  resend?: boolean;
+}) {
+  const key = {
+    userId: input.userId,
+    orgId: input.orgId,
+    kind: "org_reminder" as const,
+    localDate: input.localDate,
+  };
+  if (!input.resend && (await alreadyDelivered(key))) return "skipped" as const;
+  const org = await prisma.organization.findUnique({
+    where: { id: input.orgId },
+    select: { name: true },
+  });
+  await sendTeamReminderEmail({
+    to: input.email,
+    organizationName: org?.name ?? "",
+    weekStart: input.report.weekStart ?? input.report.localDate,
+    weekEnd: input.report.weekEnd ?? input.report.localDate,
+    recipientName: input.name,
+  });
+  await recordDelivery({ ...key, status: "success" });
+  return "reminded" as const;
 }
 
 const membershipInclude = {
@@ -237,6 +279,7 @@ export async function runDailyReportSend(
     scanned: memberships.length,
     due: 0,
     sent: 0,
+    reminded: 0,
     skipped: 0,
     failed: 0,
     ...(utcHour != null ? { utcHour } : {}),

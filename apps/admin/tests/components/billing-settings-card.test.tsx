@@ -83,8 +83,8 @@ test("Team billing shows a simple plan summary, billed users, total, and seat sy
   expect(screen.getByText("Alice Admin")).toBeTruthy();
   expect(screen.getByText("alice@example.com")).toBeTruthy();
   expect(screen.getByText("Dev User")).toBeTruthy();
-  expect(screen.getByText(/Lemon Squeezy currently shows 5 seats/i)).toBeTruthy();
-  expect(screen.getByRole("status")).toHaveTextContent(/Billing sync pending/i);
+  expect(screen.getByText(/it lists 5 seats/i)).toBeTruthy();
+  expect(screen.getByRole("status")).toHaveTextContent(/Updating your subscription/i);
   expect(screen.getByRole("button", { name: /Manage billing/i })).toBeTruthy();
 });
 

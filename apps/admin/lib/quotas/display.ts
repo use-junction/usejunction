@@ -37,6 +37,10 @@ export function quotaWindowLabel(windowType: string): string {
       return "Extra usage";
     case "plan":
       return "Plan";
+    case "api":
+      return "API models";
+    case "auto":
+      return "Auto mode";
     case "claude_5h":
       return "Claude · 5-hour";
     case "claude_weekly":

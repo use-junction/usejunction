@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { AuthShell } from "@/components/auth/auth-shell";
-import { DeviceConnectCard } from "@/components/onboarding/device-connect-card";
+import { CollectionNoticeLink, DeviceConnectCard } from "@/components/onboarding/device-connect-card";
 import { isReadyDevice, type DeviceConnectSnapshot } from "@/lib/device-connect-state";
 import { InviteTeamForm } from "@/components/onboarding/invite-team-form";
 import { useOnboardingStatus } from "@/components/onboarding/onboarding-status-provider";
@@ -199,7 +199,7 @@ export function OnboardingExperience({
       const role = next.role as OrganizationRole | null;
       const canLeave = Boolean(next.onboardingCompletedAt);
       if (canLeave) {
-        window.location.href = "/dashboard";
+        window.location.href = "/auth/continue?from=%2Fdashboard";
         return;
       }
       setStatus(next);
@@ -240,7 +240,7 @@ export function OnboardingExperience({
         setFinishError("Unable to finish onboarding. Check your connection and try again.");
         return;
       }
-      window.location.href = "/dashboard";
+      window.location.href = "/auth/continue?from=%2Fdashboard";
     } catch {
       setFinishError("Unable to finish onboarding. Check your connection and try again.");
     } finally {
@@ -338,15 +338,21 @@ export function OnboardingExperience({
         contentAlign="top"
         title={soloMode ? "Analyze your own usage first." : "Connect this computer."}
         description={
-          soloMode
-            ? "Connect the computer where you use Cursor, Claude Code, or Codex. No teammates or team rollout are needed to start."
-            : "Copy the command and paste it in Terminal. We’ll detect the machine automatically."
+          <>
+            <p>
+              {soloMode
+                ? "Connect the computer where you use Cursor, Claude Code, or Codex. No teammates or team rollout are needed to start."
+                : "Copy the command and paste it in Terminal. We’ll detect the machine automatically."}
+            </p>
+            <CollectionNoticeLink className="mt-2" />
+          </>
         }
         statement={soloMode ? "One developer. Real data." : "One command. Real data."}
       >
         <div className="space-y-5">
           <DeviceConnectCard
             compact
+            showNoticeLink={false}
             skipInitialStatusFetch
             initialDevices={connectDevices}
             onConnected={() => {

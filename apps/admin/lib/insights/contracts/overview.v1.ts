@@ -118,6 +118,8 @@ export type OrgOverviewV1 = {
   }>;
   /** Top people by usage cost in the report window. */
   people: Array<{ id: string; name: string; requests: number; cost: number }>;
+  /** Usage per team in the report window (empty until the workspace has teams). */
+  teams?: Array<{ id: string; name: string; color: string | null; people: number; requests: number; cost: number }>;
   coverage: {
     developers: number;
     activeDevelopers: number;

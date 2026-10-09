@@ -5,8 +5,7 @@ import { createContext, useContext, useMemo } from "react";
 import { useParams, usePathname, useSearchParams } from "next/navigation";
 import { MemberHubNav } from "@/components/developers/member-hub-nav";
 import { MemberHubPeriodFilter } from "@/components/developers/member-hub-period";
-import { MemberRemoveButton } from "@/components/developers/member-remove-button";
-import { MemberPrivacyActions } from "@/components/developers/member-privacy-actions";
+import { MemberActionsMenu } from "@/components/developers/member-actions-menu";
 import { MemberRoleSelect } from "@/components/developers/member-role-select";
 import { PageHeader } from "@/components/page-header";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
@@ -87,7 +86,7 @@ export function MemberClientLayout({ children }: { children: React.ReactNode }) 
       <PageHeader
         className="mb-8"
         eyebrow={
-          <Breadcrumb><BreadcrumbList><BreadcrumbItem><BreadcrumbLink asChild><Link href="/team" prefetch={false}>Team</Link></BreadcrumbLink></BreadcrumbItem><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{developer.name}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
+          <Breadcrumb><BreadcrumbList><BreadcrumbItem><BreadcrumbLink asChild><Link href="/team" prefetch={false}>People</Link></BreadcrumbLink></BreadcrumbItem><BreadcrumbSeparator /><BreadcrumbItem><BreadcrumbPage>{developer.name}</BreadcrumbPage></BreadcrumbItem></BreadcrumbList></Breadcrumb>
         }
         title={`${developer.name}.`}
         description={`${developer.email} · ${signalsProductEnabled() ? "work, tools, and plan pace." : "tools and plan pace."}`}
@@ -101,8 +100,12 @@ export function MemberClientLayout({ children }: { children: React.ReactNode }) 
         {canManageSettings(role) ? (
           <div className="flex flex-wrap items-center gap-4">
             <MemberRoleSelect developerId={developer.id} role={developer.role} memberName={developer.name} />
-            <MemberRemoveButton developerId={developer.id} memberName={developer.name} locked={developer.role === "owner"} />
-            <MemberPrivacyActions developerId={developer.id} role={role} />
+            <MemberActionsMenu
+              developerId={developer.id}
+              memberName={developer.name}
+              memberRole={developer.role}
+              viewerRole={role}
+            />
           </div>
         ) : <p className="text-xs uppercase tracking-[0.08em] text-muted-foreground">Role: {developer.role}</p>}
         <MemberHubNav developerId={developerId} />

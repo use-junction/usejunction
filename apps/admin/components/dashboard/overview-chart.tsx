@@ -25,8 +25,10 @@ const chartConfig = {
   previousRequests: { label: "Previous period", color: "var(--text-muted)" },
 } satisfies ChartConfig;
 
+/** "Oct 3", matching dates everywhere else in the app. */
 function formatShortDate(date: string) {
-  return date.slice(5);
+  if (!/^\d{4}-\d{2}-\d{2}/.test(date)) return date;
+  return new Date(`${date.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 function OverviewTooltip({ active, payload }: TooltipContentProps) {
@@ -92,7 +94,7 @@ export function OverviewChart({ data }: { data: Point[] }) {
           axisLine={false}
           tickMargin={8}
           minTickGap={isMobile ? 42 : 24}
-          tickFormatter={(value) => value.slice(5)}
+          tickFormatter={(value) => formatShortDate(String(value))}
         />
         <YAxis tickLine={false} axisLine={false} width={isMobile ? 28 : 34} allowDecimals={false} />
         <ChartTooltip content={OverviewTooltip} />

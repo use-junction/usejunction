@@ -55,7 +55,7 @@ export function reportEmailDeepLink(report: DailyReportPayload) {
     params.set("scope", "you");
     params.set("date", report.localDate);
   }
-  return `/activity?${params.toString()}#reports`;
+  return `/reports?${params.toString()}`;
 }
 
 /** Prefer tokens so the chart reads as activity over time, not a rising bill. */

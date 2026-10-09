@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Cable } from "lucide-react";
+import { Cable, TriangleAlert } from "lucide-react";
 import { RepairConnectionDialog, type RepairDeviceTarget } from "@/components/dashboard/repair-connection-dialog";
 import { DeviceConnectCard } from "@/components/onboarding/device-connect-card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -22,6 +22,9 @@ export type MeDeviceSummary = {
   architecture: string;
   lastSeenAt: string;
   state: DeviceHealthState;
+  // The macOS agent still runs from the legacy hidden location (~/.usejunction).
+  // Reconnecting converges it on ~/Applications and clears EDR false positives.
+  legacyLocation?: boolean;
 };
 
 export type MeDevicesPayload = {
@@ -100,11 +103,20 @@ export function MachineConnectionSettingsCard() {
                       <p className="mt-1 text-xs text-muted-foreground">
                         {device.os} · {STATE_LABELS[device.state]} · Last seen {formatRelativeTime(device.lastSeenAt)}
                       </p>
+                      {device.legacyLocation ? (
+                        <p className="mt-1 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-500">
+                          <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                          <span>
+                            Running from a legacy location that some security tools flag. Reconnect to move it
+                            to ~/Applications.
+                          </span>
+                        </p>
+                      ) : null}
                     </div>
                     <Button
                       type="button"
                       size="sm"
-                      variant="outline"
+                      variant={device.legacyLocation ? "default" : "outline"}
                       className="shrink-0"
                       onClick={() => setRepairDevice({ id: device.id, hostname: device.hostname })}
                     >

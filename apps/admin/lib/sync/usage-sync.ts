@@ -102,6 +102,7 @@ export type DeferredUsageStartWork = {
       toolName: string;
       plan: string | null;
       email: string | null;
+      vendorOrgId?: string | null;
       authPresent?: boolean;
     }>;
   };
@@ -122,6 +123,7 @@ async function runInventoryPlanSync(params: {
     toolName: string;
     plan: string | null;
     email: string | null;
+    vendorOrgId?: string | null;
     authPresent?: boolean;
   }>;
 }): Promise<void> {
@@ -130,12 +132,13 @@ async function runInventoryPlanSync(params: {
     if (!accounts.length) {
       const rows = await prisma.toolAccount.findMany({
         where: { deviceId: params.deviceId },
-        select: { toolName: true, plan: true, email: true, authPresent: true },
+        select: { toolName: true, plan: true, email: true, vendorOrgId: true, authPresent: true },
       });
       accounts = rows.map((row) => ({
         toolName: row.toolName,
         plan: row.plan,
         email: row.email,
+        vendorOrgId: row.vendorOrgId,
         authPresent: row.authPresent,
       }));
     }
@@ -275,6 +278,7 @@ export async function startUsageSync(params: {
     accountKey?: string | null;
     plan: string | null;
     email: string | null;
+    vendorOrgId?: string | null;
     authPresent?: boolean;
   }> = [];
   let inventoryChanged = false;
@@ -344,6 +348,7 @@ export async function startUsageSync(params: {
           accountKey: typeof item.accountKey === "string" ? item.accountKey.trim() : "",
           plan: typeof item.plan === "string" ? item.plan.trim() || null : null,
           email: typeof item.email === "string" ? item.email.trim() || null : null,
+          vendorOrgId: typeof item.orgKey === "string" ? item.orgKey.trim() || null : null,
           authPresent: Boolean(item.authPresent),
         })).filter((item) => item.toolName);
       } else {

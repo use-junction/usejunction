@@ -442,6 +442,7 @@ func collectProvider(ctx context.Context, p providers.Provider, refresh bool, po
 			AccountKey:  acc.AccountKey,
 			Email:       acc.Email,
 			Plan:        plan,
+			OrgKey:      acc.OrgKey,
 			LoginMethod: acc.LoginMethod,
 			AuthPresent: acc.AuthPresent || plan != "",
 		})
@@ -461,6 +462,57 @@ func collectProvider(ctx context.Context, p providers.Provider, refresh bool, po
 			CreditsRemaining: snap.CreditsRemaining,
 			Source:           snap.Source,
 		})
+	}
+
+	// Claude users often drive several logins from the desktop app (e.g. a
+	// personal and a work account). The active login's live windows come from
+	// quotaSnaps above; the others come from the desktop app's cached usage,
+	// each filed under its own account key and gated by that account's switch.
+	if p.ID() == "claude" {
+		for _, snap := range probe.ClaudeOtherAccountQuotas() {
+			if !accountpolicy.UsageAllowed(policy, "claude", snap.AccountKey, "") {
+				continue
+			}
+			result.quotaReports = append(result.quotaReports, client.QuotaReport{
+				ToolName:         snap.ToolName,
+				AccountKey:       snap.AccountKey,
+				WindowType:       snap.WindowType,
+				UsedPercent:      snap.UsedPercent,
+				ResetAt:          snap.ResetAt,
+				CreditsRemaining: snap.CreditsRemaining,
+				Source:           snap.Source,
+			})
+		}
+
+		// Opt-in only: when the user has connected the Claude desktop account,
+		// fetch real live limits for the account they are actively running (its
+		// token lives in the desktop app's store, not the CLI's). Never touched
+		// without consent, and gated by that account's collection switch.
+		if cfg, _ := config.Load(); cfg != nil && cfg.ClaudeDesktopUsageConsent {
+			snaps, account := probe.ClaudeActiveDesktopUsage(ctx, true)
+			if account != nil && accountpolicy.UsageAllowed(policy, "claude", account.AccountKey, account.Email) {
+				result.accountReports = append(result.accountReports, client.AccountReport{
+					ToolName:    "claude",
+					AccountKey:  account.AccountKey,
+					Email:       account.Email,
+					Plan:        account.Plan,
+					OrgKey:      account.OrgKey,
+					LoginMethod: account.LoginMethod,
+					AuthPresent: true,
+				})
+				for _, snap := range snaps {
+					result.quotaReports = append(result.quotaReports, client.QuotaReport{
+						ToolName:         snap.ToolName,
+						AccountKey:       snap.AccountKey,
+						WindowType:       snap.WindowType,
+						UsedPercent:      snap.UsedPercent,
+						ResetAt:          snap.ResetAt,
+						CreditsRemaining: snap.CreditsRemaining,
+						Source:           snap.Source,
+					})
+				}
+			}
+		}
 	}
 
 	if o, ok := p.(*providers.OllamaProvider); ok {
@@ -538,9 +590,10 @@ func otherAccountReports(ctx context.Context, p providers.Provider) []client.Acc
 	}
 	var reports []client.AccountReport
 	for _, other := range multi.OtherAccounts(ctx) {
-		// A login with no email is not a signed-in account yet. Claude desktop
-		// sessions can exist before we learn the address; ask once it is known.
-		if strings.TrimSpace(other.Email) == "" {
+		// A login needs some identity to be worth reporting: either an email we
+		// have learned, or its vendor org so the control plane can resolve the
+		// plan from the org. A login with neither is not actionable yet.
+		if strings.TrimSpace(other.Email) == "" && strings.TrimSpace(other.OrgKey) == "" {
 			continue
 		}
 		toolName := strings.TrimSpace(other.ToolName)
@@ -552,6 +605,7 @@ func otherAccountReports(ctx context.Context, p providers.Provider) []client.Acc
 			AccountKey:  other.AccountKey,
 			Email:       other.Email,
 			Plan:        strings.TrimSpace(other.Plan),
+			OrgKey:      strings.TrimSpace(other.OrgKey),
 			LoginMethod: other.LoginMethod,
 			AuthPresent: other.AuthPresent,
 		})

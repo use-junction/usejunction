@@ -127,7 +127,7 @@ var daemonCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		maybeRelocateDarwinDaemon()
+		maybeCleanupLegacyDarwinBundles()
 		if err := configure.RepairLegacyCodexGatewayConfig(); err != nil {
 			fmt.Printf("[daemon] codex config repair warning: %v\n", err)
 		}
@@ -193,6 +193,12 @@ var daemonCmd = &cobra.Command{
 			fmt.Printf("[daemon] automatic update: %v\n", updateErr)
 		} else if updated {
 			fmt.Printf("Updated UseJunction agent; restarting service…\n")
+			// Legacy installs still under ~/.usejunction converge to ~/Applications
+			// here, during the bounded update, instead of on every daemon boot.
+			if migrateDarwinBundleAfterUpdate() {
+				// The relocation already restarted launchd from the visible path.
+				return nil
+			}
 			if restartErr := restartBackgroundAgent(); restartErr != nil {
 				// KeepAlive will usually relaunch from the updated path after we exit.
 				fmt.Printf("[daemon] update installed; restart warning: %v\n", restartErr)
@@ -452,6 +458,7 @@ func heartbeatWithCollect(api *client.APIClient, collect *client.CollectStatus) 
 		LocalSyncToken:     cfg.LocalSyncToken,
 		RemoteSyncProtocol: config.RemoteSyncProtocol,
 		TimeZone:           platformdirs.LocalIANATimeZone(),
+		AppLocation:        agentAppLocation(),
 		LastCollect:        collect,
 	})
 }

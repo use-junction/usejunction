@@ -24,11 +24,12 @@ func AccountsContentHash(accounts []client.AccountReport) string {
 			auth = "1"
 		}
 		lines = append(lines, fmt.Sprintf(
-			"%s|%s|%s|%s|%s|%s",
+			"%s|%s|%s|%s|%s|%s|%s",
 			name,
 			strings.TrimSpace(a.AccountKey),
 			strings.TrimSpace(a.Email),
 			strings.TrimSpace(a.Plan),
+			strings.TrimSpace(a.OrgKey),
 			strings.TrimSpace(a.LoginMethod),
 			auth,
 		))

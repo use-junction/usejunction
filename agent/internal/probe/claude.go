@@ -103,12 +103,15 @@ type claudeKeychainBlob struct {
 }
 
 type claudeJSONOAuthAccount struct {
-	EmailAddress     string `json:"emailAddress"`
-	AccountUUID      string `json:"accountUuid"`
-	OrganizationType string `json:"organizationType"`
-	BillingType      string `json:"billingType"`
-	SubscriptionType string `json:"subscriptionType"`
-	SeatTier         string `json:"seatTier"`
+	EmailAddress              string `json:"emailAddress"`
+	AccountUUID               string `json:"accountUuid"`
+	OrganizationUUID          string `json:"organizationUuid"`
+	OrganizationType          string `json:"organizationType"`
+	BillingType               string `json:"billingType"`
+	SubscriptionType          string `json:"subscriptionType"`
+	SeatTier                  string `json:"seatTier"`
+	OrganizationRateLimitTier string `json:"organizationRateLimitTier"`
+	UserRateLimitTier         string `json:"userRateLimitTier"`
 }
 
 // ClaudeKeychainHashedService returns the modern Claude Code keychain service name
@@ -236,7 +239,7 @@ func claudeAccountFromCreds(creds *claudeCredentials, now time.Time) *types.Tool
 	account := &types.ToolAccount{
 		ToolName:    "claude",
 		Email:       strings.TrimSpace(creds.Email),
-		Plan:        normalizeClaudePlan(creds.SubscriptionType),
+		Plan:        claudePlanWithTier(normalizeClaudePlan(creds.SubscriptionType), creds.RateLimitTier),
 		LoginMethod: "oauth",
 		AuthPresent: true,
 	}
@@ -245,24 +248,49 @@ func claudeAccountFromCreds(creds *claudeCredentials, now time.Time) *types.Tool
 }
 
 func claudePlanFromOAuthAccount(oa claudeJSONOAuthAccount) string {
-	if p := strings.TrimSpace(oa.SubscriptionType); p != "" {
-		return normalizeClaudePlan(p)
-	}
-	if st := strings.TrimSpace(oa.SeatTier); st != "" {
-		return normalizeClaudePlan(st)
-	}
-	orgType := strings.ToLower(strings.TrimSpace(oa.OrganizationType))
+	plan := ""
 	switch {
-	case strings.Contains(orgType, "team"):
-		return "team-standard"
-	case strings.Contains(orgType, "enterprise"):
-		return "enterprise"
-	case orgType == "claude_max":
-		return "max"
-	case orgType == "claude_pro":
-		return "pro"
+	case strings.TrimSpace(oa.SubscriptionType) != "":
+		plan = normalizeClaudePlan(oa.SubscriptionType)
+	case strings.TrimSpace(oa.SeatTier) != "":
+		plan = normalizeClaudePlan(oa.SeatTier)
+	default:
+		orgType := strings.ToLower(strings.TrimSpace(oa.OrganizationType))
+		switch {
+		case strings.Contains(orgType, "team"):
+			plan = "team-standard"
+		case strings.Contains(orgType, "enterprise"):
+			plan = "enterprise"
+		case orgType == "claude_max":
+			plan = "max"
+		case orgType == "claude_pro":
+			plan = "pro"
+		}
 	}
-	return ""
+	tier := strings.TrimSpace(oa.OrganizationRateLimitTier)
+	if tier == "" {
+		tier = strings.TrimSpace(oa.UserRateLimitTier)
+	}
+	return claudePlanWithTier(plan, tier)
+}
+
+// claudePlanWithTier refines a Max plan into its 5x/20x variant using the
+// rate-limit tier string (e.g. "default_claude_max_20x"). All other plans, and
+// an empty/unknown tier, are returned unchanged.
+func claudePlanWithTier(plan, tier string) string {
+	p := normalizeClaudePlan(plan)
+	t := strings.ToLower(strings.TrimSpace(tier))
+	if t == "" || !strings.HasPrefix(strings.ToLower(p), "max") {
+		return p
+	}
+	switch {
+	case strings.Contains(t, "20x"):
+		return "max-20x"
+	case strings.Contains(t, "5x"):
+		return "max-5x"
+	default:
+		return p
+	}
 }
 
 func normalizeClaudePlan(plan string) string {
@@ -390,10 +418,15 @@ func mergeClaudeAccounts(credsAccount, jsonAccount *types.ToolAccount) *types.To
 	if email == "" {
 		email = strings.TrimSpace(jsonAccount.Email)
 	}
+	orgKey := strings.TrimSpace(credsAccount.OrgKey)
+	if orgKey == "" {
+		orgKey = strings.TrimSpace(jsonAccount.OrgKey)
+	}
 	return &types.ToolAccount{
 		ToolName:    "claude",
 		Email:       email,
 		Plan:        preferClaudePlan(credsAccount.Plan, jsonAccount.Plan),
+		OrgKey:      orgKey,
 		LoginMethod: "oauth",
 		AuthPresent: credsAccount.AuthPresent || jsonAccount.AuthPresent,
 	}
@@ -429,13 +462,34 @@ func ClaudeAccountFromClaudeJSON(home string) (*types.ToolAccount, error) {
 		return nil, fmt.Errorf("claude.json missing oauthAccount.emailAddress")
 	}
 	return &types.ToolAccount{
-		ToolName:    "claude",
-		Email:       email,
-		Plan:        claudePlanFromOAuthAccount(*doc.OAuthAccount),
+		ToolName: "claude",
+		Email:    email,
+		Plan:     claudePlanFromOAuthAccount(*doc.OAuthAccount),
+		OrgKey:   strings.TrimSpace(doc.OAuthAccount.OrganizationUUID),
 		// Plan metadata only — live quota windows still need Code OAuth tokens.
 		LoginMethod: "desktop",
 		AuthPresent: false,
 	}, nil
+}
+
+// claudeActiveOrgUUID reads the active Claude Code login's organization uuid
+// from ~/.claude.json, used to scope the desktop usage history to this account.
+func claudeActiveOrgUUID() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".claude.json"))
+	if err != nil {
+		return ""
+	}
+	var doc struct {
+		OAuthAccount *claudeJSONOAuthAccount `json:"oauthAccount"`
+	}
+	if json.Unmarshal(data, &doc) != nil || doc.OAuthAccount == nil {
+		return ""
+	}
+	return strings.TrimSpace(doc.OAuthAccount.OrganizationUUID)
 }
 
 // ClaudeAccountIdentity returns the best available Claude account by merging OAuth
@@ -645,12 +699,17 @@ func ClaudeAccountFromCredentials(dir string) (*types.ToolAccount, error) {
 func ProbeClaudeQuota(ctx context.Context, dir string) ([]types.QuotaSnapshot, *types.ToolAccount, error) {
 	bundle, err := LoadClaudeCredentialBundle(dir)
 	if err != nil {
-		home, homeErr := os.UserHomeDir()
-		if homeErr != nil {
-			return nil, nil, err
+		// No Claude Code OAuth token on this machine. Fall back to the desktop
+		// app's cached usage so plan-detected-but-signed-out machines still
+		// report live quota windows.
+		var account *types.ToolAccount
+		if home, homeErr := os.UserHomeDir(); homeErr == nil {
+			account, _ = ClaudeAccountFromClaudeJSON(home)
 		}
-		account, jsonErr := ClaudeAccountFromClaudeJSON(home)
-		if jsonErr != nil {
+		if snaps := ClaudeDesktopUsageSnapshots(claudeActiveOrgUUID()); len(snaps) > 0 {
+			return snaps, account, nil
+		}
+		if account == nil {
 			return nil, nil, err
 		}
 		return nil, account, fmt.Errorf("claude credentials not found")
@@ -675,13 +734,24 @@ func ProbeClaudeQuota(ctx context.Context, dir string) ([]types.QuotaSnapshot, *
 	}
 	if usageErr != nil {
 		_ = revitalizeClaudeCredentialPlan(bundle, account.Plan)
+		// The token is present but the live usage call failed (offline, expired
+		// refresh, rate limit). Fall back to the desktop app's cached windows.
+		if snaps := ClaudeDesktopUsageSnapshots(claudeActiveOrgUUID()); len(snaps) > 0 {
+			return snaps, account, nil
+		}
 		return nil, account, usageErr
 	}
 
 	account = enrichClaudeAccountPlan(account, claudePlanFromUsageRaw(raw))
 	_ = revitalizeClaudeCredentialPlan(bundle, account.Plan)
 
-	return claudeUsageSnapshots(raw), account, nil
+	snaps := claudeUsageSnapshots(raw)
+	if len(snaps) == 0 {
+		if desktop := ClaudeDesktopUsageSnapshots(claudeActiveOrgUUID()); len(desktop) > 0 {
+			return desktop, account, nil
+		}
+	}
+	return snaps, account, nil
 }
 
 func claudeUsageSnapshots(raw map[string]json.RawMessage) []types.QuotaSnapshot {

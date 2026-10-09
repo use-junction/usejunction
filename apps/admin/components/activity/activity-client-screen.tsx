@@ -14,12 +14,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ActivityPageHeader } from "@/components/activity/activity-page-header";
+import { ExportCsvButton } from "@/components/export-csv-button";
+import { TeamFilter } from "@/components/team-filter";
+import type { CsvCell } from "@/lib/csv";
+import { toolDisplayName } from "@/lib/tools/catalog";
 import { AudienceScopeSwitcher } from "@/components/audience-scope-switcher";
 import { Panel } from "@/components/panel";
 import { DeviceActivityFeed } from "@/components/activity/device-activity-feed";
-import { SentReportsSection } from "@/components/activity/sent-reports-section";
 import { UsageBreakdownList } from "@/components/activity/usage-breakdown-list";
 import { TeamAdoptionView } from "@/components/activity/team-adoption-view";
+import { sampleAdoption } from "@/components/activity/adoption-sample";
 import { LocalSyncPanel } from "@/components/dashboard/local-sync-panel";
 import { ConnectionRepairBanner } from "@/components/dashboard/connection-repair-banner";
 import { CycleViewPicker } from "@/components/dashboard/cycle-view-picker";
@@ -236,8 +240,6 @@ function SharedActivityView({ view }: { view: ActivityViewModel }) {
         <DeviceActivityFeed feed={view.deviceFeed} showDeveloper={view.showDeveloperOnFeed} />
       ) : null}
 
-      <SentReportsSection audience={view.scope} />
-
       <div className="mt-10 grid gap-6 lg:grid-cols-2">
         <Panel as="section">
           <SignalsSectionHeader
@@ -325,7 +327,30 @@ type ActivityPayload =
       cycleWindows?: CycleViewWindows;
       adoption: TeamAdoption;
       deviceFeed: DeviceFeed;
+      team?: { id: string; name: string } | null;
     };
+
+const BAND_EXPORT_LABEL: Record<TeamAdoption["people"][number]["band"], string> = {
+  regular: "Regular",
+  occasional: "Occasional",
+  not_started: "Not using yet",
+  no_data: "No data",
+};
+
+function adoptionCsvRows(adoption: TeamAdoption): CsvCell[][] {
+  return [
+    ...adoption.people.map((person) => [
+      person.name,
+      BAND_EXPORT_LABEL[person.band],
+      person.activeDays,
+      person.daysPerWeek,
+      person.tools.map((tool) => toolDisplayName(tool)).join("; "),
+      person.seats.filter((seat) => !seat.used).map((seat) => toolDisplayName(seat.toolName)).join("; "),
+      person.lastSeenAt ?? "",
+    ]),
+    ...adoption.notEnrolled.map((person) => [person.name, "No machine connected", 0, 0, "", person.seats.map((seat) => toolDisplayName(seat.toolName)).join("; "), ""]),
+  ];
+}
 
 export default function ActivityClientScreen() {
   const searchParams = useSearchParams();
@@ -370,16 +395,27 @@ export default function ActivityClientScreen() {
         <ConnectionRepairBanner scope="you" recoveryDevices={view.sync?.recoveryDevices} />
       ) : null}
       <ActivityPageHeader
-        title={isYou ? "How are you using it?" : "Adoption."}
-        description={isYou ? undefined : "Who has made AI part of how they work, who hasn't started, and who needs help getting set up."}
+        title={isYou ? "How are you using it?" : payload.team ? `Adoption · ${payload.team.name}.` : "Adoption."}
         actions={
           allowDeveloperPeriodControls ? (
-            <CycleViewPicker
-              view={cycleView}
-              period={rollingPeriod}
-              basePath="/activity"
-              cycleWindows={cycleWindows}
-            />
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {payload.kind === "organization" ? (
+                <>
+                  <TeamFilter />
+                  <ExportCsvButton
+                    name="adoption"
+                    header={["Person", "Status", "Active days", "Days per week", "Tools used", "Unused paid seats", "Last seen (UTC)"]}
+                    rows={() => adoptionCsvRows(payload.adoption)}
+                  />
+                </>
+              ) : null}
+              <CycleViewPicker
+                view={cycleView}
+                period={rollingPeriod}
+                basePath="/activity"
+                cycleWindows={cycleWindows}
+              />
+            </div>
           ) : undefined
         }
       />
@@ -388,9 +424,11 @@ export default function ActivityClientScreen() {
       {payload.kind === "personal" && (payload.youUnlinked || !payload.personal) ? (
         <DashboardSetupPanel canInvite={false} />
       ) : payload.kind === "organization" ? (
-        <TeamAdoptionView data={payload.adoption} periodLabel={periodLabel}>
+        <TeamAdoptionView
+          data={payload.adoption}
+          sample={payload.adoption.counts.enrolled === 0 ? sampleAdoption(payload.adoption) : undefined}
+        >
           <DeviceActivityFeed feed={payload.deviceFeed} showDeveloper />
-          <SentReportsSection audience="team" />
         </TeamAdoptionView>
       ) : view ? (
         <SharedActivityView view={view} />

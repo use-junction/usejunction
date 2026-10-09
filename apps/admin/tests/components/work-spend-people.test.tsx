@@ -57,7 +57,7 @@ test("unmatched authors get a match action when nobody has spend yet", () => {
       onAuthors={onAuthors}
     />,
   );
-  expect(screen.getByText(/No people spend in this period/)).toBeInTheDocument();
+  expect(screen.getByText("Match GitHub authors to see spend by person.")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /Match authors \(1\)/ }));
   expect(onAuthors).toHaveBeenCalled();
 });

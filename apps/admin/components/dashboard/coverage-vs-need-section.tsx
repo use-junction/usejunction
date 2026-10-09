@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import type { OrgOverviewV1 } from "@/lib/insights";
 import type { PlanVerdictCode } from "@/lib/billing/plan-utilization-policy";
 import { verdictLabel, verdictToneClass } from "@/lib/billing/plan-utilization-policy";
+import { IDLE_CYCLE_LABEL, isIdlePaidCycle } from "@/lib/dashboard/idle-cycles";
 
 type CycleRow = OrgOverviewV1["subscriptionCycles"][number];
 
@@ -87,6 +88,7 @@ export function CoverageVsNeedSection({
             label: toolDisplayName(toolKey),
             href: findCatalogTool(toolKey) ? `/tools/${toolKey}` : null,
             allowance: allowanceLabel(row.verdictCode),
+            idle: isIdlePaidCycle(row),
           };
         })
         .sort((a, b) => (b.consumed ?? -1) - (a.consumed ?? -1)),
@@ -97,7 +99,7 @@ export function CoverageVsNeedSection({
 
   return (
     <ul className="divide-y divide-border">
-      {rows.map(({ row, toolKey, color, consumed, display, label, href, allowance }) => {
+      {rows.map(({ row, toolKey, color, consumed, display, label, href, allowance, idle }) => {
         const known = consumed != null && display != null;
         const body = (
           <>
@@ -153,7 +155,11 @@ export function CoverageVsNeedSection({
               </p>
             )}
 
-            {allowance ? (
+            {idle ? (
+              <div className="mt-1.5 flex justify-end">
+                <p className="text-xs font-medium text-warning">{IDLE_CYCLE_LABEL} · paid seat idle</p>
+              </div>
+            ) : allowance ? (
               <div className="mt-1.5 flex justify-end">
                 <p className={cn("text-xs font-medium", verdictToneClass(row.verdictCode ?? "UNKNOWN"))}>
                   {allowance}

@@ -24,7 +24,7 @@ const usage = (toolName: string, verified: number, estimated = 0) => ({
   estimatedMicros: BigInt(estimated * 1_000_000),
   actualMicros: 0n,
 });
-const base = { previousUsage: [], activePeople: [], quotaPeaks: [], idleSeats: [] };
+const base = { previousUsage: [], activePeople: [], seatHolders: [], quotaPeaks: [], idleSeats: [] };
 
 test("annual and weekly plans are normalised to monthly, never summed raw", () => {
   expect(monthlyFactor("monthly", null)).toBe(1);
@@ -84,4 +84,41 @@ test("limit counts are per person and unassigned seats become a change with a pr
   const unassigned = result.changes.find((change) => change.kind === "unassigned_seats")!;
   expect(unassigned.monthlyMicros).toBe("40000000");
   expect(unassigned.basis).toBe("list price");
+});
+
+test("spare capacity on a detected plan is never called assigned to no one", () => {
+  // Detected plans grow as devices report seats and keep that capacity when a device stops
+  // reporting or someone changes tier, so the leftover is not a seat anyone bought.
+  const result = buildCostOverview({
+    ...base,
+    now: new Date("2026-10-15T12:00:00Z"),
+    plans: [plan({ seatCapacity: 3, assignedSeats: 1, priceSource: "detected" })],
+    usage: [],
+  });
+  expect(result.tools[0]!.plans[0]!.unassignedSeats).toBe(0);
+  expect(result.changes.find((change) => change.kind === "unassigned_seats")).toBeUndefined();
+});
+
+test("people using a tool without a seat absorb its free seats, priciest first", () => {
+  const result = buildCostOverview({
+    ...base,
+    now: new Date("2026-10-15T12:00:00Z"),
+    plans: [
+      plan({ id: "pro", name: "Pro", seatCapacity: 2, assignedSeats: 1 }),
+      plan({ id: "plus", name: "Pro+", seatCapacity: 2, assignedSeats: 1, cycleSeatMicros: 60_000_000n }),
+    ],
+    usage: [],
+    activePeople: [
+      { toolName: "cursor", developerId: "held" },
+      { toolName: "cursor", developerId: "unseated" },
+      { toolName: "Cursor", developerId: "unseated" },
+    ],
+    seatHolders: [{ toolName: "cursor", developerId: "held" }],
+  });
+  const [pro, plus] = result.tools[0]!.plans;
+  expect(plus!.unassignedSeats).toBe(0);
+  expect(pro!.unassignedSeats).toBe(1);
+  const changes = result.changes.filter((change) => change.kind === "unassigned_seats");
+  expect(changes).toHaveLength(1);
+  expect(changes[0]!.text).toBe("1 Pro seat assigned to no one");
 });

@@ -8,6 +8,11 @@ import { getWorkActivity } from "@/lib/signals/queries/get-work-activity";
 import { listSubscriptions } from "@/lib/tools/subscriptions";
 import type { OrganizationRole } from "@/lib/rbac/permissions";
 import { reportNow } from "@/lib/report-now";
+import { getToolUsers } from "@/lib/queries/usage-activity";
+import { canonicalToolKey } from "@/lib/tools/catalog";
+
+/** Same trailing window the Cost page uses to call a seat unused. */
+const SEAT_SIGNAL_DAYS = 30;
 
 export type TeamMemberSearch = {
   view?: string | null;
@@ -30,6 +35,8 @@ export type TeamMemberHubPayload = {
   rollingPeriod: ReturnType<typeof parseMemberCycleSearch>["rollingPeriod"];
   selectedPeriodLabel: string;
   cycleWindows: CycleViewWindows;
+  /** Canonical tool keys this person used in the trailing SEAT_SIGNAL_DAYS. */
+  toolsUsedLast30d: string[];
 };
 
 export type TeamMemberWorkPayload = {
@@ -57,11 +64,15 @@ export async function loadTeamMemberHubPage(
   const subscriptions = await listSubscriptions(principal.orgId);
   const reportWindow = reportWindowForCycleView(cycleView, rollingPeriod, subscriptions, now);
   const cycleWindows = cycleViewWindows(subscriptions, now);
-  const personal = await getDeveloperOverview(principal.orgId, developerId, {
-    reportWindow,
-    cycleView,
-    includeOrgPlanSync: false,
-  });
+  const signalStart = new Date(now.getTime() - (SEAT_SIGNAL_DAYS - 1) * 86_400_000);
+  const [personal, toolUsers] = await Promise.all([
+    getDeveloperOverview(principal.orgId, developerId, {
+      reportWindow,
+      cycleView,
+      includeOrgPlanSync: false,
+    }),
+    getToolUsers(principal.orgId, signalStart, now, { developerId }),
+  ]);
   if (!personal) return null;
 
   return jsonSafe({
@@ -78,6 +89,7 @@ export async function loadTeamMemberHubPage(
     rollingPeriod,
     selectedPeriodLabel: cycleViewPeriodLabel(cycleView, rollingPeriod),
     cycleWindows,
+    toolsUsedLast30d: [...new Set(toolUsers.map((row) => canonicalToolKey(row.toolName)))],
   });
 }
 

@@ -21,7 +21,7 @@ async function authenticate(page: Page, email: string, password: string, fileNam
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/dashboard/, { timeout: 30_000 });
+  await expect(page).toHaveURL(/\/(dashboard|overview)/, { timeout: 30_000 });
   await page.context().storageState({ path: path.join(authDir, fileName) });
 }
 

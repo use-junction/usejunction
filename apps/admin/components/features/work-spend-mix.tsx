@@ -11,9 +11,6 @@ import { formatMicrosAsCurrency } from "@/lib/format";
 
 export function WorkSpendMix({ data }: { data: WorkSpendPayload }) {
   const allocated = data.coverage.attributedMicros;
-  const period = `last ${data.days} days`;
-  const cycleCount = Math.max(1, Math.round(data.days / 30));
-  const cycleLabel = cycleCount === 1 ? "1 cycle" : `${cycleCount} cycles`;
   const repos = [...data.repositories]
     .map((repo) => ({
       ...repo,
@@ -32,7 +29,6 @@ export function WorkSpendMix({ data }: { data: WorkSpendPayload }) {
   return (
     <section aria-label="Spend by repository" className="min-w-0">
       <h2 className="text-lg font-semibold tracking-tight">By repository.</h2>
-      <p className="mt-1.5 text-xs text-muted-foreground">Spend on work by repo for the {period} ({cycleLabel}).</p>
       {repos.length ? (
         <ul className="mt-4 divide-y divide-border">
           {repos.map((repo, index) => {
@@ -49,31 +45,25 @@ export function WorkSpendMix({ data }: { data: WorkSpendPayload }) {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold tabular-nums">{formatMicrosAsCurrency(repo.micros)}</p>
-                    {BigInt(repo.estimatedMicros) > 0n ? (
-                      <p className="mt-0.5 text-xs text-muted-foreground">Estimated usage · across {cycleLabel}</p>
-                    ) : null}
+                    <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                      {share}%{BigInt(repo.estimatedMicros) > 0n ? " · estimated" : ""}
+                    </p>
                   </div>
                 </div>
                 <div className="mt-2">
-                  <div className="mb-1 flex items-baseline justify-between gap-3 text-[0.7rem] leading-snug text-muted-foreground">
-                    <span>
-                      <span className="font-medium tabular-nums text-foreground">{share}%</span> of spend on work · {period}
-                    </span>
-                  </div>
-                  <WorkSpendMeter value={share} color={color} label={`${repo.fullName} ${share}% of spend on work · ${period}`} />
+                  <WorkSpendMeter value={share} color={color} label={`${repo.fullName} ${share}% of spend on work`} />
                 </div>
               </li>
             );
           })}
         </ul>
       ) : (
-        <p className="mt-4 text-sm text-muted-foreground">No repository spend in the {period}.</p>
+        <p className="mt-4 text-sm text-muted-foreground">No repository spend in this period.</p>
       )}
 
       {changes.length ? (
         <div className="mt-8">
           <h3 className="text-sm font-semibold tracking-tight">Commit types.</h3>
-          <p className="mt-1 text-xs text-muted-foreground">Prefixes on the commits in this work.</p>
           <div className="mt-3">
             <WorkSpendStack
               label="Commit prefixes in work with spend"

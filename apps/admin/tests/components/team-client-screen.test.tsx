@@ -10,6 +10,20 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => "/team",
+}));
+
+vi.mock("next-auth/react", () => ({
+  useSession: () => ({ data: { user: { role: "owner" } } }),
+}));
+
+vi.mock("@/components/team-filter", () => ({
+  TeamFilter: () => null,
+}));
+
+vi.mock("@/components/team/team-teams-panel", () => ({
+  TeamTeamsPanel: () => <div>teams</div>,
 }));
 
 vi.mock("@/lib/api/client", () => ({
@@ -48,6 +62,13 @@ vi.mock("@/components/team/team-invited-panel", () => ({
 
 vi.mock("@/components/team/team-syncs-panel", () => ({
   TeamSyncsPanel: () => <div>syncs</div>,
+}));
+
+// Avoid pulling the heavy @lobehub/ui icon set (which loads @emoji-mart data as
+// a raw JSON module) through the ghost-rows roster preview, matching the mock
+// used in calculation-components.test.tsx.
+vi.mock("@/components/tools/tool-brand-icon", () => ({
+  ToolLogoTile: ({ tool }: { tool: string }) => <span aria-label={`${tool} logo`} />,
 }));
 
 vi.mock("@/components/app-data-state", () => ({

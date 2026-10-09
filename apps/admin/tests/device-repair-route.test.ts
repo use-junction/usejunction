@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   requireAppPrincipal: vi.fn(),
   developerFindFirst: vi.fn(),
   deviceFindFirst: vi.fn(),
+  enrollmentTokenFindFirst: vi.fn(),
   issueRepairEnrollmentToken: vi.fn(),
   audit: vi.fn(),
 }));
@@ -35,6 +36,7 @@ vi.mock("@usejunction/db", () => ({
   prisma: {
     developer: { findFirst: mocks.developerFindFirst },
     device: { findFirst: mocks.deviceFindFirst },
+    enrollmentToken: { findFirst: mocks.enrollmentTokenFindFirst },
   },
 }));
 
@@ -109,4 +111,26 @@ test("POST /api/me/devices/:id/repair returns auth errors from principal guard",
   );
 
   assert.equal(response.status, 401);
+});
+
+test("GET /api/me/devices/:id/repair waits for a usage sync before reporting connected", async () => {
+  const { GET } = await import("@/app/api/me/devices/[id]/repair/route");
+  const usedAt = new Date("2026-08-09T14:00:00.000Z");
+  const after = new Date("2026-08-09T14:00:05.000Z");
+  const statusFor = async (repairDevice: { lastSeenAt: Date; lastUsageSyncAt: Date | null }) => {
+    mocks.enrollmentTokenFindFirst.mockResolvedValueOnce({
+      usedAt,
+      expiresAt: new Date("2026-08-09T15:00:00.000Z"),
+      repairDevice: { ...repairDevice, decommissionedAt: null },
+    });
+    const response = await GET(
+      { nextUrl: new URL("https://usejunction.dev/api/me/devices/device_1/repair?tokenId=enroll_repair") } as never,
+      { params: Promise.resolve({ id: "device_1" }) },
+    );
+    return ((await response.json()) as { status: string }).status;
+  };
+
+  assert.equal(await statusFor({ lastSeenAt: usedAt, lastUsageSyncAt: null }), "enrolled");
+  assert.equal(await statusFor({ lastSeenAt: after, lastUsageSyncAt: usedAt }), "syncing");
+  assert.equal(await statusFor({ lastSeenAt: after, lastUsageSyncAt: after }), "connected");
 });

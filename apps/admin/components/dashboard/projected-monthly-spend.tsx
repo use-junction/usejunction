@@ -31,6 +31,7 @@ import { billingCadenceLabel } from "@/lib/billing/cycles";
 import { formatShortDate, formatUsd } from "@/lib/format";
 import { canonicalToolKey, toolDisplayName } from "@/lib/tools/catalog";
 import { cn } from "@/lib/utils";
+import { isIdlePaidCycle } from "@/lib/dashboard/idle-cycles";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { OrgOverviewV1 } from "@/lib/insights";
 
@@ -341,7 +342,10 @@ export function ProjectedMonthlySpend({
   const todayInDomain =
     domain.todayMs >= domain.rangeStartMs && domain.todayMs <= domain.rangeEndMs;
 
-  const seatsCaption = fleetRunways.earliestRunOutDate
+  const idlePlans = cycles.filter(isIdlePaidCycle).length;
+  const seatsCaption = idlePlans > 0
+    ? `${idlePlans} of ${cycles.length} paid ${cycles.length === 1 ? "plan" : "plans"} with no use this period`
+    : fleetRunways.earliestRunOutDate
     ? `Earliest run-out ${formatShortDate(fleetRunways.earliestRunOutDate)} · ${fleetRunways.coversFullCount}/${fleetRunways.rows.length || 0} on track`
     : fleetRunways.coversFullCount > 0 && fleetRunways.coversFullCount === fleetRunways.rows.length
       ? "All tracked plans on track"
@@ -352,7 +356,7 @@ export function ProjectedMonthlySpend({
       <div className="w-full shrink-0 lg:w-[12.5rem]">
         <div className="flex min-w-0 items-center gap-1.5">
           <p className="truncate text-sm font-medium text-muted-foreground">
-            {lens === "commitment" ? "Subscription commitment" : "Provider usage"}
+            {lens === "commitment" ? "Seat commitment" : "Provider usage"}
           </p>
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
@@ -458,7 +462,7 @@ export function ProjectedMonthlySpend({
             ? formatUsd(commitment)
             : formatUsd(usageSeries.projectedSpend)}
         </p>
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className={cn("mt-2 text-xs", lens === "commitment" && idlePlans > 0 ? "text-warning" : "text-muted-foreground")}>
           {lens === "commitment" ? seatsCaption : "Projected at current daily pace"}
         </p>
 

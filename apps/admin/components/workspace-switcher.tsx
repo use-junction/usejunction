@@ -100,7 +100,8 @@ export function WorkspaceSwitcher({
     try {
       await activateWorkspace(orgId);
       queryClient.clear();
-      window.location.assign("/dashboard");
+      // The role can differ per workspace, so let the server pick the right home.
+      window.location.assign("/auth/continue?from=%2Fdashboard");
     } catch {
       // Keep the current workspace selected when the server rejects the switch.
     }

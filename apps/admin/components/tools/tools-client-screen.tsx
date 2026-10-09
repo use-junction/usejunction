@@ -327,6 +327,7 @@ type ToolsPayload =
       error: string | null;
       syncContext: RemoteSyncPanelContext | null;
       costOverview: CostOverview | null;
+      team?: { id: string; name: string } | null;
     };
 
 export default function ToolsClientScreen() {
@@ -381,7 +382,9 @@ export default function ToolsClientScreen() {
         initialCatalog={serializedCatalog}
         initialSubscriptions={query.data.subscriptions}
         overview={costOverview}
+        team={query.data.team ?? null}
         hasLocalSync={Boolean(syncContext?.deviceCount)}
+        onChanged={() => void query.refetch()}
       >
         {syncContext?.deviceCount ? (
           <LocalSyncPanel

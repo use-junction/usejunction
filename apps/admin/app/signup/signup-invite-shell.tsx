@@ -14,7 +14,8 @@ export function SignupInviteShell({ children }: { children: React.ReactNode }) {
   if (joiningInvite) {
     return (
       <AuthShell
-        accent="yellow"
+        accent="cyan"
+        statement="Make model decisions based on evidence."
         title="Create your account."
         description={
           hasOAuth
@@ -29,9 +30,9 @@ export function SignupInviteShell({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthShell
-      accent="yellow"
+      accent="cyan"
+        statement="Make model decisions based on evidence."
       title="Create your workspace."
-      description="Start with a shared workspace for your team's AI coding tools, spend, and device health. You can add more workspaces later when you need them."
     >
       {children}
     </AuthShell>

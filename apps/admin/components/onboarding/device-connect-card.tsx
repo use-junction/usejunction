@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { AlertCircle, Check, Loader2 } from "lucide-react";
+import { AlertCircle, Check, Info, Loader2 } from "lucide-react";
 import { hasToolBrandIcon, ToolLogoTile } from "@/components/tools/tool-brand-icon";
 import { Panel } from "@/components/panel";
 import { PlatformCommand } from "@/components/onboarding/platform-command";
@@ -17,6 +17,14 @@ import {
 } from "@/lib/device-connect-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { canonicalToolKey } from "@/lib/tools/catalog";
 import { userFacingError } from "@/lib/errors/user-facing";
 import { browserMutationInit } from "@/lib/api/client";
@@ -43,6 +51,8 @@ type Props = {
   description?: string;
   footerDescription?: string;
   compact?: boolean;
+  /** Render the "What this collects" link above the command. Off when the parent shows it. */
+  showNoticeLink?: boolean;
   /** Only poll for enrollment after the connect command is copied. */
   pollAfterCopy?: boolean;
   /** Hide the inline waiting row (e.g. when parent renders status elsewhere). */
@@ -75,6 +85,7 @@ export const DeviceConnectCard = forwardRef<DeviceConnectCardHandle, Props>(func
     description = "Choose this device's platform, then run the command. It installs the agent, enables reporting, and starts it in the background. Expires in 15 minutes.",
     footerDescription,
     compact = false,
+    showNoticeLink = true,
     pollAfterCopy = false,
     hideInlineStatus = false,
     initialDevices,
@@ -92,9 +103,6 @@ export const DeviceConnectCard = forwardRef<DeviceConnectCardHandle, Props>(func
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<CollectionNoticeCopy | null>(null);
-  const [noticeAcked, setNoticeAcked] = useState(false);
-  const [noticeChecked, setNoticeChecked] = useState(false);
-  const [noticeBusy, setNoticeBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [waitingForTools, setWaitingForTools] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
@@ -275,17 +283,14 @@ export const DeviceConnectCard = forwardRef<DeviceConnectCardHandle, Props>(func
     [deviceEnrolled, ensureFreshEnrollment],
   );
 
+  /** Records that the collection notice was shown; the token route requires it. */
   const acknowledgeNotice = useCallback(async () => {
-    setNoticeBusy(true);
-    setError(null);
     const response = await fetch("/api/me/collection-notice", browserMutationInit("POST", { accept: true }));
     const body = (await response.json().catch(() => ({}))) as { acknowledged?: boolean; error?: string };
-    setNoticeBusy(false);
     if (!response.ok || !body.acknowledged) {
-      setError(userFacingError(body.error, "Could not record the collection notice."));
+      setError(userFacingError(body.error, "Unable to create a connect command."));
       return false;
     }
-    setNoticeAcked(true);
     return true;
   }, []);
 
@@ -315,7 +320,6 @@ export const DeviceConnectCard = forwardRef<DeviceConnectCardHandle, Props>(func
       };
       if (noticeBody.notice) setNotice(noticeBody.notice);
       const acked = noticeBody.acknowledged === true;
-      setNoticeAcked(acked);
 
       if (initialCredentials) {
         setToken(initialCredentials.token);
@@ -329,13 +333,14 @@ export const DeviceConnectCard = forwardRef<DeviceConnectCardHandle, Props>(func
         if (shouldEnterSyncWait(existing)) {
           beginSyncWait(existing);
         }
-      } else if (!initialCredentials && acked) {
+      } else if (!initialCredentials && (acked || (await acknowledgeNotice()))) {
         await generateToken();
       }
 
       setLoading(false);
     })();
   }, [
+    acknowledgeNotice,
     beginSyncWait,
     generateToken,
     initialCredentials,
@@ -525,60 +530,13 @@ export const DeviceConnectCard = forwardRef<DeviceConnectCardHandle, Props>(func
             </Button>
           ) : null}
         </div>
-      ) : !noticeAcked && notice ? (
-        <div className="space-y-4 border border-border bg-white p-4">
-          <div>
-            <p className="text-sm font-medium">{notice.title}</p>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">{notice.summary}</p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Collected</p>
-              <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                {notice.collects.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Never</p>
-              <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                {notice.neverCollects.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          <p className="text-sm leading-6 text-muted-foreground">{notice.whoSees}</p>
-          <p className="text-sm leading-6 text-muted-foreground">{notice.retention}</p>
-          <label className="flex items-start gap-2 text-sm leading-6">
-            <input
-              type="checkbox"
-              className="mt-1 size-4 accent-[#08a8c4]"
-              checked={noticeChecked}
-              onChange={(event) => setNoticeChecked(event.target.checked)}
-            />
-            <span>I understand what this agent will upload about this device.</span>
-          </label>
-          {error ? (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          ) : null}
-          <Button
-            type="button"
-            disabled={!noticeChecked || noticeBusy}
-            onClick={() => {
-              void acknowledgeNotice().then((ok) => {
-                if (ok) void generateToken();
-              });
-            }}
-          >
-            {noticeBusy ? "Saving…" : "Continue to connect command"}
-          </Button>
-        </div>
       ) : (
         <>
+          {notice && showNoticeLink ? (
+            <div className={cn(compact && "mb-3")}>
+              <CollectionNoticeDialog notice={notice} />
+            </div>
+          ) : null}
           {commands ? (
             <PlatformCommand
               commands={commands}
@@ -623,3 +581,71 @@ export const DeviceConnectCard = forwardRef<DeviceConnectCardHandle, Props>(func
     </div>
   );
 });
+
+/** Standalone link for parents that place the notice next to their own copy. */
+export function CollectionNoticeLink({ className }: { className?: string }) {
+  const [notice, setNotice] = useState<CollectionNoticeCopy | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/me/collection-notice", { credentials: "same-origin" })
+      .then((response) => response.json())
+      .then((body: { notice?: CollectionNoticeCopy }) => {
+        if (!cancelled && body.notice) setNotice(body.notice);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!notice) return null;
+  return <CollectionNoticeDialog notice={notice} className={className} />;
+}
+
+function CollectionNoticeDialog({ notice, className }: { notice: CollectionNoticeCopy; className?: string }) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex w-fit items-center gap-1.5 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline",
+            className,
+          )}
+        >
+          <Info className="size-3.5 shrink-0" aria-hidden />
+          What this collects from this device
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{notice.title}</DialogTitle>
+          <DialogDescription className="leading-6">{notice.summary}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 text-sm sm:grid-cols-2">
+          <div>
+            <p className="font-mono text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground">Collected</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4 leading-5 text-muted-foreground">
+              {notice.collects.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <p className="font-mono text-[0.65rem] uppercase tracking-[0.14em] text-muted-foreground">Never collected</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4 leading-5 text-muted-foreground">
+              {notice.neverCollects.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+        <div className="space-y-2 border-t border-border pt-4 text-xs leading-5 text-muted-foreground">
+          <p>{notice.whoSees}</p>
+          <p>{notice.retention}</p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

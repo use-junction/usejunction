@@ -34,12 +34,9 @@ export function readBrowserAnalyticsConsent(): AnalyticsConsentState | null {
   return readConsentCookie(document.cookie);
 }
 
+/** Analytics are on by default (covered by the Terms); only an explicit opt-out turns them off. */
 export function hasAnalyticsConsent(state: AnalyticsConsentState | null = readBrowserAnalyticsConsent()): boolean {
-  return Boolean(state?.analytics && state.version === ANALYTICS_CONSENT_VERSION);
-}
-
-export function hasResolvedAnalyticsConsent(state: AnalyticsConsentState | null = readBrowserAnalyticsConsent()): boolean {
-  return Boolean(state && state.version === ANALYTICS_CONSENT_VERSION);
+  return state?.analytics !== false;
 }
 
 export function serializeAnalyticsConsent(analytics: boolean, at = new Date()): AnalyticsConsentState {

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { BarChart3, ChevronDown, ChevronUp, Loader2, SquarePen, Users } from "lucide-react";
+import { BarChart3, ChevronDown, ChevronUp, Loader2, Search, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useErrorMessageToast } from "@/components/app-data-state";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -38,7 +38,12 @@ import {
 } from "@/lib/rbac/permissions";
 import type { PlanUsageDeveloperRow } from "@/lib/insights/contracts/plan-usage.v1";
 import { countActiveDevices } from "@/lib/devices/presence";
-import { useInvalidateAppData } from "@/lib/api/client";
+import { browserMutationInit, useAppQuery, useInvalidateAppData } from "@/lib/api/client";
+import { teamsKey } from "@/lib/app-pages/query-keys";
+import type { TeamSummary } from "@/lib/teams";
+import { Input } from "@/components/ui/input";
+
+const NO_TEAM = "none";
 
 type Subscription = {
   id: string;
@@ -57,6 +62,7 @@ type Developer = {
   name: string;
   email: string;
   authUserId: string | null;
+  teamId?: string | null;
   role: string;
   requests: number;
   devices: Array<{
@@ -92,8 +98,11 @@ export function DeveloperToolInventory({
   planUsageError = null,
   retryPlanUsage,
   periodSuffix = "30d",
+  ghostRows,
 }: {
   showSummary?: boolean;
+  /** Faded sample rows under the roster while no machine reports yet. */
+  ghostRows?: ReactNode;
   initialDevelopers: Developer[];
   initialSubscriptions: Subscription[];
   initialPlanUsage?: PlanUsageDeveloperRow[];
@@ -103,6 +112,8 @@ export function DeveloperToolInventory({
   periodSuffix?: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const teamFilter = searchParams.get("team");
   const { data: session } = useSession();
   const canAssignRoles = canManageSettings(session?.user?.role as OrganizationRole | null | undefined);
   const invalidateAppData = useInvalidateAppData();
@@ -114,6 +125,11 @@ export function DeveloperToolInventory({
   const [bulkOpen, setBulkOpen] = useState(false);
   const [addSubscriptionOpen, setAddSubscriptionOpen] = useState(false);
   const [planUsageByDeveloper, setPlanUsageByDeveloper] = useState(() => planUsageMap(initialPlanUsage ?? []));
+  const [search, setSearch] = useState("");
+  const teamsQuery = useAppQuery<{ teams: TeamSummary[] }>(teamsKey, "/api/app/teams", { staleTime: 60_000 });
+  const teams = useMemo(() => teamsQuery.data?.teams ?? [], [teamsQuery.data]);
+  const teamById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
+  const canManageTeams = canAssignRoles && teams.length > 0;
 
   useErrorMessageToast(error);
   useErrorMessageToast(planUsageError, { retry: retryPlanUsage });
@@ -124,6 +140,16 @@ export function DeveloperToolInventory({
   }, [initialDevelopers, initialSubscriptions, initialPlanUsage]);
 
   const canBulkAssign = developers.length > 1 && subscriptions.some((subscription) => subscription.availableSeats > 0);
+  const canSelect = canBulkAssign || (canManageTeams && developers.length > 1);
+  const visibleDevelopers = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return developers.filter((developer) => {
+      if (teamFilter === NO_TEAM && developer.teamId) return false;
+      if (teamFilter && teamFilter !== NO_TEAM && developer.teamId !== teamFilter) return false;
+      if (!needle) return true;
+      return developer.name.toLowerCase().includes(needle) || developer.email.toLowerCase().includes(needle);
+    });
+  }, [developers, search, teamFilter]);
 
   const summary = useMemo(() => {
     const devices = developers.flatMap((developer) => developer.devices);
@@ -187,6 +213,22 @@ export function DeveloperToolInventory({
     setSaving(null);
   }
 
+  async function moveToTeam(developerIds: string[], teamId: string | null) {
+    setSaving(`team:${developerIds.join(",")}`);
+    setError(null);
+    const response = await fetch("/api/app/teams/members", browserMutationInit("POST", { developerIds, teamId }));
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    setSaving(null);
+    if (!response.ok) {
+      setError(userFacingError(body.error, "Could not change the team."));
+      return;
+    }
+    setDevelopers((current) => current.map((developer) => (developerIds.includes(developer.id) ? { ...developer, teamId } : developer)));
+    setSelected(new Set());
+    toast.success(teamId ? `Moved to ${teamById.get(teamId)?.name ?? "team"}.` : "Removed from team.");
+    await invalidateAppData();
+  }
+
   async function changeRole(developerId: string, role: AssignableRole) {
     const memberName = developers.find((developer) => developer.id === developerId)?.name;
     setSaving(`role:${developerId}`);
@@ -235,14 +277,14 @@ export function DeveloperToolInventory({
             }
           />
           <SignalsKpi
-            label="Team members"
+            label="Members"
             compactMobile
             className="border-l-2 border-border-strong pl-3 pr-2 sm:pl-4 sm:pr-3"
             value={summary.memberCount}
             sub="on the roster"
           />
           <SignalsKpi
-            label="Team plan coverage"
+            label="Plan coverage"
             compactMobile
             className="border-l-2 border-border-strong pl-3 pr-2 sm:pl-4 sm:pr-3"
             value={
@@ -263,7 +305,7 @@ export function DeveloperToolInventory({
             }
           />
           <SignalsKpi
-            label="Team usage"
+            label="Plan usage"
             compactMobile
             className="border-l-2 border-border-strong pl-3 pr-2 sm:pl-4 sm:pr-3"
             value={planUsageLoading ? "…" : summary.avgPercent != null ? `${summary.avgPercent.toFixed(0)}%` : "—"}
@@ -293,22 +335,51 @@ export function DeveloperToolInventory({
       ) : null}
 
       <Panel as="section" padded={false}>
-        <div className="border-b bg-muted/25 px-5 py-4">
-          <h2 className="text-lg font-semibold tracking-tight">Team members.</h2>
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            {developers.length
-              ? `${developers.length} on the roster · open anyone for plans, their device, and usage`
-              : "Invite people, then assign plans from their profile."}
-          </p>
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b bg-muted/25 px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Members.</h2>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {developers.length
+                ? `${visibleDevelopers.length === developers.length ? developers.length : `${visibleDevelopers.length} of ${developers.length}`} on the roster · open anyone for plans, their device, and usage`
+                : "Invite people, then assign plans from their profile."}
+            </p>
+          </div>
+          {developers.length > 5 ? (
+            <label className="relative block w-full sm:w-64">
+              <span className="sr-only">Search people</span>
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <Input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search name or email"
+                className="h-9 rounded-none pl-8 text-sm"
+              />
+            </label>
+          ) : null}
         </div>
 
         <div>
-          {canBulkAssign && selected.size > 0 ? (
+          {canSelect && selected.size > 0 ? (
             <div className="mx-5 mt-4 mb-1 flex flex-wrap items-center gap-3 bg-muted/40 px-4 py-3">
               <div className="mr-auto flex items-center gap-2 text-sm font-medium">
                 <Users className="size-4" />
                 {selected.size} selected
               </div>
+              {canManageTeams ? (
+                <Select onValueChange={(value) => void moveToTeam([...selected], value === NO_TEAM ? null : value)} disabled={Boolean(saving)}>
+                  <SelectTrigger className="h-8 w-[160px] rounded-none" aria-label="Move selected people to a team">
+                    <SelectValue placeholder="Move to team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                    ))}
+                    <SelectItem value={NO_TEAM}>No team</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : null}
+              {canBulkAssign ? (
               <div className="relative">
                 <Button size="sm" className="rounded-none" onClick={() => setBulkOpen(!bulkOpen)}>
                   Assign plan {bulkOpen ? <ChevronUp /> : <ChevronDown />}
@@ -325,6 +396,7 @@ export function DeveloperToolInventory({
                   </div>
                 ) : null}
               </div>
+              ) : null}
               <Button variant="ghost" size="sm" className="rounded-none" onClick={() => setSelected(new Set())}>
                 Clear
               </Button>
@@ -335,9 +407,13 @@ export function DeveloperToolInventory({
             <Empty className="min-h-0 gap-1 border-0 px-5 py-6 md:px-5 md:py-6">
               <EmptyDescription>Invite people, then open their profile to assign plans.</EmptyDescription>
             </Empty>
+          ) : !visibleDevelopers.length ? (
+            <Empty className="min-h-0 gap-1 border-0 px-5 py-6 md:px-5 md:py-6">
+              <EmptyDescription>Nobody matches this search or team.</EmptyDescription>
+            </Empty>
           ) : (
             <ul className="divide-y">
-              {developers.map((developer) => {
+              {visibleDevelopers.map((developer) => {
                 const machineCount = developer.devices.length;
                 const meta = [
                   machineCount
@@ -366,7 +442,7 @@ export function DeveloperToolInventory({
                     className="group transition-colors hover:bg-muted/40 has-[:focus-visible]:bg-muted/40"
                   >
                     <div className="flex flex-wrap items-start gap-3 px-5 py-5">
-                      {canBulkAssign ? (
+                      {canSelect ? (
                         <input
                           type="checkbox"
                           aria-label={`Select ${developer.name}`}
@@ -391,6 +467,12 @@ export function DeveloperToolInventory({
                             {developer.name}
                           </p>
                           <p className="mt-0.5 truncate text-xs text-muted-foreground">{developer.email}</p>
+                          {developer.teamId && teamById.get(developer.teamId) && !canManageTeams ? (
+                            <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <span className="size-2" style={{ background: teamById.get(developer.teamId)?.color ?? "var(--muted-foreground)" }} aria-hidden />
+                              {teamById.get(developer.teamId)?.name}
+                            </p>
+                          ) : null}
                           {meta ? <p className="mt-1.5 text-xs text-muted-foreground">{meta}</p> : null}
                           {rosterPlans.length ? <RosterPlanUsage plans={rosterPlans} /> : null}
                         </div>
@@ -431,22 +513,30 @@ export function DeveloperToolInventory({
                           {roleDisplayLabel(developer.role)}
                         </Badge>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0 self-start rounded-none px-2.5"
-                        asChild
-                      >
-                        <Link href={`/team/${developer.id}`} prefetch={false} aria-label={`Edit ${developer.name}`}>
-                          <SquarePen className="size-4" />
-                        </Link>
-                      </Button>
+                      {canManageTeams ? (
+                        <Select
+                          value={developer.teamId && teamById.has(developer.teamId) ? developer.teamId : NO_TEAM}
+                          onValueChange={(value) => void moveToTeam([developer.id], value === NO_TEAM ? null : value)}
+                          disabled={Boolean(saving)}
+                        >
+                          <SelectTrigger className="h-8 w-[148px] shrink-0 self-start rounded-none" aria-label={`Team for ${developer.name}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teams.map((team) => (
+                              <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                            ))}
+                            <SelectItem value={NO_TEAM}>No team</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : null}
                     </div>
                   </li>
                 );
               })}
             </ul>
           )}
+          {ghostRows}
         </div>
       </Panel>
 

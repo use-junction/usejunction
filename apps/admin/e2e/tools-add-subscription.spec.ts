@@ -102,8 +102,9 @@ test("adding ChatGPT / Codex persists through the real subscriptions API", async
     expect(createResponse.status()).toBe(201);
     expect(createdSubscriptionId).toBeTruthy();
     await expect(sheet).toBeHidden();
-    await expect(page.getByRole("heading", { name: "ChatGPT / Codex" })).toBeVisible();
-    await expect(page.getByText(/1 Plus/i).first()).toBeVisible();
+    // The /tools list now shows the added subscription as a table row.
+    await expect(page.getByRole("row", { name: /ChatGPT Plus/i })).toBeVisible();
+    await expect(page.getByText(/1 of 1 used/i).first()).toBeVisible();
     expect(pageErrors, "persisted add page errors").toEqual([]);
   } finally {
     if (createdSubscriptionId) {

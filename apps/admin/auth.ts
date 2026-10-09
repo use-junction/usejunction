@@ -18,6 +18,7 @@ import {
   notifyUserSignedUp,
 } from "@/lib/notifications/slack";
 import { provisionWorkspaceOnCreateUser } from "@/lib/ensure-workspace";
+import { recordLegalAcceptance } from "@/lib/legal/acceptance";
 import authConfig from "./auth.config";
 
 const MAX_PASSWORD_BYTES = 256;
@@ -139,6 +140,8 @@ export const {
   events: {
     async createUser({ user }) {
       if (!user.email) return;
+      // OAuth signup shows the Terms/Privacy agreement next to the provider buttons.
+      if (user.id) await recordLegalAcceptance(user.id);
       notifyUserSignedUp({
         email: user.email,
         name: user.name,

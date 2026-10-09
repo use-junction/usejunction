@@ -15,6 +15,11 @@ type ToolAccount struct {
 	AccountKey  string `json:"accountKey,omitempty"`
 	Email       string `json:"email,omitempty"`
 	Plan        string `json:"plan,omitempty"`
+	// OrgKey is the vendor's organization identifier for this login (e.g. the
+	// Anthropic organization uuid). It is plaintext and lets the control plane
+	// resolve a login's plan from the org even when the plan is not known on
+	// this device.
+	OrgKey      string `json:"orgKey,omitempty"`
 	LoginMethod string `json:"loginMethod"`
 	AuthPresent bool   `json:"authPresent"`
 }

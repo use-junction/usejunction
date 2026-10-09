@@ -83,6 +83,12 @@ var updateCmd = &cobra.Command{
 			startBackgroundAgent()
 			return nil
 		}
+		// Legacy installs still under ~/.usejunction converge to ~/Applications as
+		// part of the update rather than on every daemon boot.
+		if migrateDarwinBundleAfterUpdate() {
+			fmt.Printf("Installed UseJunction agent v%s and moved it to ~/Applications. The background service is restarting.\n", directive.TargetVersion)
+			return nil
+		}
 		if err := restartBackgroundAgent(); err != nil {
 			return fmt.Errorf("update installed but daemon restart failed: %w", err)
 		}

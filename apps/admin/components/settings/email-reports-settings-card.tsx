@@ -26,6 +26,17 @@ const COMMON_TIMEZONES = [
   "Pacific/Auckland",
 ];
 
+/** Every IANA zone the browser knows, so nobody is stuck with a neighbouring city's offset. */
+function allTimeZones(): string[] {
+  try {
+    const zones = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf?.("timeZone");
+    if (zones?.length) return ["UTC", ...zones.filter((zone) => zone !== "UTC")];
+  } catch {
+    // Older browsers: fall back to the common list below.
+  }
+  return COMMON_TIMEZONES;
+}
+
 export type EmailReportsPrefs = {
   timeZone: string;
   timeZoneManual: boolean;
@@ -43,7 +54,8 @@ export function EmailReportsSettingsCard({ initial }: { initial: EmailReportsPre
   const [pending, startTransition] = useTransition();
   const showOrg = initial.role === "owner" || initial.role === "admin";
 
-  const zones = COMMON_TIMEZONES.includes(timeZone) ? COMMON_TIMEZONES : [timeZone, ...COMMON_TIMEZONES];
+  const [available] = useState(allTimeZones);
+  const zones = available.includes(timeZone) ? available : [timeZone, ...available];
 
   function save(event: FormEvent) {
     event.preventDefault();

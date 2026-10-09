@@ -5,6 +5,7 @@ import {
   dashboardShellKey,
   workSpendKey,
   myDataKey,
+  overviewKey,
   teamKey,
   toolsKey,
 } from "@/lib/app-pages/query-keys";
@@ -14,6 +15,7 @@ import {
  * `/tools/:toolKey` or `/team/:developerId`.
  */
 const NAV_PREFETCH_TARGETS: Record<string, { queryKey: readonly unknown[]; url: string }> = {
+  "/overview": { queryKey: overviewKey(), url: "/api/app/overview" },
   "/dashboard": { queryKey: dashboardShellKey, url: "/api/app/dashboard?slice=shell" },
   "/team": { queryKey: teamKey(), url: "/api/app/team" },
   "/tools": { queryKey: toolsKey(), url: "/api/app/tools" },

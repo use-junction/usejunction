@@ -9,6 +9,19 @@ const DEFAULT_PLAN_KEYS: Record<string, string> = {
   opencode: "multi_provider",
 };
 
+// Tools where simply being signed in justifies auto-creating a base-tier seat,
+// even before we learn the vendor plan. Claude is deliberately excluded: Claude
+// Code runs on a paid subscription (Pro/Max/Team/Enterprise), so defaulting a
+// detected login to "Free" is almost always wrong. When we cannot read the
+// plan for a Claude login we leave it as "Plan unknown" for an admin to assign.
+const AUTH_ONLY_SEAT_DEFAULTS: Record<string, string> = {
+  "chatgpt-codex": "free",
+  cursor: "hobby",
+  antigravity: "individual",
+  "github-copilot": "free",
+  opencode: "multi_provider",
+};
+
 const VENDOR_PLAN_ALIASES: Record<string, Record<string, string>> = {
   cursor: {
     free: "hobby",
@@ -104,7 +117,7 @@ export function canAutoCreateDetectedSeat(
   input: { hasVendorPlan: boolean; authPresent?: boolean },
 ): boolean {
   if (input.hasVendorPlan) return true;
-  return Boolean(input.authPresent && DEFAULT_PLAN_KEYS[toolKey]);
+  return Boolean(input.authPresent && AUTH_ONLY_SEAT_DEFAULTS[toolKey]);
 }
 
 function normalizeVendorPlan(plan: string) {
@@ -142,4 +155,20 @@ export function mapVendorPlanToCatalog(
     if (alias) return alias;
   }
   return fallback;
+}
+
+// Catalog plans are listed weakest-first, so a plan's index is its strength.
+// Returns -1 for an unknown tool.
+export function vendorPlanRank(toolKey: string, vendorPlan: string | null | undefined): number {
+  const tool = findCatalogTool(toolKey);
+  if (!tool) return -1;
+  const key = mapVendorPlanToCatalog(toolKey, vendorPlan);
+  return tool.plans.findIndex((plan) => plan.key === key);
+}
+
+// strongerVendorPlan picks the higher-tier of two vendor plans for a tool, used
+// when one person has several logins (e.g. personal Pro + work Team) and we must
+// choose a single billing seat. Ties keep the first argument.
+export function strongerVendorPlan(toolKey: string, a: string, b: string): string {
+  return vendorPlanRank(toolKey, a) >= vendorPlanRank(toolKey, b) ? a : b;
 }

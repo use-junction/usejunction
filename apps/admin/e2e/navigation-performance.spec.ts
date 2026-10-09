@@ -2,9 +2,9 @@ import { expect, test, type Page, type Response } from "@playwright/test";
 
 const enabled = process.env.E2E_NAV_BENCHMARK === "1";
 const routeSequence = [
-  { href: "/team", link: "Team", heading: "Who's here?" },
+  { href: "/team", link: "People", heading: "People." },
   { href: "/activity", link: "Adoption", heading: "Adoption." },
-  { href: "/dashboard", link: "Coverage", heading: "What's reporting?" },
+  { href: "/dashboard", link: "Usage", heading: "Usage." },
 ] as const;
 
 function percentile(samples: number[], percentileValue: number) {
@@ -45,7 +45,7 @@ test("dashboard → Team → Activity → dashboard navigation meets warm-cache 
   });
 
   await page.goto("/dashboard");
-  await expect(page.getByRole("heading", { name: "What's reporting?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Usage." })).toBeVisible();
 
   // Warm all destination page-data queries using the same interactions users
   // make before a click, then measure three cached navigation loops.

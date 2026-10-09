@@ -137,6 +137,12 @@ export type DailyReportPayload = {
   membersActive?: number;
 };
 
+/** True when the report window recorded no AI usage at all — we never email these. */
+export function isEmptyReport(report: Pick<DailyReportPayload, "kpis">): boolean {
+  const { requests, tokens, cost } = report.kpis;
+  return requests <= 0 && tokens <= 0 && cost <= 0;
+}
+
 function localDatesInclusive(start: string, end: string): string[] {
   const dates: string[] = [];
   let cursor = start;

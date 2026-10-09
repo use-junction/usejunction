@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
       os: true,
       architecture: true,
       lastSeenAt: true,
+      appLocation: true,
     },
     orderBy: { lastSeenAt: "desc" },
   });
@@ -43,6 +44,9 @@ export async function GET(request: NextRequest) {
       architecture: device.architecture,
       lastSeenAt: device.lastSeenAt.toISOString(),
       state: deviceHealthState(device.lastSeenAt),
+      // "legacyHidden" means the macOS agent still runs from ~/.usejunction and
+      // should be reconnected to converge on ~/Applications (clears EDR flags).
+      legacyLocation: device.appLocation === "legacyHidden",
     })),
   });
 }

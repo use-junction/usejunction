@@ -39,7 +39,7 @@ export const privacyPage: ContentPage = {
         "Contract (Art. 6(1)(b)): creating your account, authenticating you, delivering the product you purchased or signed up for, and sending transactional email (verification, invites, password reset, device recovery).",
         "Legal obligation (Art. 6(1)(c)): tax, invoicing, and responding to lawful requests.",
         "Legitimate interests (Art. 6(1)(f)): securing the Service, preventing abuse, rate limiting (including IP address), diagnosing reliability issues, and keeping audit records of privacy-sensitive actions. You may object where the right applies.",
-        "Consent (Art. 6(1)(a)): optional PostHog product analytics and non-essential cookies. You can refuse or withdraw consent at any time via the cookie banner or Settings → Privacy. Employee monitoring is not based on employee consent.",
+        "Legitimate interests (Art. 6(1)(f)): PostHog product analytics, as described in our Terms. You can turn analytics off at any time via Settings → Privacy. Employee monitoring is not based on employee consent.",
       ],
     },
     {
@@ -52,7 +52,7 @@ export const privacyPage: ContentPage = {
         "Optional Signals work context (not available on the EU hosted region): titles, summaries, change narratives, file basenames, git metadata, and clipped user asks only if the customer enables raw work text.",
         "Support and sales: contact-form name, email, company, message; Slack ops alerts on US deployments may include signup email (EU deployments send counts only).",
         "Security: IP address embedded in short-lived rate-limit keys; Auth.js session cookies; device and integration secrets stored hashed or encrypted.",
-        "Product analytics (only with consent): PostHog events identified by user id, email, name, organization id, and role.",
+        "Product analytics (unless you opt out): PostHog events identified by user id, email, name, organization id, and role.",
       ],
     },
     {
@@ -106,7 +106,7 @@ export const privacyPage: ContentPage = {
       heading: "10. Cookies",
       body: [
         "Strictly necessary cookies keep you signed in (Auth.js session) and remember workspace and sidebar state. These do not require consent.",
-        "PostHog analytics cookies load only after you opt in. See /cookies for the inventory.",
+        "PostHog analytics cookies are on by default and can be turned off in Settings → Privacy. See /cookies for the inventory.",
       ],
     },
     {

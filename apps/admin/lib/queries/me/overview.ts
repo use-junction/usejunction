@@ -6,6 +6,7 @@ import { getWorkspaceSyncReadiness } from "@/lib/analytics/snapshots/readiness";
 import { deviceHealthState } from "@/lib/devices/health";
 import { orgNeedsPlanSync } from "@/lib/queries/me/local-sync-context";
 import { canonicalToolKey, findCatalogTool, isCodingTool } from "@/lib/tools/catalog";
+import { monthlyMicros } from "@/lib/billing/monthly";
 import type { OrganizationRole } from "@/lib/workspace-context";
 import { rollupPersonalToolsUsage } from "@/lib/queries/me/tools-usage-rollup";
 import {
@@ -65,6 +66,8 @@ export interface MeOverviewData {
       os: string;
       architecture: string;
       agentVersion: string;
+      /** 0 means the agent predates remote sync and needs an update (same rule as Team → Fleet). */
+      remoteSyncProtocol: number;
       lastSeenAt: Date;
       lastUsageSyncAt: Date | null;
       lastAccountSyncAt: Date | null;
@@ -148,11 +151,16 @@ export interface MeOverviewData {
   /** Active seat assignments — used to resolve billing cycle windows on plan cards. */
   planSeats: Array<{
     toolName: string;
+    /** Canonical tool key for links and matching usage. */
+    toolKey: string;
+    planName: string;
     billingCadence: string;
     billingCycleAnchorDate: string | null;
     billingCycleDays: number | null;
     /** Full-cycle seat dollars for this assignment (seatCount × cycle seat price). */
     cycleSeatCost: number;
+    /** cycleSeatCost normalised to a month, matching the Cost page. */
+    monthlySeatCost: number;
   }>;
   aiCoding30d: AiCodingMetrics;
   modelUsage30d: ModelUsageRow[];
@@ -304,6 +312,7 @@ async function buildMeOverview(
       select: {
         id: true,
         toolName: true,
+        planName: true,
         billingCadence: true,
         billingCycleAnchorDate: true,
         billingCycleDays: true,
@@ -368,12 +377,17 @@ async function buildMeOverview(
   );
   const planSeats = planAssignments.map((row) => ({
     toolName: row.toolName,
+    toolKey: canonicalToolKey(row.template?.toolKey ?? row.toolName),
+    planName: row.planName,
     billingCadence: row.billingCadence,
     billingCycleAnchorDate: row.billingCycleAnchorDate
       ? row.billingCycleAnchorDate.toISOString().slice(0, 10)
       : null,
     billingCycleDays: row.billingCycleDays ?? null,
     cycleSeatCost: microsToDollars(row.cycleSeatMicros * BigInt(Math.max(0, row.seatCount))),
+    monthlySeatCost: microsToDollars(
+      monthlyMicros(row.cycleSeatMicros * BigInt(Math.max(0, row.seatCount)), row.billingCadence, row.billingCycleDays ?? null),
+    ),
   }));
 
   const modelUsageRows: ModelUsageRow[] = snapshotUsage.models.flatMap((row) => {
@@ -505,6 +519,7 @@ async function buildMeOverview(
         os: device.os,
         architecture: device.architecture,
         agentVersion: device.agentVersion,
+        remoteSyncProtocol: device.remoteSyncProtocol ?? 0,
         lastSeenAt: device.lastSeenAt,
         lastUsageSyncAt: device.lastUsageSyncAt ?? null,
         lastAccountSyncAt: device.lastAccountSyncAt ?? null,

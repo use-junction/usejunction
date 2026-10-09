@@ -9,8 +9,8 @@ import {
 } from "@/lib/region";
 
 const LABELS: Record<DeploymentRegion, string> = {
-  us: "United States",
-  eu: "European Union",
+  us: "US",
+  eu: "EU",
 };
 
 export function RegionPicker() {
@@ -25,17 +25,13 @@ export function RegionPicker() {
   }
 
   return (
-    <fieldset className="space-y-2">
-      <legend className="text-sm font-medium">Data region</legend>
-      <p className="text-xs leading-5 text-muted-foreground">
-        Workspaces stay in the region you pick. EU hosts at eu.usejunction.dev with Signals work
-        extraction off.
-      </p>
-      <div className="grid grid-cols-2 gap-2">
+    <fieldset className="flex items-center justify-between gap-3">
+      <legend className="float-left text-xs font-medium text-muted-foreground">Data region</legend>
+      <div className="inline-flex border border-input text-xs">
         {DEPLOYMENT_REGIONS.map((region) => (
           <label
             key={region}
-            className="flex cursor-pointer items-center gap-2 border border-input px-3 py-2 text-sm"
+            className="cursor-pointer px-2.5 py-1 text-muted-foreground has-[:checked]:bg-foreground has-[:checked]:text-background has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
           >
             <input
               type="radio"
@@ -43,6 +39,7 @@ export function RegionPicker() {
               value={region}
               checked={selected === region}
               onChange={() => choose(region)}
+              className="sr-only"
             />
             {LABELS[region]}
           </label>

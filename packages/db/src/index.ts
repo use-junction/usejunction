@@ -6,7 +6,7 @@ import { Pool } from "pg";
  * Bump when Device (or other hot models) gain fields so a long-lived Next.js
  * process drops a stale PrismaClient after `prisma generate`.
  */
-const PRISMA_SCHEMA_REV = "usage-default-on-v1";
+const PRISMA_SCHEMA_REV = "teams-v1";
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;

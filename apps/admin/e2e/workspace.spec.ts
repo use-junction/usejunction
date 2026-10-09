@@ -49,7 +49,7 @@ test("workspace startup has no bootstrap gate or duplicate page-data request", a
   });
 
   await page.goto("/dashboard");
-  await expect(page.getByRole("heading", { name: "What's reporting?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Usage." })).toBeVisible();
 
   expect(appRequests).not.toContain("/api/app/bootstrap");
   // The client workspace context and destination page model each load at most once.
@@ -92,8 +92,8 @@ test("unknown routes show branded 404 recovery", async ({ page }) => {
 
 test("owner chrome exposes nav, active-plan badge, and workspace switcher", async ({ page }) => {
   await page.goto("/dashboard");
-  await expect(page.getByRole("link", { name: "Coverage" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Team" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Usage", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "People" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Signals" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Cost", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Adoption" })).toBeVisible();
@@ -109,7 +109,7 @@ test("owner Team | You switcher scopes Dashboard and Activity", async ({ page })
   const audience = page.getByRole("tablist", { name: "Audience" });
   await expect(audience).toBeVisible();
   await expect(audience.getByRole("tab", { name: "Team" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("heading", { name: "What's reporting?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Usage." })).toBeVisible();
 
   await Promise.all([
     page.waitForURL(/scope=you/),
@@ -117,7 +117,7 @@ test("owner Team | You switcher scopes Dashboard and Activity", async ({ page })
   ]);
   await expect(
     page
-      .getByRole("heading", { name: "What's reporting?" })
+      .getByRole("heading", { name: "Usage." })
       .or(page.getByRole("heading", { name: "Nothing reporting yet." }))
       .or(page.getByText(/Link a developer profile/i)),
   ).toBeVisible();
@@ -126,7 +126,7 @@ test("owner Team | You switcher scopes Dashboard and Activity", async ({ page })
     page.waitForURL((url) => !url.searchParams.has("scope") || url.searchParams.get("scope") !== "you"),
     audience.getByRole("tab", { name: "Team" }).click(),
   ]);
-  await expect(page.getByRole("heading", { name: "What's reporting?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Usage." })).toBeVisible();
 
   await page.goto("/activity");
   const activityAudience = page.getByRole("tablist", { name: "Audience" });
@@ -145,7 +145,7 @@ test("owner Activity shows Team adoption and You usage with Reports", async ({ p
   await expect(page.getByRole("heading", { name: "Who uses AI, day by day." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Needs a nudge." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Spread by tool." })).toBeVisible();
-  await page.getByText("Collection health and sent reports").click();
+  await page.getByText("Collection health", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Reports." })).toBeVisible();
 
   const audience = page.getByRole("tablist", { name: "Audience" });
@@ -154,21 +154,20 @@ test("owner Activity shows Team adoption and You usage with Reports", async ({ p
     audience.getByRole("tab", { name: "You" }).click(),
   ]);
   await expect(page.getByRole("heading", { name: "How are you using it?" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Reports." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "By tool." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "By model." })).toBeVisible();
 
   await page.goto("/reports/daily?scope=you&date=2026-07-21");
-  await expect(page).toHaveURL(/\/activity/);
+  await expect(page).toHaveURL(/\/reports\?/);
   await expect(page).toHaveURL(/scope=you/);
-  await expect(page).toHaveURL(/#reports/);
+  await expect(page.getByRole("heading", { name: "Reports." }).first()).toBeVisible();
 });
 
 test("dashboard exposes seeded calculation output and all period controls", async ({ page }) => {
   await page.goto("/dashboard");
-  await expect(page.getByRole("heading", { name: "What's reporting?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Usage." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Requests." })).toBeVisible();
-  await expect(page.getByText("Subscription commitment")).toBeVisible();
+  await expect(page.getByText("Seat commitment")).toBeVisible();
   await expect(
     page.getByText(/All tracked plans on track|Purchased seats · run-out from allowance pace|Earliest run-out/i),
   ).toBeVisible();
@@ -213,7 +212,7 @@ test("hidden Signals product routes redirect to dashboard", async ({ page }) => 
 
 test("Settings shows workspace, billing, and team visibility controls", async ({ page }) => {
   await page.goto("/settings");
-  await expect(page.getByRole("heading", { name: "How is this set up?", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Settings.", level: 1 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Workspace", level: 2 })).toBeVisible();
   const billing = page.getByRole("region", { name: "Billing" });
   await expect(billing).toBeVisible();
@@ -255,7 +254,8 @@ test("settings mutations rename workspace and toggle team visibility", async ({ 
 test("seeded usage totals stay consistent across owner calculation views", async ({ page }) => {
   await page.goto("/tools");
   await expect(page.getByText("$40.00").first()).toBeVisible();
-  await expect(page.getByText("2 Cursor Pro")).toBeVisible();
+  await expect(page.getByRole("table").getByText("Cursor Pro")).toBeVisible();
+  await expect(page.getByRole("table").getByText("1 of 2 used")).toBeVisible();
 
   await page.goto("/tools/cursor");
   await expect(page.getByText(/Usage cost \(/)).toBeVisible();
@@ -293,9 +293,9 @@ test("team member mirrors dashboard rolling and cycle filters", async ({ page })
 
 test("team roster lists seeded members and opens invite dialog", async ({ page }) => {
   await page.goto("/team");
-  await expect(page.getByRole("heading", { name: "Who's here?", exact: true, level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "People.", exact: true, level: 1 })).toBeVisible();
   await expect(page.getByText("E2E Developer").first()).toBeVisible();
-  await expect(page.getByRole("link", { name: "Edit E2E Developer" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /^E2E Developer/ }).first()).toBeVisible();
   await expect(page.getByText("1 machine · 66 requests · current")).toBeVisible();
   await expect(page.getByRole("meter", { name: /Average plan use/i })).toBeVisible();
   await page.getByRole("button", { name: "Invite teammates" }).click();
@@ -319,11 +319,12 @@ test("member hub tabs expose coding and fleet", async ({ page }) => {
   await page.goto("/team/e2e-developer/work");
   await expect(page).toHaveURL(/\/team\/e2e-developer(?:\?|$)/);
 
-  await page.getByRole("link", { name: "Coding", exact: true }).click();
+  const memberSections = page.getByRole("navigation", { name: "Member sections" });
+  await memberSections.getByRole("link", { name: "Coding", exact: true }).click();
   await expect(page).toHaveURL(/\/team\/e2e-developer\/coding/);
   await expect(page.getByRole("heading", { name: "AI coding." })).toBeVisible();
 
-  await page.getByRole("link", { name: "Fleet", exact: true }).click();
+  await memberSections.getByRole("link", { name: "Fleet", exact: true }).click();
   await expect(page).toHaveURL(/\/team\/e2e-developer\/fleet/);
   await expect(page.getByRole("heading", { name: "Fleet." })).toBeVisible();
   await expect(page.getByText("e2e-laptop")).toBeVisible();

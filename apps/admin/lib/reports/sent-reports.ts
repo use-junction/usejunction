@@ -126,7 +126,8 @@ export async function listSentReports(input: {
     orgId: input.orgId,
     userId: input.viewerUserId,
     status: "success",
-    ...(kindFilter ? { kind: kindFilter } : {}),
+    // Explicit list keeps non-report rows (e.g. empty-week reminders) out of the inbox.
+    kind: kindFilter ?? { in: ["personal", "org"] },
   };
 
   const [rows, total] = await Promise.all([

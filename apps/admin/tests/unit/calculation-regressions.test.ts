@@ -190,7 +190,7 @@ test("dashboard rolling-period preferences normalize, deduplicate, and remove sa
   assert.deepEqual(readRollingPeriodPrefs(), { active: DEFAULT_ROLLING_PERIOD, saved: [] });
 
   window.localStorage.setItem(DASHBOARD_PERIOD_STORAGE_KEY, JSON.stringify({
-    active: { kind: "preset", days: 90 },
+    active: { kind: "preset", days: 60 },
     saved: [{ kind: "custom", from: "bad", to: "bad" }, { kind: "custom", from: "2026-07-01", to: "2026-07-02" }],
   }));
   assert.deepEqual(readRollingPeriodPrefs().active, DEFAULT_ROLLING_PERIOD);

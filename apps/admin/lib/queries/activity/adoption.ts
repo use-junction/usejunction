@@ -1,5 +1,7 @@
-import { prisma } from "@usejunction/db";
+import { Prisma, prisma } from "@usejunction/db";
 import type { MetricWindow } from "@/lib/analytics/contracts/time-window";
+import { monthlyMicros, type UnassignedSeats } from "@/lib/billing/monthly";
+import { AI_USAGE_ACTIVITY_SQL } from "@/lib/queries/usage-activity";
 import { canonicalToolKey } from "@/lib/tools/catalog";
 
 /**
@@ -47,8 +49,10 @@ export type TeamAdoption = {
     noData: number;
   };
   tools: Array<{ toolName: string; people: number; previousPeople: number }>;
-  /** Paid seats (non-zero price) whose tool saw no use this period, from people whose collection is healthy. */
-  idleSeats: { count: number; cycleMicros: string; tools: Array<{ toolName: string; count: number; cycleMicros: string }> };
+  /** Assigned paid seats whose tool saw no use this period, from people whose collection is healthy. Priced per month. */
+  idleSeats: { count: number; monthlyMicros: string; tools: Array<{ toolName: string; count: number; monthlyMicros: string }> };
+  /** Paid seats bought but assigned to no one right now (empty for past windows). Priced per month. */
+  unassignedSeats: UnassignedSeats;
 };
 
 export type AdoptionInput = {
@@ -60,7 +64,15 @@ export type AdoptionInput = {
   }>;
   /** One row per developer, tool, and UTC day with any usage, covering the previous and current windows. */
   activity: Array<{ developerId: string; toolName: string; date: string }>;
-  plans: Array<{ developerId: string; toolName: string; cycleSeatMicros: bigint; seatCount: number }>;
+  plans: Array<{
+    developerId: string;
+    toolName: string;
+    cycleSeatMicros: bigint;
+    seatCount: number;
+    billingCadence?: string;
+    billingCycleDays?: number | null;
+  }>;
+  unassignedSeats?: UnassignedSeats;
 };
 
 const DAY_MS = 86_400_000;
@@ -149,7 +161,11 @@ export function buildTeamAdoption(input: AdoptionInput): TeamAdoption {
         if (countable && !used) {
           const entry = idleByTool.get(toolKey(plan.toolName)) ?? { toolName: toolKey(plan.toolName), count: 0, micros: 0n };
           entry.count += Math.max(1, plan.seatCount);
-          entry.micros += plan.cycleSeatMicros * BigInt(Math.max(1, plan.seatCount));
+          entry.micros += monthlyMicros(
+            plan.cycleSeatMicros * BigInt(Math.max(1, plan.seatCount)),
+            plan.billingCadence ?? "monthly",
+            plan.billingCycleDays ?? null,
+          );
           idleByTool.set(toolKey(plan.toolName), entry);
         }
         return { toolName: toolKey(plan.toolName), used };
@@ -244,11 +260,12 @@ export function buildTeamAdoption(input: AdoptionInput): TeamAdoption {
       .sort((a, b) => b.people - a.people || a.toolName.localeCompare(b.toolName)),
     idleSeats: {
       count: [...idleByTool.values()].reduce((sum, tool) => sum + tool.count, 0),
-      cycleMicros: [...idleByTool.values()].reduce((sum, tool) => sum + tool.micros, 0n).toString(),
+      monthlyMicros: [...idleByTool.values()].reduce((sum, tool) => sum + tool.micros, 0n).toString(),
       tools: [...idleByTool.values()]
         .sort((a, b) => (b.micros > a.micros ? 1 : b.micros < a.micros ? -1 : a.toolName.localeCompare(b.toolName)))
-        .map((tool) => ({ toolName: tool.toolName, count: tool.count, cycleMicros: tool.micros.toString() })),
+        .map((tool) => ({ toolName: tool.toolName, count: tool.count, monthlyMicros: tool.micros.toString() })),
     },
+    unassignedSeats: input.unassignedSeats ?? { count: 0, monthlyMicros: "0", tools: [] },
   };
 }
 
@@ -259,14 +276,25 @@ export function clampAdoptionWindow(window: { from: Date; to: Date }, now: Date)
   return { from: from > to ? to : from, to };
 }
 
-export async function getTeamAdoption(orgId: string, window: MetricWindow, now: Date = new Date()): Promise<TeamAdoption> {
+export async function getTeamAdoption(
+  orgId: string,
+  window: MetricWindow,
+  now: Date = new Date(),
+  options: { unassignedSeats?: UnassignedSeats; developerIds?: string[] } = {},
+): Promise<TeamAdoption> {
   const { from, to } = clampAdoptionWindow(window, now);
   const spanDays = Math.round((to.getTime() - from.getTime()) / DAY_MS) + 1;
   const previousFrom = new Date(from.getTime() - spanDays * DAY_MS);
+  // A team scope with nobody in it must match nobody, not everyone.
+  const scope = options.developerIds
+    ? options.developerIds.length
+      ? Prisma.sql`AND developer_id IN (${Prisma.join(options.developerIds)})`
+      : Prisma.sql`AND FALSE`
+    : Prisma.empty;
 
   const [developers, activity, plans] = await Promise.all([
     prisma.developer.findMany({
-      where: { orgId, removedAt: null },
+      where: { orgId, removedAt: null, ...(options.developerIds ? { id: { in: options.developerIds } } : {}) },
       select: {
         id: true,
         name: true,
@@ -277,12 +305,10 @@ export async function getTeamAdoption(orgId: string, window: MetricWindow, now: 
       SELECT developer_id AS "developerId", tool_name AS "toolName", to_char(date, 'YYYY-MM-DD') AS date
       FROM usage_daily
       WHERE org_id = ${orgId}
-        AND developer_id IS NOT NULL
         AND date >= ${dayKey(previousFrom)}::date
         AND date <= ${dayKey(to)}::date
-        AND metric_kind <> 'productivity'
-        AND source NOT IN ('cursor_local', 'opencode_local')
-        AND (requests > 0 OR sessions > 0 OR input_tokens > 0 OR output_tokens > 0 OR active_seconds > 0)
+        AND ${AI_USAGE_ACTIVITY_SQL}
+        ${scope}
       GROUP BY developer_id, tool_name, date
     `,
     prisma.developerPlanAssignment.findMany({
@@ -291,12 +317,20 @@ export async function getTeamAdoption(orgId: string, window: MetricWindow, now: 
         active: true,
         seatStatus: "active",
         cycleSeatMicros: { gt: 0n },
+        ...(options.developerIds ? { developerId: { in: options.developerIds } } : {}),
         startDate: { lte: to },
         OR: [{ endDate: null }, { endDate: { gte: from } }],
       },
-      select: { developerId: true, toolName: true, cycleSeatMicros: true, seatCount: true },
+      select: {
+        developerId: true,
+        toolName: true,
+        cycleSeatMicros: true,
+        seatCount: true,
+        billingCadence: true,
+        billingCycleDays: true,
+      },
     }),
   ]);
 
-  return buildTeamAdoption({ window: { from, to }, developers, activity, plans });
+  return buildTeamAdoption({ window: { from, to }, developers, activity, plans, unassignedSeats: options.unassignedSeats });
 }

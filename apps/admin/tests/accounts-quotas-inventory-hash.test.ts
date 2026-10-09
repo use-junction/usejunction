@@ -42,7 +42,7 @@ test("accountsInventoryCanonicalLine matches agent format", () => {
       loginMethod: "local_app",
       authPresent: true,
     }),
-    "cursor||a@x.com|pro|local_app|1",
+    "cursor||a@x.com|pro||local_app|1",
   );
 });
 
@@ -52,7 +52,7 @@ test("accountsInventoryContentHash matches agent fixture", () => {
       { toolName: "cursor", email: "a@x.com", plan: "pro", loginMethod: "local_app", authPresent: true },
       { toolName: "codex", email: "", plan: "plus", loginMethod: "chatgpt", authPresent: true },
     ]),
-    "ffd1b111476f51ed1268d111947636e6",
+    "a39e2436620c9f42c16586b34188e790",
   );
 });
 

@@ -8,6 +8,7 @@ import { SignalsSettingsCard } from "@/components/settings/signals-settings-card
 import { MachineConnectionSettingsCard } from "@/components/settings/machine-connection-settings-card";
 import { AnalyticsConsentCard } from "@/components/settings/analytics-consent-card";
 import { WorkspaceSettingsCard } from "@/components/settings/workspace-settings-card";
+import { DataRetentionSettingsCard } from "@/components/settings/data-retention-settings-card";
 import type { getOrgActivitySettings } from "@/lib/activity/service";
 import type { getOrgSignalsPolicy } from "@/lib/signals/service";
 import type { getOrgBillingStatus } from "@/lib/saas-billing/status";
@@ -56,12 +57,9 @@ export default function SettingsClientScreen() {
 
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <PageHeader title="How is this set up?" className="mb-8" />
+      <PageHeader title="Settings." className="mb-8" />
 
       <div className="space-y-6">
-        <MachineConnectionSettingsCard />
-        <AnalyticsConsentCard />
-
         {canManageOrg && orgQuery.data ? (
           <>
             <WorkspaceSettingsCard
@@ -70,13 +68,19 @@ export default function SettingsClientScreen() {
               initialColor={orgQuery.data.orgColor}
             />
             <BillingSettingsCard billing={orgQuery.data.billing} members={orgQuery.data.billingMembers} />
-            {prefsQuery.data ? <EmailReportsSettingsCard initial={prefsQuery.data} /> : null}
-            {signalsProductEnabled() ? <SignalsSettingsCard initialPolicy={orgQuery.data.signalsPolicy} /> : null}
+            {prefsQuery.data ? <div id="email-reports" className="scroll-mt-20"><EmailReportsSettingsCard initial={prefsQuery.data} /></div> : null}
             <ActivitySettingsCard initialSettings={orgQuery.data.settings} />
+            <DataRetentionSettingsCard />
+            {signalsProductEnabled() ? <SignalsSettingsCard initialPolicy={orgQuery.data.signalsPolicy} /> : null}
           </>
         ) : prefsQuery.data ? (
-          <EmailReportsSettingsCard initial={prefsQuery.data} />
+          <div id="email-reports" className="scroll-mt-20"><EmailReportsSettingsCard initial={prefsQuery.data} /></div>
         ) : null}
+
+        {/* Personal settings come after the workspace ones admins visit this page for. */}
+        <h2 className="pt-4 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Just you</h2>
+        <MachineConnectionSettingsCard />
+        <AnalyticsConsentCard />
       </div>
     </div>
   );

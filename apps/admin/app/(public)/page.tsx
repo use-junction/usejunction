@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 
 export default async function HomePage() {
   if ((await auth())?.user?.id) {
-    redirect("/dashboard");
+    redirect("/auth/continue?from=%2Fdashboard");
   }
 
   return (

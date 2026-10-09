@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
               accountKey: typeof item.accountKey === "string" ? item.accountKey : null,
               email: typeof item.email === "string" ? item.email : null,
               plan: typeof item.plan === "string" ? item.plan : null,
+              orgKey: typeof item.orgKey === "string" ? item.orgKey : null,
               loginMethod: typeof item.loginMethod === "string" ? item.loginMethod : "unknown",
               authPresent: Boolean(item.authPresent),
             })),

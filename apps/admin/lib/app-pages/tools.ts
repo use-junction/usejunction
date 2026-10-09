@@ -9,12 +9,14 @@ import { getDashboardTools } from "@/lib/queries/dashboard/tools";
 import { listSubscriptions } from "@/lib/tools/subscriptions";
 import { reportNow } from "@/lib/report-now";
 import { getCostOverview } from "@/lib/queries/tools/cost-overview";
+import { resolveTeamFilter } from "@/lib/teams";
 
 export type ToolsSearch = {
   view?: string | null;
   days?: string | null;
   from?: string | null;
   to?: string | null;
+  team?: string | null;
 };
 
 export async function loadToolsPage(principal: AppPrincipal, search: ToolsSearch = {}) {
@@ -46,12 +48,13 @@ export async function loadToolsPage(principal: AppPrincipal, search: ToolsSearch
   const now = reportNow();
   const reportWindow = reportWindowForCycleView(cycleView, rollingPeriod, subscriptions, now);
   const cycleWindows = cycleViewWindows(subscriptions, now);
+  const team = await resolveTeamFilter(principal.orgId, search.team);
   const [result, syncContext, costOverview] = await Promise.all([
     getDashboardTools(principal.orgId, reportWindow)
       .then((data) => ({ data, error: null as string | null }))
       .catch(() => ({ data: null, error: "Failed to load tools." })),
     syncPromise,
-    getCostOverview(principal.orgId, subscriptions, now).catch(() => null),
+    getCostOverview(principal.orgId, subscriptions, now, { developerIds: team?.developerIds }).catch(() => null),
   ]);
   return jsonSafe({
     kind: "organization" as const,
@@ -63,5 +66,6 @@ export async function loadToolsPage(principal: AppPrincipal, search: ToolsSearch
     error: result.error,
     syncContext,
     costOverview,
+    team: team ? { id: team.teamId, name: team.name } : null,
   });
 }

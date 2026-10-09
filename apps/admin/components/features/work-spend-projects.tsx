@@ -82,21 +82,17 @@ export function WorkSpendProjects({
   return (
     <section aria-label="Spend by project" className="min-w-0">
       <div className="mb-4 flex min-w-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight">Spend by project.</h2>
-          <p className="mt-1.5 text-xs text-muted-foreground">Every board's AI cost, split by whether the work merged, is still open, or is not moving. Select an amount to filter.</p>
-        </div>
-        <GitHubProjectsBadge />
+        <h2 className="min-w-0 text-lg font-semibold tracking-tight">Spend by project.</h2>
+        {connected ? <GitHubProjectsBadge /> : null}
       </div>
       {!connected ? (
         <div className="border bg-muted/30 px-4 py-5">
-          <p className="text-sm font-medium">Connect GitHub Projects to see where spend landed.</p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="text-sm font-medium">
             {data.projects.state === "personal_account"
-              ? "Organization Projects need a GitHub organization installation."
+              ? "GitHub Projects need an organization installation."
               : needsAccess
-                ? "Projects read access needs approval. Repository work is still available."
-                : "Board names and item status sit next to the work they match."}
+                ? "Approve GitHub Projects access to see where spend landed."
+                : "Connect GitHub Projects to see where spend landed."}
           </p>
           <div className="mt-3">
             <ProjectToolConnectDialog approveUrl={approveUrl} appPermissionsUrl={data.connection.appPermissionsUrl}>
@@ -111,7 +107,7 @@ export function WorkSpendProjects({
       ) : query.error ? (
         <p role="alert" className="py-8 text-sm text-destructive">Couldn’t load spend by project. <Button variant="ghost" size="sm" onClick={() => void query.refetch()}>Retry</Button></p>
       ) : !rows.length ? (
-        <p className="py-8 text-sm text-muted-foreground">No project spend in this period. Sync GitHub Projects after work lands on a board.</p>
+        <p className="py-8 text-sm text-muted-foreground">No project spend in this period.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[30rem] border-collapse text-sm">
@@ -147,9 +143,11 @@ export function WorkSpendProjects({
                           {row.title}
                         </button>
                       )}
-                      <p className="mt-0.5 text-[0.7rem] font-normal text-muted-foreground">
-                        {row.muted ? "Outside the selected boards" : `GitHub Project · ${row.workCount ?? 0} ${(row.workCount ?? 0) === 1 ? "item" : "items"}`}
-                      </p>
+                      {row.muted ? null : (
+                        <p className="mt-0.5 text-[0.7rem] font-normal text-muted-foreground">
+                          {row.workCount ?? 0} {(row.workCount ?? 0) === 1 ? "item" : "items"}
+                        </p>
+                      )}
                     </th>
                     {SEGMENTS.map((segment) => {
                       const value = row[segment.field];
@@ -199,7 +197,7 @@ export function WorkSpendProjects({
             </tfoot>
           </table>
           {overlap ? (
-            <p className="mt-3 text-xs text-muted-foreground">The same work can sit on two projects, so these rows can add up to more than spend on work ({formatMicrosAsCurrency(overlap)} on more than one project).</p>
+            <p className="mt-3 text-xs text-muted-foreground">Work on two projects counts in both ({formatMicrosAsCurrency(overlap)}), so rows can exceed spend on work.</p>
           ) : null}
         </div>
       )}

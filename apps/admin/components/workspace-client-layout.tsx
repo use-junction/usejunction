@@ -6,7 +6,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { WorkspaceShell } from "@/components/workspace-shell";
 import { AppPageError, isBlockingAppQueryError } from "@/components/app-data-state";
-import { LegalAcceptanceGate } from "@/components/legal/legal-acceptance-gate";
 import { TimezoneReporter } from "@/components/timezone-reporter";
 import { NewCollectionBanner } from "@/components/new-collection-banner";
 import { activateWorkspace, AppApiError, useAppQuery } from "@/lib/api/client";
@@ -114,7 +113,11 @@ function WorkspaceClientLayoutInner({ children }: { children: React.ReactNode })
       pathname === "/features" ||
       pathname.startsWith("/features/") ||
       pathname === "/work-spend" ||
-      pathname.startsWith("/work-spend/")
+      pathname.startsWith("/work-spend/") ||
+      pathname === "/overview" ||
+      pathname === "/accounts" ||
+      pathname === "/settings/integrations" ||
+      pathname === "/settings/audit"
     ) {
       router.replace("/dashboard");
     }
@@ -214,7 +217,6 @@ function WorkspaceClientLayoutInner({ children }: { children: React.ReactNode })
       loading={shellLoading}
     >
       <TimezoneReporter />
-      <LegalAcceptanceGate>
       {shellLoading ? null : blockingContextError ? (
         <AppPageError
           error={contextError}
@@ -230,7 +232,6 @@ function WorkspaceClientLayoutInner({ children }: { children: React.ReactNode })
           {children}
         </>
       )}
-      </LegalAcceptanceGate>
     </WorkspaceShell>
   );
 }

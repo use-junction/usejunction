@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
     days: query.get("days"),
     from: query.get("from"),
     to: query.get("to"),
+    team: query.get("team"),
   });
   const loaded = performance.now();
   return appData(data, {

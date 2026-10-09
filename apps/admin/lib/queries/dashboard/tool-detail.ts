@@ -7,10 +7,13 @@ import {
   readDeveloperUsageFromSnapshots,
 } from "@/lib/analytics/snapshots";
 import { activeDeviceWhere } from "@/lib/devices/decommission";
-import { findCatalogTool, subscriptionToolKeys, toolUsageNames } from "@/lib/tools/catalog";
+import { findCatalogPlan, findCatalogTool, subscriptionToolKeys, toolUsageNames } from "@/lib/tools/catalog";
 import { mapVendorPlanToCatalog } from "@/lib/tools/sync-detected";
+import { strongerVendorPlan } from "@/lib/tools/detected-plan";
 import { listSubscriptions, type listSubscriptions as ListSubscriptions } from "@/lib/tools/subscriptions";
 import { isPersonCovered } from "@/lib/queries/dashboard/tool-detail-kpi";
+import { provenFreeSeats } from "@/lib/billing/monthly";
+import { getUnseatedUsers } from "@/lib/queries/tools/cost-overview";
 
 export type ToolDetailData = {
   toolKey: string;
@@ -60,6 +63,19 @@ export type ToolDetailData = {
     deviceHostname: string | null;
     developerId: string | null;
     developerName: string | null;
+    accountKey: string;
+  }>;
+  // One entry per login a person has for this tool (a person can have several,
+  // e.g. a personal Pro account and a work Team account on the same machine).
+  accounts: Array<{
+    developerId: string;
+    accountKey: string;
+    email: string | null;
+    plan: string | null;
+    mappedCatalogPlanKey: string | null;
+    mappedCatalogPlanName: string | null;
+    planInferredFromOrg: boolean;
+    deviceHostname: string | null;
   }>;
   modelsByDeveloper: Array<{
     developerId: string;
@@ -375,11 +391,15 @@ export async function getToolDetail(
   for (const quota of quotas) {
     const developerIdForRow = quota.device?.user?.id ?? null;
     const hostname = quota.device?.hostname ?? null;
+    const accountKey = quota.accountKey ?? "";
+    // Dedupe per account (not just per person), so a person's personal and work
+    // logins each keep their own windows instead of one shadowing the other.
     const already = quotaRows.some(
       (item) =>
         item.windowType === quota.windowType &&
         item.deviceHostname === hostname &&
-        item.developerId === developerIdForRow,
+        item.developerId === developerIdForRow &&
+        item.accountKey === accountKey,
     );
     if (already) continue;
     quotaRows.push({
@@ -391,11 +411,55 @@ export async function getToolDetail(
       deviceHostname: hostname,
       developerId: developerIdForRow,
       developerName: quota.device?.user?.name ?? null,
+      accountKey,
+    });
+  }
+
+  // A login with no plan of its own (e.g. a desktop-only Team account) inherits
+  // the strongest plan any login in this org reported for the same vendor org.
+  const orgPlan = new Map<string, string>();
+  for (const account of accounts) {
+    const org = account.vendorOrgId?.trim();
+    const plan = account.plan?.trim();
+    if (!org || !plan) continue;
+    const current = orgPlan.get(org);
+    orgPlan.set(org, current ? strongerVendorPlan(tool.key, plan, current) : plan);
+  }
+
+  // One row per (person, login). Accounts are ordered updatedAt desc, so the
+  // first time we see a (developer, accountKey) pair is the freshest.
+  const accountRows: ToolDetailData["accounts"] = [];
+  const seenAccountRow = new Set<string>();
+  for (const account of accounts) {
+    const key = `${account.user.id}\u0000${account.accountKey}`;
+    if (seenAccountRow.has(key)) continue;
+    seenAccountRow.add(key);
+    const org = account.vendorOrgId?.trim();
+    const resolvedPlan = account.plan ?? (org ? orgPlan.get(org) ?? null : null);
+    const planInferredFromOrg = !account.plan && Boolean(resolvedPlan);
+    const mappedKey = resolvedPlan ? mapVendorPlanToCatalog(tool.key, resolvedPlan) : null;
+    accountRows.push({
+      developerId: account.user.id,
+      accountKey: account.accountKey,
+      email: account.email,
+      plan: resolvedPlan,
+      mappedCatalogPlanKey: mappedKey,
+      mappedCatalogPlanName: mappedKey ? findCatalogPlan(tool.key, mappedKey)?.name ?? null : null,
+      planInferredFromOrg,
+      deviceHostname: account.device?.hostname ?? null,
     });
   }
 
   const seatsPurchased = plans.reduce((sum, plan) => sum + plan.seatCapacity, 0);
   const seatsAssigned = plans.reduce((sum, plan) => sum + plan.assignedSeats, 0);
+  // "Free" is the same claim as Cost's "assigned to no one", so it follows the same evidence rule.
+  const seatsFree = plans.length
+    ? provenFreeSeats(
+        plans.map((plan) => ({ ...plan, toolName: tool.toolName, billingCycleDays: null })),
+        () => tool.key,
+        await getUnseatedUsers(orgId),
+      ).reduce((sum, free) => sum + free, 0)
+    : 0;
   const deviceIds = new Set(installations.map((item) => item.deviceId));
 
   const modelsByDeveloper: ToolDetailData["modelsByDeveloper"] = [];
@@ -433,7 +497,7 @@ export async function getToolDetail(
       devices: deviceIds.size,
       people: peopleCovered,
       peopleInstallOnly,
-      seatsFree: Math.max(0, seatsPurchased - seatsAssigned),
+      seatsFree,
       seatsPurchased,
       seatsAssigned,
       usageCost,
@@ -442,6 +506,7 @@ export async function getToolDetail(
     },
     people,
     quotas: quotaRows,
+    accounts: accountRows,
     plans,
     modelsByDeveloper,
   };

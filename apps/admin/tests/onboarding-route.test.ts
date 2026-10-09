@@ -188,6 +188,22 @@ describe("POST /api/onboarding", () => {
     expect(mocks.syncSessionWorkspace).toHaveBeenCalledWith("user-1", "org-1");
   });
 
+  it("returns 401 session_expired when the JWT user id is stale", async () => {
+    mocks.ensureOwnerWorkspace.mockResolvedValue({
+      orgId: "org-1",
+      userId: "user-current",
+      role: "owner",
+      created: false,
+    });
+
+    const { POST } = await import("@/app/api/onboarding/route");
+    const response = await POST(postRequest());
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "session_expired" });
+    expect(mocks.syncSessionWorkspace).not.toHaveBeenCalled();
+  });
+
   it("returns 409 invite_pending when ensure blocks on a pending invite", async () => {
     mocks.ensureOwnerWorkspace.mockRejectedValue(new PendingInviteError());
 

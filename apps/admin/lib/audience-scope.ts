@@ -13,6 +13,9 @@ export function copyAudienceScope(params: URLSearchParams, from: URLSearchParams
   const source = typeof from === "string" ? new URLSearchParams(from.startsWith("?") ? from.slice(1) : from) : from;
   const scope = source.get("scope");
   if (scope === "you" || scope === "team") params.set("scope", scope);
+  // A team filter survives period changes, like the audience does.
+  const team = source.get("team");
+  if (team) params.set("team", team);
 }
 
 /** Build a path that sets audience scope while preserving other search params. */

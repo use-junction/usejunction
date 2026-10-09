@@ -38,7 +38,20 @@ const enrollmentCredentials = {
 function mockFetch(handlers: Record<string, () => Response | Promise<Response>>) {
   const all = {
     "/api/me/collection-notice": () =>
-      new Response(JSON.stringify({ acknowledged: true, notice: { title: "Collection notice" } }), { status: 200 }),
+      new Response(
+        JSON.stringify({
+          acknowledged: true,
+          notice: {
+            title: "Collection notice",
+            summary: "Usage and device health.",
+            collects: ["Usage"],
+            neverCollects: ["Keystrokes"],
+            whoSees: "Admins",
+            retention: "365 days",
+          },
+        }),
+        { status: 200 },
+      ),
     ...handlers,
   };
   vi.stubGlobal(
@@ -155,34 +168,45 @@ describe("DeviceConnectCard", () => {
     ).toBe(false);
   });
 
-  it("asks for collection notice acknowledgment before minting a token", async () => {
+  it("records the collection notice and shows the command without a confirm step", async () => {
+    let acknowledged = false;
     mockFetch({
       "/api/onboarding?include=developer": () =>
         new Response(JSON.stringify({ developer: { devices: [] } }), { status: 200 }),
-      "/api/me/collection-notice": () =>
-        new Response(
-          JSON.stringify({
-            acknowledged: false,
-            notice: {
-              title: "What this agent collects",
-              summary: "Usage and device health.",
-              collects: ["Usage"],
-              neverCollects: ["Keystrokes"],
-              whoSees: "Admins",
-              retention: "365 days",
-            },
-          }),
-          { status: 200 },
-        ),
+      "/api/me/collection-notice": () => {
+        const body = acknowledged
+          ? { acknowledged: true }
+          : {
+              acknowledged: false,
+              notice: {
+                title: "What this agent collects",
+                summary: "Usage and device health.",
+                collects: ["Usage"],
+                neverCollects: ["Keystrokes"],
+                whoSees: "Admins",
+                retention: "365 days",
+              },
+            };
+        acknowledged = true;
+        return new Response(JSON.stringify(body), { status: 200 });
+      },
+      "/api/me/enrollment-token": () =>
+        new Response(JSON.stringify(enrollmentCredentials), { status: 200 }),
     });
 
     render(<DeviceConnectCard />);
 
     await waitFor(() => {
-      expect(screen.getByText("What this agent collects")).toBeTruthy();
+      expect(screen.getByTestId("platform-command")).toBeTruthy();
     });
-    expect(screen.queryByTestId("platform-command")).toBeNull();
-    expect(screen.getByRole("button", { name: "Continue to connect command" })).toBeTruthy();
+    expect(screen.getByText("What this collects from this device")).toBeTruthy();
+    expect(screen.queryByRole("checkbox")).toBeNull();
+    const fetchMock = fetch as unknown as ReturnType<typeof vi.fn>;
+    const calls = fetchMock.mock.calls.map((call) => [String(call[0]), call[1]?.method ?? "GET"]);
+    const ackIndex = calls.findIndex(([url, method]) => url.includes("/api/me/collection-notice") && method === "POST");
+    const tokenIndex = calls.findIndex(([url]) => url.includes("/api/me/enrollment-token"));
+    expect(ackIndex).toBeGreaterThan(-1);
+    expect(tokenIndex).toBeGreaterThan(ackIndex);
   });
 
   it("finishes exactly once when both server sync checkpoints arrive", async () => {

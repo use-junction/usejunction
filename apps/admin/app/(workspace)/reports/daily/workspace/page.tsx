@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Legacy workspace report URL. */
+/** Legacy workspace report URL; reports have their own page now. */
 export default async function DailyWorkspaceReportRedirectPage({
   searchParams,
 }: {
@@ -12,5 +12,5 @@ export default async function DailyWorkspaceReportRedirectPage({
     if (typeof value === "string") query.set(key, value);
   }
   if (!query.has("scope")) query.set("scope", "team");
-  redirect(`/activity?${query.toString()}#reports`);
+  redirect(`/reports?${query.toString()}`);
 }

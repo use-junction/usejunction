@@ -24,15 +24,19 @@ export default function MyDataClientScreen() {
   const data = query.data;
   if (!data) return <AppPageSkeleton />;
 
+  const noticeBanner = (
+    <MyDataNoticeBanner
+      notice={data.notice}
+      acknowledged={data.membership.collectionNoticeAcked}
+      acknowledgedAt={data.membership.collectionNoticeAckAt}
+    />
+  );
+
   return (
     <div className="mx-auto w-full max-w-6xl">
-      <PageHeader title="What do we hold?" className="mb-8" />
-      <div className="space-y-8">
-        <MyDataNoticeBanner
-          notice={data.notice}
-          acknowledged={data.membership.collectionNoticeAcked}
-          acknowledgedAt={data.membership.collectionNoticeAckAt}
-        />
+      <PageHeader title="My data." description="What UseJunction holds about you, and your controls over it." className="mb-8" />
+      <div className="space-y-6">
+        {data.membership.collectionNoticeAcked ? null : noticeBanner}
         <MyDataSummary
           summary={data.summary}
           region={data.organization?.dataRegion ?? null}
@@ -44,6 +48,7 @@ export default function MyDataClientScreen() {
           notice={data.notice}
           hasUnattributedUsage={data.summary.hasUnattributedUsage}
         />
+        {data.membership.collectionNoticeAcked ? <div className="-mt-5">{noticeBanner}</div> : null}
         <MyDataRights
           rights={data.rights}
           analyticsEnabled={analyticsEnabled}

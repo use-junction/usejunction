@@ -241,7 +241,7 @@ export const TRUST_FEATURES = [
   },
   {
     title: "No surveillance posture",
-    description: "UseJunction does not intercept network traffic, capture browser activity, or enforce MDM.",
+    description: "UseJunction does not intercept network traffic, capture browser activity, or enforce MDM. Optional work summaries from AI tools stay off until an admin turns them on.",
   },
 ] as const;
 

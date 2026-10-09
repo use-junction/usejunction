@@ -72,6 +72,7 @@ const detail = {
   },
   people: [],
   quotas: [],
+  accounts: [],
   modelsByDeveloper: [],
   plans: [],
 };

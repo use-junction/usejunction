@@ -10,6 +10,10 @@ import { getMeOverview } from "@/lib/queries/me/overview";
 import { resolveLinkedDeveloperId } from "@/lib/queries/me/resolve-developer";
 import { getPersonalSignalsLedger } from "@/lib/signals/read";
 import { listSubscriptions } from "@/lib/tools/subscriptions";
+import { getUnseatedUsers } from "@/lib/queries/tools/cost-overview";
+import { unassignedSeats } from "@/lib/billing/monthly";
+import { canonicalToolKey } from "@/lib/tools/catalog";
+import { resolveTeamFilter } from "@/lib/teams";
 import { canSeeOrgOverview } from "@/lib/rbac/permissions";
 import { reportNow } from "@/lib/report-now";
 
@@ -19,6 +23,7 @@ export type ActivitySearch = {
   from?: string | null;
   to?: string | null;
   scope?: string | null;
+  team?: string | null;
 };
 
 export async function loadActivityPage(principal: AppPrincipal, search: ActivitySearch = {}) {
@@ -106,8 +111,18 @@ export async function loadActivityPage(principal: AppPrincipal, search: Activity
     });
   }
 
+  const team = await resolveTeamFilter(principal.orgId, search.team);
+  // Assignment state is "now", so it only belongs in windows that reach today; and unassigned
+  // seats belong to the workspace, not a team.
+  const showUnassigned = !team && reportWindow.to.getTime() >= now.getTime() - 86_400_000;
+  const unseated = showUnassigned ? await getUnseatedUsers(principal.orgId, now) : undefined;
   const [adoption, deviceFeed] = await Promise.all([
-    getTeamAdoption(principal.orgId, reportWindow, now),
+    getTeamAdoption(principal.orgId, reportWindow, now, {
+      developerIds: team?.developerIds,
+      unassignedSeats: showUnassigned
+        ? unassignedSeats(subscriptions, (plan) => canonicalToolKey(plan.toolKey ?? plan.toolName), unseated)
+        : undefined,
+    }),
     getDeviceActivityFeed(principal.orgId, { limit: 50 }),
   ]);
   return jsonSafe({
@@ -121,5 +136,6 @@ export async function loadActivityPage(principal: AppPrincipal, search: Activity
     cycleWindows,
     adoption,
     deviceFeed,
+    team: team ? { id: team.teamId, name: team.name } : null,
   });
 }

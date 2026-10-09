@@ -48,22 +48,23 @@ const data = buildCostOverview({
   usage: [{ toolName: "cursor", verifiedMicros: 139_000_000n, estimatedMicros: 0n, actualMicros: 0n }],
   previousUsage: [],
   activePeople: [{ toolName: "cursor", developerId: "a" }, { toolName: "codex", developerId: "a" }],
+  seatHolders: [{ toolName: "cursor", developerId: "a" }, { toolName: "chatgpt-codex", developerId: "a" }],
   quotaPeaks: [{ toolName: "codex", developerId: "a", peak: 100 }],
   idleSeats: [
-    { toolName: "claude", count: 1, cycleMicros: "25000000" },
-    { toolName: "antigravity", count: 1, cycleMicros: "19990000" },
+    { toolName: "claude", count: 1, monthlyMicros: "25000000" },
+    { toolName: "antigravity", count: 1, monthlyMicros: "19990000" },
   ],
 });
 
-test("cost hero leads with the seat bill and names the unused tools", () => {
+test("cost hero leads with the seat bill and leaves the unused saving to the action list", () => {
   render(<CostOverviewView data={data} />);
   expect(screen.getByText("$84.99")).toBeInTheDocument();
   expect(screen.getByText(/on 4 paid plans/)).toBeInTheDocument();
-  expect(screen.getAllByText("$44.99")).toHaveLength(2);
-  expect(screen.getByText(/of it went to Claude and Antigravity/)).toBeInTheDocument();
+  expect(screen.getAllByText("$44.99")).toHaveLength(1);
+  expect(screen.queryByText(/of it went to/)).not.toBeInTheDocument();
   expect(screen.queryByText(/53%/)).not.toBeInTheDocument();
   expect(screen.queryByText(/pay-as-you-go/i)).not.toBeInTheDocument();
-  expect(screen.getByText(/Also on free plans/)).toBeInTheDocument();
+  expect(screen.queryByText(/Also on free plans/)).not.toBeInTheDocument();
   expect(screen.getByRole("listitem", { name: /Claude \$25\.00 · No use in 30 days/ })).toBeInTheDocument();
   expect(screen.getByRole("listitem", { name: /Cursor \$20\.00 · Past its allowance/ })).toBeInTheDocument();
 });
@@ -75,4 +76,35 @@ test("actions are ordered by saving, with limits and allowance after", () => {
   expect(titles).toContain("Cursor is past its included allowance");
   expect(titles.some((title) => /is hitting its limit/.test(title ?? ""))).toBe(true);
   expect(screen.getByText(/^Save/)).toHaveTextContent("Save $44.99/mo");
+});
+
+test("the tool table gives each tool one plain status and links to its page", () => {
+  render(<CostOverviewView data={data} />);
+  const row = (tool: string) => screen.getByRole("link", { name: new RegExp(`^${tool}$`) }).closest("tr")!;
+  expect(row("Cursor")).toHaveTextContent("Past its allowance");
+  expect(row("Cursor")).toHaveTextContent("~$139 at API prices");
+  expect(row("Cursor")).toHaveTextContent("7× over");
+  expect(row("Claude")).toHaveTextContent("No use in 30 days");
+  expect(row("Claude")).toHaveTextContent("$25.00/mo · list price");
+  expect(screen.getByRole("link", { name: /^Cursor$/ })).toHaveAttribute("href", "/tools/cursor");
+  expect(screen.queryByText(/under 10%/)).not.toBeInTheDocument();
+});
+
+test("an unassigned seat is its own segment, never painted as in use", () => {
+  // Two Cursor seats at $20: one assigned and idle, one assigned to no one. Nothing is in use.
+  const idle = buildCostOverview({
+    now: new Date("2026-10-08T12:00:00Z"),
+    plans: [plan("cursor", 20_000_000, { seatCapacity: 2, assignedSeats: 1 })],
+    usage: [],
+    previousUsage: [],
+    activePeople: [],
+    seatHolders: [],
+    quotaPeaks: [],
+    idleSeats: [{ toolName: "cursor", count: 1, monthlyMicros: "20000000" }],
+  });
+  render(<CostOverviewView data={idle} />);
+  expect(screen.getByRole("listitem", { name: /Cursor \$20\.00 · No use in 30 days/ })).toBeInTheDocument();
+  expect(screen.getByRole("listitem", { name: /Cursor \$20\.00 · Assigned to no one/ })).toBeInTheDocument();
+  expect(screen.queryByRole("listitem", { name: /· In use/ })).not.toBeInTheDocument();
+  expect(screen.getByText(/Up to/)).toHaveTextContent("Up to $40.00/mo is going to seats nobody used in the last 30 days.");
 });

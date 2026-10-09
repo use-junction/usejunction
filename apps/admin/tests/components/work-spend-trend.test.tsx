@@ -26,7 +26,7 @@ test("falls back to a ranked list when fewer than four weeks are available", () 
 
 test("Project view discloses overlapping totals", () => {
   mount(projectTrend);
-  expect(screen.getByText(/The same work can sit on two projects/i)).toBeInTheDocument();
+  expect(screen.getByText(/Work on two projects counts in both/i)).toBeInTheDocument();
   expect(screen.getByText("Guessed from the repo")).toBeInTheDocument();
 });
 
@@ -40,5 +40,4 @@ test("group-by tabs switch the trend query", () => {
   const onBy = mount(personTrend);
   fireEvent.click(screen.getByRole("button", { name: "Projects" }));
   expect(onBy).toHaveBeenCalledWith("project");
-  expect(screen.getByText("AI cost on their commits")).toBeInTheDocument();
 });

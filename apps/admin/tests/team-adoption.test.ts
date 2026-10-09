@@ -50,7 +50,7 @@ test("people are banded by weeks active, with no-data kept apart from not using"
   expect(result.notEnrolled.map((person) => person.id)).toEqual(["eve"]);
   expect(result.counts).toMatchObject({ members: 5, enrolled: 4, active: 2, previousActive: 1, regular: 1, occasional: 1, notStarted: 1, noData: 1 });
   // Dee's seat is not counted idle: no data is not the same as no use.
-  expect(result.idleSeats).toEqual({ count: 1, cycleMicros: "20000000", tools: [{ toolName: "cursor", count: 1, cycleMicros: "20000000" }] });
+  expect(result.idleSeats).toEqual({ count: 1, monthlyMicros: "20000000", tools: [{ toolName: "cursor", count: 1, monthlyMicros: "20000000" }] });
   expect(result.tools).toEqual([
     { toolName: "cursor", people: 2, previousPeople: 1 },
     { toolName: "chatgpt-codex", people: 1, previousPeople: 0 },
@@ -83,7 +83,7 @@ test("free plans are never unused paid seats", () => {
       { developerId: "ada", toolName: "cursor", cycleSeatMicros: 20_000_000n, seatCount: 1 },
     ],
   });
-  expect(result.idleSeats).toEqual({ count: 1, cycleMicros: "25000000", tools: [{ toolName: "claude", count: 1, cycleMicros: "25000000" }] });
+  expect(result.idleSeats).toEqual({ count: 1, monthlyMicros: "25000000", tools: [{ toolName: "claude", count: 1, monthlyMicros: "25000000" }] });
   expect(result.people[0]!.seats.map((seat) => seat.toolName)).toEqual(["claude", "cursor"]);
 });
 
@@ -105,4 +105,18 @@ test("tool aliases count as one tool and match the seat", () => {
   });
   expect(result.people[0]!.tools).toEqual(["chatgpt-codex"]);
   expect(result.idleSeats.count).toBe(0);
+});
+
+test("idle seats are priced per month whatever the billing cadence, and unassigned seats pass through", () => {
+  const unassigned = { count: 1, monthlyMicros: "20000000", tools: [{ toolName: "cursor", count: 1, monthlyMicros: "20000000" }] };
+  const result = buildTeamAdoption({
+    window,
+    developers: [{ id: "ada", name: "Ada", devices: [device()] }],
+    activity: [],
+    plans: [{ developerId: "ada", toolName: "claude", cycleSeatMicros: 240_000_000n, seatCount: 1, billingCadence: "annual", billingCycleDays: null }],
+    unassignedSeats: unassigned,
+  });
+  // $240 a year is $20 a month, not $240.
+  expect(result.idleSeats).toEqual({ count: 1, monthlyMicros: "20000000", tools: [{ toolName: "claude", count: 1, monthlyMicros: "20000000" }] });
+  expect(result.unassignedSeats).toEqual(unassigned);
 });
