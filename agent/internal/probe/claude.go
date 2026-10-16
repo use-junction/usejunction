@@ -293,42 +293,34 @@ func claudePlanWithTier(plan, tier string) string {
 	}
 }
 
+// normalizeClaudePlan maps the many spellings Claude uses for a plan — OAuth
+// subscriptionType ("team"), seat tiers ("team_tier_1"), org types
+// ("claude_team") — onto one key. Unrecognised values pass through unchanged.
 func normalizeClaudePlan(plan string) string {
 	p := strings.TrimSpace(plan)
 	if p == "" {
 		return ""
 	}
-	switch strings.ToLower(p) {
-	case "team_standard":
-		return "team-standard"
-	case "team_premium":
+	lower := strings.ToLower(p)
+	switch lower {
+	case "claude_pro":
+		return "pro"
+	case "claude_max":
+		return "max"
+	case "claude_free":
+		return "free"
+	}
+	switch {
+	case strings.Contains(lower, "enterprise"):
+		return "enterprise"
+	case strings.Contains(lower, "team") && strings.Contains(lower, "premium"):
 		return "team-premium"
-	default:
-		return p
+	case strings.Contains(lower, "team"):
+		// "team", "team_standard", "claude_team" and seat tiers such as
+		// "team_tier_1" are all a standard Team seat.
+		return "team-standard"
 	}
-}
-
-// claudePlanForCredentialStorage maps normalized plan keys to credential-file shape.
-func claudePlanForCredentialStorage(plan string) string {
-	p := normalizeClaudePlan(plan)
-	switch p {
-	case "team-standard":
-		return "team_standard"
-	case "team-premium":
-		return "team_premium"
-	default:
-		return p
-	}
-}
-
-func claudePlanFromTokenPayload(payload map[string]any) string {
-	if v, ok := payload["subscription_type"].(string); ok && strings.TrimSpace(v) != "" {
-		return normalizeClaudePlan(v)
-	}
-	if v, ok := payload["subscriptionType"].(string); ok && strings.TrimSpace(v) != "" {
-		return normalizeClaudePlan(v)
-	}
-	return ""
+	return p
 }
 
 func claudePlanFromUsageRaw(raw map[string]json.RawMessage) string {
@@ -343,25 +335,6 @@ func claudePlanFromUsageRaw(raw map[string]json.RawMessage) string {
 		}
 	}
 	return ""
-}
-
-func revitalizeClaudeCredentialPlan(bundle *ClaudeCredentialBundle, mergedPlan string) error {
-	if bundle == nil || bundle.Creds == nil {
-		return nil
-	}
-	merged := normalizeClaudePlan(mergedPlan)
-	if merged == "" {
-		return nil
-	}
-	credsPlan := normalizeClaudePlan(bundle.Creds.SubscriptionType)
-	if merged == credsPlan {
-		return nil
-	}
-	if preferClaudePlan(credsPlan, merged) != merged {
-		return nil
-	}
-	bundle.Creds.SubscriptionType = claudePlanForCredentialStorage(merged)
-	return SaveClaudeCredentialBundle(bundle)
 }
 
 func enrichClaudeAccountPlan(account *types.ToolAccount, apiPlan string) *types.ToolAccount {
@@ -579,26 +552,54 @@ func saveClaudeCredentialsFile(dir string, creds *claudeCredentials) error {
 	return os.WriteFile(path, out, 0600)
 }
 
+// saveClaudeCredentialsKeychain writes refreshed tokens back to Claude Code's
+// keychain item. The item belongs to Claude Code, so only the token fields are
+// updated; everything else it stores (scopes, subscriptionType, rateLimitTier,
+// fields we do not know about) is kept exactly as Claude Code wrote it.
 func saveClaudeCredentialsKeychain(service string, creds *claudeCredentials) error {
-	blob := claudeKeychainBlob{
-		ClaudeAiOauth: &claudeKeychainOAuth{
-			AccessToken:      creds.AccessToken,
-			RefreshToken:     creds.RefreshToken,
-			SubscriptionType: creds.SubscriptionType,
-			RateLimitTier:    creds.RateLimitTier,
-			ExpiresAt:        creds.ExpiresAtMs,
-		},
+	account := keychainAccountName()
+	readArgs := []string{"find-generic-password", "-s", service, "-w"}
+	if account != "" {
+		readArgs = []string{"find-generic-password", "-a", account, "-s", service, "-w"}
 	}
-	data, err := json.Marshal(blob)
+	existing, _ := exec.Command("security", readArgs...).Output()
+	data, err := mergeClaudeKeychainTokens(strings.TrimSpace(string(existing)), creds)
 	if err != nil {
 		return err
 	}
-	account := keychainAccountName()
-	args := []string{"add-generic-password", "-U", "-s", service, "-w", string(data)}
+	args := []string{"add-generic-password", "-U", "-s", service, "-w", data}
 	if account != "" {
-		args = []string{"add-generic-password", "-U", "-a", account, "-s", service, "-w", string(data)}
+		args = []string{"add-generic-password", "-U", "-a", account, "-s", service, "-w", data}
 	}
 	return exec.Command("security", args...).Run()
+}
+
+// mergeClaudeKeychainTokens updates only the token fields of a Claude Code
+// keychain blob, preserving every other field.
+func mergeClaudeKeychainTokens(existing string, creds *claudeCredentials) (string, error) {
+	doc := map[string]any{}
+	if existing != "" {
+		if err := json.Unmarshal([]byte(existing), &doc); err != nil {
+			return "", fmt.Errorf("refusing to overwrite unreadable claude keychain item: %w", err)
+		}
+	}
+	oauth, _ := doc["claudeAiOauth"].(map[string]any)
+	if oauth == nil {
+		oauth = map[string]any{}
+	}
+	oauth["accessToken"] = creds.AccessToken
+	if creds.RefreshToken != "" {
+		oauth["refreshToken"] = creds.RefreshToken
+	}
+	if creds.ExpiresAtMs > 0 {
+		oauth["expiresAt"] = creds.ExpiresAtMs
+	}
+	doc["claudeAiOauth"] = oauth
+	out, err := json.Marshal(doc)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }
 
 func refreshClaudeToken(ctx context.Context, bundle *ClaudeCredentialBundle) (*ClaudeCredentialBundle, error) {
@@ -644,11 +645,8 @@ func refreshClaudeToken(ctx context.Context, bundle *ClaudeCredentialBundle) (*C
 	if expiresIn := numberValue(refreshed["expires_in"]); expiresIn > 0 {
 		creds.ExpiresAtMs = time.Now().Add(time.Duration(expiresIn) * time.Second).UnixMilli()
 	}
-	if apiPlan := claudePlanFromTokenPayload(refreshed); apiPlan != "" {
-		creds.SubscriptionType = claudePlanForCredentialStorage(
-			preferClaudePlan(creds.SubscriptionType, apiPlan),
-		)
-	}
+	// Only the tokens are written back. The plan is reported from what we read
+	// (and the usage response), never written into Claude Code's own store.
 	if err := SaveClaudeCredentialBundle(bundle); err != nil {
 		return nil, err
 	}
@@ -733,7 +731,6 @@ func ProbeClaudeQuota(ctx context.Context, dir string) ([]types.QuotaSnapshot, *
 		}
 	}
 	if usageErr != nil {
-		_ = revitalizeClaudeCredentialPlan(bundle, account.Plan)
 		// The token is present but the live usage call failed (offline, expired
 		// refresh, rate limit). Fall back to the desktop app's cached windows.
 		if snaps := ClaudeDesktopUsageSnapshots(claudeActiveOrgUUID()); len(snaps) > 0 {
@@ -743,7 +740,6 @@ func ProbeClaudeQuota(ctx context.Context, dir string) ([]types.QuotaSnapshot, *
 	}
 
 	account = enrichClaudeAccountPlan(account, claudePlanFromUsageRaw(raw))
-	_ = revitalizeClaudeCredentialPlan(bundle, account.Plan)
 
 	snaps := claudeUsageSnapshots(raw)
 	if len(snaps) == 0 {

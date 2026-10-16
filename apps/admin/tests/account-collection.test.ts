@@ -7,9 +7,24 @@ import {
   keepUsageRow,
   loggingEffectivelyEnabled,
   normalizeAccountKey,
+  isPlaceholderAccount,
   pickExistingAccount,
   usageEffectivelyEnabled,
 } from "@/lib/privacy/account-collection-policy";
+
+test("only a nameless tool-prefixed login counts as a placeholder", () => {
+  assert.equal(isPlaceholderAccount("claude", { accountKey: "claude:0d9a33e1", email: null }), true);
+  assert.equal(isPlaceholderAccount("claude", { accountKey: "claude:0d9a33e1", email: "a@x.com" }), false);
+  assert.equal(isPlaceholderAccount("claude", { accountKey: "a@x.com", email: null }), false);
+  assert.equal(isPlaceholderAccount("claude", { accountKey: "", email: null }), false);
+  assert.equal(isPlaceholderAccount("cursor", { accountKey: "claude:0d9a33e1", email: null }), false);
+});
+
+test("a legacy row is only claimed by a login with an email", () => {
+  const legacy = { id: "legacy", accountKey: "", email: null };
+  assert.equal(pickExistingAccount([legacy], { accountKey: "claude:abc" }), null);
+  assert.equal(pickExistingAccount([legacy], { accountKey: "a@x.com", email: "a@x.com" })?.id, "legacy");
+});
 
 test("usage collection is on by default and activity logging stays off", () => {
   assert.equal(isGatedCollectionTool("cursor"), true);

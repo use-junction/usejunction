@@ -10,6 +10,7 @@ import { activeDeviceWhere } from "@/lib/devices/decommission";
 import { findCatalogPlan, findCatalogTool, subscriptionToolKeys, toolUsageNames } from "@/lib/tools/catalog";
 import { mapVendorPlanToCatalog } from "@/lib/tools/sync-detected";
 import { strongerVendorPlan } from "@/lib/tools/detected-plan";
+import { isPlaceholderAccount } from "@/lib/privacy/account-collection-policy";
 import { listSubscriptions, type listSubscriptions as ListSubscriptions } from "@/lib/tools/subscriptions";
 import { isPersonCovered } from "@/lib/queries/dashboard/tool-detail-kpi";
 import { provenFreeSeats } from "@/lib/billing/monthly";
@@ -387,8 +388,21 @@ export async function getToolDetail(
   const peopleCovered = people.filter((person) => person.coverage === "covered").length;
   const peopleInstallOnly = people.filter((person) => person.coverage === "install_only").length;
 
+  // A nameless placeholder login the device no longer reports has been renamed
+  // to its email key (or is gone); drop it and its windows so the same login
+  // does not show twice. Sync deletes these too — this covers rows stored
+  // before that cleanup existed.
+  const retiredLogin = (deviceId: string | null, accountKey: string) => `${deviceId ?? ""}\u0000${accountKey}`;
+  const retiredLogins = new Set(
+    accounts
+      .filter((account) => !account.authPresent && isPlaceholderAccount(account.toolName, account))
+      .map((account) => retiredLogin(account.deviceId, account.accountKey)),
+  );
+  const liveAccounts = accounts.filter((account) => !retiredLogins.has(retiredLogin(account.deviceId, account.accountKey)));
+
   const quotaRows: ToolDetailData["quotas"] = [];
   for (const quota of quotas) {
+    if (retiredLogins.has(retiredLogin(quota.deviceId, quota.accountKey ?? ""))) continue;
     const developerIdForRow = quota.device?.user?.id ?? null;
     const hostname = quota.device?.hostname ?? null;
     const accountKey = quota.accountKey ?? "";
@@ -418,7 +432,7 @@ export async function getToolDetail(
   // A login with no plan of its own (e.g. a desktop-only Team account) inherits
   // the strongest plan any login in this org reported for the same vendor org.
   const orgPlan = new Map<string, string>();
-  for (const account of accounts) {
+  for (const account of liveAccounts) {
     const org = account.vendorOrgId?.trim();
     const plan = account.plan?.trim();
     if (!org || !plan) continue;
@@ -430,7 +444,7 @@ export async function getToolDetail(
   // first time we see a (developer, accountKey) pair is the freshest.
   const accountRows: ToolDetailData["accounts"] = [];
   const seenAccountRow = new Set<string>();
-  for (const account of accounts) {
+  for (const account of liveAccounts) {
     const key = `${account.user.id}\u0000${account.accountKey}`;
     if (seenAccountRow.has(key)) continue;
     seenAccountRow.add(key);

@@ -12,6 +12,7 @@ import { syncDetectedPlansForDevice } from "@/lib/tools/sync-detected";
 import { logServerError } from "@/lib/errors/public";
 import {
   defaultCollectionFlags,
+  isPlaceholderAccount,
   normalizeAccountKey,
   pickExistingAccount,
 } from "@/lib/privacy/account-collection-policy";
@@ -181,6 +182,20 @@ export async function applyDeviceAccountInventory(params: {
   }
 
   for (const [toolName, keys] of incomingKeysByTool) {
+    // A placeholder login ("claude:<uuid>", no email) that the device stopped
+    // reporting has been renamed to its email key, or is gone. Either way the
+    // old row and its quota windows would show as a duplicate person row.
+    const unreported = await prisma.toolAccount.findMany({
+      where: { deviceId: params.deviceId, toolName, accountKey: { notIn: keys } },
+      select: { id: true, accountKey: true, email: true },
+    });
+    const stale = unreported.filter((row) => isPlaceholderAccount(toolName, row));
+    if (stale.length) {
+      await prisma.quotaSnapshot.deleteMany({
+        where: { deviceId: params.deviceId, toolName, accountKey: { in: stale.map((row) => row.accountKey) } },
+      });
+      await prisma.toolAccount.deleteMany({ where: { id: { in: stale.map((row) => row.id) } } });
+    }
     await prisma.toolAccount.updateMany({
       where: {
         deviceId: params.deviceId,

@@ -828,42 +828,41 @@ func TestShouldRefreshClaudeToken(t *testing.T) {
 	}
 }
 
-func TestRevitalizeClaudeCredentialPlanWritesTeamPlan(t *testing.T) {
-	dir := t.TempDir()
-	credsPath := filepath.Join(dir, ".credentials.json")
-	initial := `{
-	  "access_token": "access-token",
-	  "refresh_token": "refresh-token",
-	  "email": "user@example.com",
-	  "subscription_type": "pro",
-	  "expires_at_ms": 1999999999999
-	}`
-	if err := os.WriteFile(credsPath, []byte(initial), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	bundle := &ClaudeCredentialBundle{
-		Creds: &claudeCredentials{
-			AccessToken:      "access-token",
-			RefreshToken:     "refresh-token",
-			Email:            "user@example.com",
-			SubscriptionType: "pro",
-			ExpiresAtMs:      1999999999999,
-		},
-		ConfigDir: dir,
-		Source:    claudeCredsSourceFile,
-	}
-	if err := revitalizeClaudeCredentialPlan(bundle, "team-standard"); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(credsPath)
+func TestMergeClaudeKeychainTokensKeepsClaudeCodeFields(t *testing.T) {
+	existing := `{"claudeAiOauth":{"accessToken":"old","refreshToken":"old-rt","expiresAt":1,"scopes":["user:inference","user:profile"],"subscriptionType":"team","rateLimitTier":"default_claude_max_5x","extra":"kept"},"other":{"x":1}}`
+	out, err := mergeClaudeKeychainTokens(existing, &claudeCredentials{
+		AccessToken:      "new",
+		RefreshToken:     "new-rt",
+		ExpiresAtMs:      42,
+		SubscriptionType: "team-standard",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), "team_standard") {
-		t.Fatalf("expected team_standard in creds file, got %s", data)
+	var doc struct {
+		OAuth map[string]any `json:"claudeAiOauth"`
+		Other map[string]any `json:"other"`
 	}
-	if bundle.Creds.SubscriptionType != "team_standard" {
-		t.Fatalf("bundle plan = %q", bundle.Creds.SubscriptionType)
+	if err := json.Unmarshal([]byte(out), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.OAuth["accessToken"] != "new" || doc.OAuth["refreshToken"] != "new-rt" || doc.OAuth["expiresAt"] != float64(42) {
+		t.Fatalf("tokens not updated: %v", doc.OAuth)
+	}
+	if doc.OAuth["subscriptionType"] != "team" {
+		t.Fatalf("subscriptionType must be left as Claude Code wrote it, got %v", doc.OAuth["subscriptionType"])
+	}
+	if scopes, _ := doc.OAuth["scopes"].([]any); len(scopes) != 2 {
+		t.Fatalf("scopes dropped: %v", doc.OAuth["scopes"])
+	}
+	if doc.OAuth["rateLimitTier"] != "default_claude_max_5x" || doc.OAuth["extra"] != "kept" || doc.Other["x"] != float64(1) {
+		t.Fatalf("unknown fields dropped: %s", out)
+	}
+}
+
+func TestMergeClaudeKeychainTokensRefusesUnreadableItem(t *testing.T) {
+	if _, err := mergeClaudeKeychainTokens("not json", &claudeCredentials{AccessToken: "a"}); err == nil {
+		t.Fatal("expected an error instead of overwriting an unreadable keychain item")
 	}
 }
 
@@ -878,7 +877,7 @@ func TestClaudePlanFromUsageRaw(t *testing.T) {
 	}
 }
 
-func TestRefreshClaudeTokenAppliesSubscriptionType(t *testing.T) {
+func TestRefreshClaudeTokenUpdatesTokensOnly(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token":      "new-access",
@@ -907,8 +906,12 @@ func TestRefreshClaudeTokenAppliesSubscriptionType(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if refreshed.Creds.SubscriptionType != "team_standard" {
-		t.Fatalf("subscription_type = %q", refreshed.Creds.SubscriptionType)
+	if refreshed.Creds.AccessToken != "new-access" || refreshed.Creds.RefreshToken != "new-refresh" {
+		t.Fatalf("tokens not refreshed: %+v", refreshed.Creds)
+	}
+	// The stored plan belongs to Claude Code; a refresh must not rewrite it.
+	if refreshed.Creds.SubscriptionType != "pro" {
+		t.Fatalf("subscription_type rewritten to %q", refreshed.Creds.SubscriptionType)
 	}
 }
 

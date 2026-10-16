@@ -59,9 +59,24 @@ export function pickExistingAccount<T extends { accountKey: string; email: strin
     const byEmail = existing.find((row) => String(row.email ?? "").trim().toLowerCase() === email);
     if (byEmail) return byEmail;
   }
+  // A pre-account-key row is the device's old single login. Only a login with a
+  // real email may claim it; a nameless placeholder would inherit that login's
+  // sticky plan and show it under the wrong account.
+  if (!email) return null;
   const legacy = existing.find((row) => row.accountKey === "");
   if (legacy) return legacy;
   return null;
+}
+
+// isPlaceholderAccount reports whether a stored login is a nameless stand-in
+// ("claude:<uuid>" with no email) that the agent reports until it learns the
+// login's email, after which it reports the email key instead.
+export function isPlaceholderAccount(
+  toolName: string,
+  row: { accountKey: string; email: string | null },
+): boolean {
+  if (String(row.email ?? "").trim()) return false;
+  return row.accountKey.startsWith(`${toolName.trim()}:`);
 }
 
 export function usageAccountToken(toolName: string, accountKey?: string | null): string {
