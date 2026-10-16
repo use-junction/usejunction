@@ -36,6 +36,21 @@ describe("mapVendorPlanToCatalog (claude tiers)", () => {
     expect(mapVendorPlanToCatalog("claude", "team_standard")).toBe("team-standard");
     expect(mapVendorPlanToCatalog("claude", "team-premium")).toBe("team-premium");
   });
+
+  test("paid seat shapes never fall back to Free", () => {
+    // What older agents stored for a paid Team seat (raw seatTier from ~/.claude.json).
+    expect(mapVendorPlanToCatalog("claude", "team_tier_1")).toBe("team-standard");
+    expect(mapVendorPlanToCatalog("claude", "claude_team")).toBe("team-standard");
+    expect(mapVendorPlanToCatalog("claude", "team_premium_tier")).toBe("team-premium");
+    expect(mapVendorPlanToCatalog("claude", "enterprise_tier_1")).toBe("enterprise");
+    expect(mapVendorPlanToCatalog("claude", "claude_pro")).toBe("pro");
+    expect(mapVendorPlanToCatalog("claude", "claude_max")).toBe("max-5x");
+  });
+
+  test("a genuinely unknown or empty plan still falls back to Free", () => {
+    expect(mapVendorPlanToCatalog("claude", "")).toBe("free");
+    expect(mapVendorPlanToCatalog("claude", "something_new")).toBe("free");
+  });
 });
 
 describe("strongerVendorPlan (one person, several logins)", () => {

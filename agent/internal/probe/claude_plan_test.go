@@ -39,3 +39,38 @@ func TestClaudePlanFromOAuthAccountTier(t *testing.T) {
 		t.Fatalf("claude_pro = %q, want pro", got)
 	}
 }
+
+func TestNormalizeClaudePlanSpellings(t *testing.T) {
+	cases := map[string]string{
+		"team_tier_1":     "team-standard",
+		"team":            "team-standard",
+		"team_standard":   "team-standard",
+		"claude_team":     "team-standard",
+		"team_premium":    "team-premium",
+		"enterprise_tier": "enterprise",
+		"claude_pro":      "pro",
+		"claude_max":      "max",
+		"pro":             "pro",
+		"max-20x":         "max-20x",
+		"":                "",
+	}
+	for in, want := range cases {
+		if got := normalizeClaudePlan(in); got != want {
+			t.Errorf("normalizeClaudePlan(%q)=%q want %q", in, got, want)
+		}
+	}
+}
+
+func TestClaudePlanFromOAuthAccountTeamSeatTier(t *testing.T) {
+	// The shape ~/.claude.json has for a paid Team seat: no subscriptionType, a
+	// seat tier, and a max-style user rate tier that must not turn it into Max.
+	got := claudePlanFromOAuthAccount(claudeJSONOAuthAccount{
+		SeatTier:                  "team_tier_1",
+		OrganizationType:          "claude_team",
+		OrganizationRateLimitTier: "default_raven",
+		UserRateLimitTier:         "default_claude_max_5x",
+	})
+	if got != "team-standard" {
+		t.Fatalf("team seat = %q, want team-standard", got)
+	}
+}

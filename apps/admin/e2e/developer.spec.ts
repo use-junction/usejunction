@@ -46,7 +46,9 @@ test("developer chrome hides owner-only navigation", async ({ page }) => {
   await expect(page.getByRole("tablist", { name: "Audience" })).toHaveCount(0);
 
   await page.goto("/reports/daily");
-  await expect(page).toHaveURL(/\/activity/);
+  // Developers now have Reports access, so a daily report redirects to the
+  // Reports index rather than bouncing to Activity.
+  await expect(page).toHaveURL(/\/reports(?:$|\?|\/)/);
   await expect(page.getByRole("heading", { name: "Reports." })).toBeVisible();
   await expect(page.getByRole("tablist", { name: "Audience" })).toHaveCount(0);
 });

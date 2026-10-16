@@ -154,7 +154,22 @@ export function mapVendorPlanToCatalog(
     const alias = aliases?.[candidate];
     if (alias) return alias;
   }
+  if (toolKey === "claude") {
+    const family = claudePlanFamily(normalizeVendorPlan(vendorPlan));
+    if (family) return family;
+  }
   return fallback;
+}
+
+// Claude reports paid seats in several shapes the alias table cannot list
+// exhaustively: seat tiers ("team_tier_1"), org types ("claude_team"),
+// "enterprise_*". A paid seat must never fall back to Free.
+function claudePlanFamily(normalized: string): string | null {
+  if (normalized.includes("enterprise")) return "enterprise";
+  if (normalized.includes("team")) return normalized.includes("premium") ? "team-premium" : "team-standard";
+  if (normalized === "claude-pro") return "pro";
+  if (normalized === "claude-max") return "max-5x";
+  return null;
 }
 
 // Catalog plans are listed weakest-first, so a plan's index is its strength.

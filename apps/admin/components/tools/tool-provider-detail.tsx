@@ -617,7 +617,9 @@ export function ToolProviderDetail({
                         ) : (
                           <span className="text-xs text-muted-foreground">
                             {planName
-                              ? "No live limits yet. They appear once the tool is signed in on this machine."
+                              ? data.toolKey === "claude"
+                                ? <>No live limits yet. If this login is used in the Claude desktop app, run <code className="font-mono">usejunction claude-desktop connect</code> on that machine.</>
+                                : "No live limits yet. They appear once the tool is signed in on this machine."
                               : "No limits reported yet"}
                           </span>
                         )}
