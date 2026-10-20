@@ -39,6 +39,7 @@ async function handle(req: NextRequest) {
       noticesSent: 0,
       noticesFailed: 0,
       seatsAssigned: 0,
+      seatsEnded: 0,
     };
     for (const org of orgs) {
       const result = await reconcileDeviceHealth({
@@ -54,6 +55,7 @@ async function handle(req: NextRequest) {
       try {
         const seats = await reconcileDetectedSeatsForOrg(org.id);
         totals.seatsAssigned += seats.assigned;
+        totals.seatsEnded += seats.ended;
       } catch (error) {
         logServerError("cron/device-health/detected-seats", error, { orgId: org.id });
       }
