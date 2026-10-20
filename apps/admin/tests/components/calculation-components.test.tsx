@@ -296,6 +296,212 @@ describe("calculation-bearing components", () => {
     expect(screen.getByRole("meter", { name: "Weekly usage" })).toHaveAttribute("aria-valuenow", "92");
   });
 
+  test("ToolProviderDetail lists a person once, leading with their busiest login", async () => {
+    const login = (accountKey: string, email: string | null, planName: string, planKey: string) => ({
+      developerId: "dev-1",
+      accountKey,
+      email,
+      plan: planKey,
+      mappedCatalogPlanKey: planKey,
+      mappedCatalogPlanName: planName,
+      planInferredFromOrg: false,
+      deviceHostname: "ada-mac",
+    });
+    renderWithQueryClient(
+      <ToolProviderDetail
+        data={{
+          toolKey: "claude",
+          name: "Claude",
+          shortName: "Claude",
+          provider: "anthropic",
+          product: "claude",
+          toolName: "claude",
+          aliases: [],
+          sourceUrl: "https://example.com",
+          accounts: [
+            login("personal@example.com", "personal@example.com", "Pro", "pro"),
+            login("claude:stale-uuid", null, "Pro", "pro"),
+            login("work@example.com", "work@example.com", "Team Standard", "team-standard"),
+          ],
+          kpis: { devices: 1, people: 1, peopleInstallOnly: 0, seatsFree: 0, seatsPurchased: 0, seatsAssigned: 0, usageCost: 0, requests: 0, tokens: 0 },
+          people: [
+            {
+              developerId: "dev-1",
+              name: "Ada Lovelace",
+              email: "ada@example.com",
+              detected: true,
+              coverage: "covered",
+              deviceHostname: "ada-mac",
+              vendorPlan: "pro",
+              vendorEmail: "personal@example.com",
+              mappedCatalogPlanKey: "pro",
+              assignment: null,
+              planMismatch: false,
+            },
+          ],
+          quotas: [
+            {
+              toolName: "claude",
+              windowType: "session_5h",
+              usedPercent: 40,
+              creditsRemaining: null,
+              resetAt: null,
+              deviceHostname: "ada-mac",
+              developerId: "dev-1",
+              developerName: "Ada Lovelace",
+              accountKey: "work@example.com",
+            },
+          ],
+          plans: [],
+          modelsByDeveloper: [],
+        }}
+      />,
+    );
+
+    // One person row, led by the login that reports live limits.
+    expect(screen.getAllByText("Ada Lovelace")).toHaveLength(1);
+    expect(screen.getByText("work@example.com")).toBeInTheDocument();
+    expect(screen.queryByText("personal@example.com")).not.toBeInTheDocument();
+    expect(screen.getByText("1 of 1 reporting")).toBeInTheDocument();
+
+    const toggle = screen.getByRole("button", { name: /Show 2 other logins/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(toggle);
+    expect(screen.getByRole("button", { name: /Hide 2 other logins/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("personal@example.com")).toBeInTheDocument();
+    // The named login comes before the nameless stale one.
+    const rows = screen.getAllByRole("row").map((row) => row.textContent ?? "");
+    const personal = rows.findIndex((text) => text.includes("personal@example.com"));
+    const work = rows.findIndex((text) => text.includes("work@example.com"));
+    expect(work).toBeLessThan(personal);
+    expect(screen.getAllByText("Ada Lovelace")).toHaveLength(1);
+  });
+
+  test("ToolProviderDetail leads with the most-used login and never flags extra detected plans", async () => {
+    const login = (accountKey: string, planName: string, planKey: string, requests: number) => ({
+      developerId: "dev-1",
+      accountKey,
+      email: accountKey,
+      plan: planKey,
+      mappedCatalogPlanKey: planKey,
+      mappedCatalogPlanName: planName,
+      planInferredFromOrg: false,
+      deviceHostname: "ada-mac",
+      requests,
+      cost: requests / 10,
+    });
+    renderWithQueryClient(
+      <ToolProviderDetail
+        data={{
+          toolKey: "claude",
+          name: "Claude",
+          shortName: "Claude",
+          provider: "anthropic",
+          product: "claude",
+          toolName: "claude",
+          aliases: [],
+          sourceUrl: "https://example.com",
+          accounts: [
+            login("work@example.com", "Team Standard", "team-standard", 12),
+            login("personal@example.com", "Max 5x", "max-5x", 300),
+          ],
+          kpis: { devices: 1, people: 1, peopleInstallOnly: 0, seatsFree: 0, seatsPurchased: 2, seatsAssigned: 2, usageCost: 0, requests: 0, tokens: 0 },
+          people: [
+            {
+              developerId: "dev-1",
+              name: "Ada Lovelace",
+              email: "ada@example.com",
+              detected: true,
+              coverage: "covered",
+              deviceHostname: "ada-mac",
+              vendorPlan: "max-5x",
+              vendorEmail: "personal@example.com",
+              mappedCatalogPlanKey: "max-5x",
+              assignment: { id: "a-1", planTemplateId: "t-1", planName: "Team Standard", catalogPlanKey: "team-standard", source: "detected" },
+              planMismatch: false,
+            },
+          ],
+          quotas: [
+            {
+              toolName: "claude",
+              windowType: "session_5h",
+              usedPercent: 70,
+              creditsRemaining: null,
+              resetAt: null,
+              deviceHostname: "ada-mac",
+              developerId: "dev-1",
+              developerName: "Ada Lovelace",
+              accountKey: "work@example.com",
+            },
+          ],
+          plans: [],
+          modelsByDeveloper: [],
+        }}
+      />,
+    );
+
+    // The login used most this period leads, even though the other is closer to a limit.
+    expect(screen.getByText("personal@example.com")).toBeInTheDocument();
+    expect(screen.queryByText("work@example.com")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use detected plan" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/none of their logins report it/)).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Show 1 other login/ }));
+    expect(screen.getByText("work@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Team Standard")).toBeInTheDocument();
+  });
+
+  test("ToolProviderDetail notes an admin seat that no login reports, without a button", () => {
+    renderWithQueryClient(
+      <ToolProviderDetail
+        data={{
+          toolKey: "claude",
+          name: "Claude",
+          shortName: "Claude",
+          provider: "anthropic",
+          product: "claude",
+          toolName: "claude",
+          aliases: [],
+          sourceUrl: "https://example.com",
+          accounts: [
+            {
+              developerId: "dev-1",
+              accountKey: "ada@example.com",
+              email: "ada@example.com",
+              plan: "pro",
+              mappedCatalogPlanKey: "pro",
+              mappedCatalogPlanName: "Pro",
+              planInferredFromOrg: false,
+              deviceHostname: "ada-mac",
+            },
+          ],
+          kpis: { devices: 1, people: 1, peopleInstallOnly: 0, seatsFree: 0, seatsPurchased: 1, seatsAssigned: 1, usageCost: 0, requests: 0, tokens: 0 },
+          people: [
+            {
+              developerId: "dev-1",
+              name: "Ada Lovelace",
+              email: "ada@example.com",
+              detected: true,
+              coverage: "covered",
+              deviceHostname: "ada-mac",
+              vendorPlan: "pro",
+              vendorEmail: "ada@example.com",
+              mappedCatalogPlanKey: "pro",
+              assignment: { id: "a-1", planTemplateId: "t-1", planName: "Max 20x", catalogPlanKey: "max-20x", source: "admin_confirmed" },
+              planMismatch: true,
+            },
+          ],
+          quotas: [],
+          plans: [],
+          modelsByDeveloper: [],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Assigned Max 20x, but none of their logins report it")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Use detected plan" })).not.toBeInTheDocument();
+  });
+
   test("ToolProviderDetail aggregates tokens per person in Models", () => {
     renderWithQueryClient(
       <ToolProviderDetail

@@ -77,6 +77,10 @@ export type ToolDetailData = {
     mappedCatalogPlanName: string | null;
     planInferredFromOrg: boolean;
     deviceHostname: string | null;
+    // Usage this login ran in the period, used to lead with the login a person
+    // actually uses.
+    requests?: number;
+    cost?: number;
   }>;
   modelsByDeveloper: Array<{
     developerId: string;
@@ -311,15 +315,29 @@ export async function getToolDetail(
     });
   }
 
+  // Every plan a person's logins report. A person can hold several at once
+  // (a work Team seat and a personal Pro or Max), and each gets its own
+  // detected seat, so detected seats never "mismatch". Only an admin-assigned
+  // seat that none of their logins report is worth flagging.
+  const loginPlansByDeveloper = new Map<string, Set<string>>();
+  for (const account of accounts) {
+    if (!account.authPresent || !account.plan?.trim()) continue;
+    const plans = loginPlansByDeveloper.get(account.user.id) ?? new Set<string>();
+    plans.add(mapVendorPlanToCatalog(tool.key, account.plan));
+    loginPlansByDeveloper.set(account.user.id, plans);
+  }
+
   for (const assignment of assignments) {
     const existing = peopleMap.get(assignment.developer.id);
     const catalogPlanKey = assignment.template.catalogPlanKey;
     const mapped = existing?.mappedCatalogPlanKey ?? null;
+    const loginPlans = loginPlansByDeveloper.get(assignment.developer.id);
     const planMismatch =
-      Boolean(mapped) &&
-      Boolean(catalogPlanKey) &&
-      mapped !== catalogPlanKey &&
-      assignment.source === "detected";
+      Boolean(existing?.planMismatch) ||
+      (assignment.source !== "detected" &&
+        Boolean(catalogPlanKey) &&
+        Boolean(loginPlans?.size) &&
+        !loginPlans!.has(catalogPlanKey!));
 
     peopleMap.set(assignment.developer.id, {
       developerId: assignment.developer.id,
@@ -442,6 +460,16 @@ export async function getToolDetail(
 
   // One row per (person, login). Accounts are ordered updatedAt desc, so the
   // first time we see a (developer, accountKey) pair is the freshest.
+  const usageByLogin = new Map<string, { requests: number; cost: number }>();
+  for (const row of modelRows) {
+    if (!row.developerId) continue;
+    const key = `${row.developerId}\u0000${row.accountKey ?? ""}`;
+    const entry = usageByLogin.get(key) ?? { requests: 0, cost: 0 };
+    entry.requests += row.requests;
+    entry.cost += row.verifiedUsageCost + row.estimatedApiCost;
+    usageByLogin.set(key, entry);
+  }
+
   const accountRows: ToolDetailData["accounts"] = [];
   const seenAccountRow = new Set<string>();
   for (const account of liveAccounts) {
@@ -461,6 +489,8 @@ export async function getToolDetail(
       mappedCatalogPlanName: mappedKey ? findCatalogPlan(tool.key, mappedKey)?.name ?? null : null,
       planInferredFromOrg,
       deviceHostname: account.device?.hostname ?? null,
+      requests: usageByLogin.get(`${account.user.id}\u0000${account.accountKey}`)?.requests ?? 0,
+      cost: usageByLogin.get(`${account.user.id}\u0000${account.accountKey}`)?.cost ?? 0,
     });
   }
 
