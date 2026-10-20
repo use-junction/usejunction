@@ -16,6 +16,7 @@ import {
 } from "./detected-plan";
 import { logServerError } from "@/lib/errors/public";
 import { activeDeviceWhere } from "@/lib/devices/decommission";
+import { staleLoginCutoff } from "./stale-login";
 
 export type DetectedAccount = {
   toolName: string;
@@ -380,7 +381,8 @@ export async function syncDetectedPlansForDevice(input: {
       orgId: input.orgId,
       userId: developer.id,
       authPresent: true,
-      device: activeDeviceWhere,
+      // A device silent for 30 days no longer holds its logins' seats.
+      device: { ...activeDeviceWhere, lastSeenAt: { gte: staleLoginCutoff() } },
     },
     select: { toolName: true, plan: true, email: true, vendorOrgId: true, authPresent: true },
   });
@@ -555,9 +557,15 @@ export async function reconcileDetectedSeatsForOrg(orgId: string) {
   }
 
   // A detected seat whose holder was removed, or no longer has any signed-in
-  // login for that tool on an active device, is no longer held by anyone.
+  // login for that tool on a device seen in the last 30 days, is no longer
+  // held by anyone.
   const liveLogins = await prisma.toolAccount.findMany({
-    where: { orgId, authPresent: true, device: activeDeviceWhere, user: { removedAt: null } },
+    where: {
+      orgId,
+      authPresent: true,
+      device: { ...activeDeviceWhere, lastSeenAt: { gte: staleLoginCutoff() } },
+      user: { removedAt: null },
+    },
     select: { userId: true, toolName: true },
   });
   const liveTools = new Set(liveLogins.map((row) => `${row.userId}\u0000${canonicalToolKey(row.toolName)}`));

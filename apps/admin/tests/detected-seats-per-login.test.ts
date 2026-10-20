@@ -225,3 +225,32 @@ test("reconcile ends seats held by removed people or people with no live login",
     await prisma.organization.delete({ where: { id: org.id } });
   }
 });
+
+test("a login silent for 30 days loses its seat and drops off the tool page", { skip: !runDb }, async () => {
+  const { org, user, device } = await seed();
+  try {
+    const laptop = await device("laptop");
+    const oldMac = await device("old-mac");
+    await prisma.toolAccount.createMany({
+      data: [
+        { orgId: org.id, userId: user.id, deviceId: laptop.id, toolName: "claude", accountKey: "work@example.com", email: "work@example.com", plan: "team-standard", authPresent: true },
+        { orgId: org.id, userId: user.id, deviceId: oldMac.id, toolName: "claude", accountKey: "old@example.com", email: "old@example.com", plan: "max-5x", authPresent: true },
+      ],
+    });
+    await reconcileDetectedSeatsForOrg(org.id);
+    assert.deepEqual(await activeSeats(org.id, user.id), [
+      "old@example.com=max-5x:detected",
+      "work@example.com=team-standard:detected",
+    ]);
+
+    await prisma.device.update({ where: { id: oldMac.id }, data: { lastSeenAt: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000) } });
+    await reconcileDetectedSeatsForOrg(org.id);
+    assert.deepEqual(await activeSeats(org.id, user.id), ["work@example.com=team-standard:detected"]);
+
+    const { getToolDetail } = await import("@/lib/queries/dashboard/tool-detail");
+    const detail = await getToolDetail(org.id, "claude");
+    assert.deepEqual(detail?.accounts.map((account) => account.accountKey), ["work@example.com"]);
+  } finally {
+    await prisma.organization.delete({ where: { id: org.id } });
+  }
+});

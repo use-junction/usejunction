@@ -196,11 +196,14 @@ export async function applyDeviceAccountInventory(params: {
       });
       await prisma.toolAccount.deleteMany({ where: { id: { in: stale.map((row) => row.id) } } });
     }
+    // Only stamp the moment a login goes away, so updatedAt on an unreported
+    // login records when it was last seen and it can age out as stale.
     await prisma.toolAccount.updateMany({
       where: {
         deviceId: params.deviceId,
         toolName,
         accountKey: { notIn: keys },
+        authPresent: true,
       },
       data: { authPresent: false, updatedAt: new Date() },
     });
