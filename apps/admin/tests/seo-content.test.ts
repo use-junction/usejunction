@@ -139,7 +139,7 @@ test("llms-full.txt includes page summaries", () => {
 });
 
 test("native blog exposes canonical founder-authored posts", () => {
-  assert.equal(BLOG_POSTS.length, 4);
+  assert.equal(BLOG_POSTS.length, 6);
   const flagship = BLOG_POSTS.find((post) => post.path === "/blog/ai-coding-observability-vs-jellyfish-dx-linearb");
   assert.ok(flagship);
   assert.equal(flagship!.author.name, "Dinuda Yaggahavita");
@@ -208,5 +208,7 @@ test("llms.txt cites a short brand-first path list", () => {
     "/solutions/ai-coding-seat-utilization",
     "/guides/see-plan-usage-and-waste",
     "/blog/what-is-ai-coding-observability",
+    "/blog/check-claude-team-usage",
+    "/guides/claude-premium-vs-standard-seat",
   ]);
 });

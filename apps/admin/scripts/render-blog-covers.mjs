@@ -158,6 +158,66 @@ const covers = [
       );
     },
   },
+  {
+    slug: "check-claude-team-usage",
+    html: () => {
+      const steps = ["Your initials", "Analytics", "Export spend report"]
+        .map(
+          (label, i) => `<div style="border:2px solid ${C.ink};background:${i === 2 ? C.yellow : "#fff"};padding:12px 16px;font:700 20px 'Avenir Next Condensed';letter-spacing:1px;text-transform:uppercase;margin-bottom:${i === 2 ? 0 : 6}px">${label}</div>
+          ${i === 2 ? "" : `<div class="mono" style="font-size:16px;color:${C.muted};padding:0 0 6px 18px">↓</div>`}`,
+        )
+        .join("");
+      const team = [
+        ["DEV-01", "PREM", 96],
+        ["DEV-02", "STD", 34],
+        ["DEV-03", "STD", 100],
+        ["DEV-04", "PREM", 22],
+        ["DEV-05", "STD", 58],
+        ["DEV-06", "STD", 12],
+      ];
+      const rows = team
+        .map(([name, seat, pct]) => {
+          const color = pct >= 90 ? C.yellow : C.teal;
+          return `<div style="display:grid;grid-template-columns:86px 64px 1fr 56px;align-items:center;gap:12px;margin-bottom:11px">
+            <span class="mono" style="font-size:14px">${name}</span>
+            <span class="mono" style="font-size:12px;border:2px solid ${seat === "PREM" ? C.ink : C.line};padding:3px 0;text-align:center;background:${seat === "PREM" ? C.tealPale : "transparent"}">${seat}</span>
+            ${gauge(pct, color, 300)}
+            <span class="mono" style="font-size:14px;text-align:right">${pct}%</span>
+          </div>`;
+        })
+        .join("");
+      return shell(
+        "Who on your Claude<br>Team needs Premium?",
+        `<div style="display:flex;gap:44px;height:100%;align-items:center">
+          <div style="width:290px">${steps}</div>
+          <div style="flex:1"><div class="mono" style="font-size:13px;color:${C.muted};margin-bottom:14px">WEEKLY LIMIT USED · SEAT · EXAMPLE</div>${rows}</div>
+        </div>`,
+        "Admin &nbsp;→&nbsp; Limits &nbsp;→&nbsp; Seats",
+      );
+    },
+  },
+  {
+    slug: "claude-for-startups-team-seats",
+    html: () => {
+      const marks = { 3: ["Month 3", "Check seats"], 6: ["Month 6", "Credits expire"], 11: ["Month 11", "Pick seats"] };
+      const months = Array.from({ length: 12 }, (_, i) => i + 1)
+        .map((m) => {
+          const mark = marks[m];
+          return `<div style="flex:1;position:relative;height:100%">
+            <div style="position:absolute;left:0;right:0;top:120px;height:28px;border:2px solid ${C.ink};border-right:${m === 12 ? 2 : 0}px solid ${C.ink};background:${mark ? C.yellow : m <= 6 ? C.tealPale : "#fff"}"></div>
+            <div class="mono" style="position:absolute;top:160px;left:6px;font-size:12px;color:${C.muted}">M${m}</div>
+            ${mark ? `<div style="position:absolute;top:0;left:-4px;width:150px"><div style="font:700 22px 'Avenir Next Condensed';text-transform:uppercase;letter-spacing:1px">${mark[0]}</div><div class="mono" style="font-size:13px;color:${C.tealDark};margin-top:6px">${mark[1]}</div><div style="width:2px;height:44px;background:${C.ink};margin:10px 0 0 6px"></div></div>` : ""}
+          </div>`;
+        })
+        .join("");
+      return shell(
+        "Your free Claude<br>Team year, tracked",
+        `<div style="display:flex;height:100%;padding-top:20px">${months}</div>
+         <div class="mono" style="position:absolute;left:0;bottom:6px;font-size:13px;color:${C.muted}">API CREDITS: MONTHS 1–6 · FREE PREMIUM SEATS: MONTHS 1–12</div>`,
+        "Month 3 &nbsp;→&nbsp; 6 &nbsp;→&nbsp; 11",
+      );
+    },
+  },
 ];
 
 const filter = process.argv[2];

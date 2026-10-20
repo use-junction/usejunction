@@ -269,6 +269,7 @@ export const solutionSeatUtilization: ContentPage = {
     "/solutions/ai-coding-spend-management",
     "/solutions/ai-coding-plan-usage",
     "/guides/see-plan-usage-and-waste",
+    "/guides/claude-premium-vs-standard-seat",
     "/for/cursor",
     "/compare/engineering-intelligence",
   ],

@@ -38,6 +38,10 @@ export type ContentPage = {
   };
   compareRows?: { feature: string; usejunction: string; other: string }[];
   compareOtherName?: string;
+  /** Header for the `usejunction` column when the table compares two other things. Defaults to the site name. */
+  compareOwnName?: string;
+  /** Table heading. Defaults to "Feature comparison". */
+  compareHeading?: string;
 };
 
 export type SitemapEntry = {
@@ -84,7 +88,8 @@ export type BlogBlock =
   | { type: "paragraph"; content: BlogInline[] }
   | { type: "list"; items: BlogInline[][] }
   | { type: "quote"; content: BlogInline[] }
-  | { type: "image"; image: BlogImage };
+  | { type: "image"; image: BlogImage }
+  | { type: "table"; caption: string; columns: string[]; rows: string[][] };
 
 export type BlogPost = {
   slug: string;

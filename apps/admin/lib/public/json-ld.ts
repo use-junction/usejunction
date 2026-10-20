@@ -174,6 +174,7 @@ function blogWordCount(post: BlogPost): number {
       if (block.type === "heading") return block.text;
       if (block.type === "list") return block.items.map(inline).join(" ");
       if (block.type === "image") return "";
+      if (block.type === "table") return [block.caption, ...block.columns, ...block.rows.flat()].join(" ");
       return inline(block.content);
     }),
     ...(post.faq ?? []).flatMap((item) => [item.question, item.answer]),

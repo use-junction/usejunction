@@ -1,3 +1,5 @@
+import { CLAUDE_FOR_STARTUPS_TEAM_SEATS_POST } from "@/content/blog/claude-for-startups-team-seats";
+import { CHECK_CLAUDE_TEAM_USAGE_POST } from "@/content/blog/check-claude-team-usage";
 import { AI_CODING_OBSERVABILITY_VS_EI_POST } from "@/content/blog/ai-coding-observability-vs-engineering-intelligence";
 import { CODEXBAR_FOR_TEAMS_POST } from "@/content/blog/codexbar-for-teams";
 import { SEE_MY_TEAMS_AI_SPEND_POST } from "@/content/blog/see-my-teams-ai-spend";
@@ -204,7 +206,7 @@ export const AI_CODING_OBSERVABILITY_POST: BlogPost = {
   ],
 };
 
-export const BLOG_POSTS: BlogPost[] = [SEE_MY_TEAMS_AI_SPEND_POST, CODEXBAR_FOR_TEAMS_POST, AI_CODING_OBSERVABILITY_VS_EI_POST, AI_CODING_OBSERVABILITY_POST];
+export const BLOG_POSTS: BlogPost[] = [CHECK_CLAUDE_TEAM_USAGE_POST, CLAUDE_FOR_STARTUPS_TEAM_SEATS_POST, SEE_MY_TEAMS_AI_SPEND_POST, CODEXBAR_FOR_TEAMS_POST, AI_CODING_OBSERVABILITY_VS_EI_POST, AI_CODING_OBSERVABILITY_POST];
 
 export function getBlogPostBySlug(slug: string): BlogPost | undefined {
   return BLOG_POSTS.find((post) => post.slug === slug);
