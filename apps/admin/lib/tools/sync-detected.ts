@@ -15,6 +15,7 @@ import {
   strongerVendorPlan,
 } from "./detected-plan";
 import { logServerError } from "@/lib/errors/public";
+import { activeDeviceWhere } from "@/lib/devices/decommission";
 
 export type DetectedAccount = {
   toolName: string;
@@ -297,80 +298,101 @@ async function ensureSeatAndAssign(input: {
   });
 }
 
+type SeatCandidate = {
+  email: string | null;
+  plan: string | null;
+  hasVendorPlan: boolean;
+  authPresent: boolean;
+};
+
+const normEmail = (email: string | null | undefined) => (email ?? "").trim().toLowerCase();
+
+/**
+ * Keep one detected seat per paid login. A person can hold several plans for
+ * the same tool at once (a work Team seat and a personal Pro or Max), and each
+ * one is real spend, so every named login with a plan gets its own seat.
+ * Logins with no email (placeholders the agent reports before it learns the
+ * email) never get a seat of their own while a named login exists, since they
+ * are usually that same login. Admin-confirmed seats are never touched.
+ *
+ * Candidates come from every active device of the developer, plus any
+ * accounts passed in, so a sync from one device never drops another device's
+ * seat.
+ */
 export async function syncDetectedPlansForDevice(input: {
   orgId: string;
   developerId: string;
   toolNames?: string[];
   accounts?: DetectedAccount[];
 }) {
-  const byTool = new Map<
-    string,
-    { plan: string | null; email: string | null; hasVendorPlan: boolean; authPresent: boolean }
-  >();
-
-  for (const name of input.toolNames ?? []) {
-    const toolKey = canonicalToolKey(name);
-    if (!findCatalogTool(toolKey)) continue;
-    if (!byTool.has(toolKey)) {
-      byTool.set(toolKey, { plan: null, email: null, hasVendorPlan: false, authPresent: false });
-    }
-  }
-
-  // A login that carries no plan (e.g. a desktop-only Team account whose plan
-  // we never read on this device) is resolved from its vendor org: any login in
-  // this org that did report a plan for the same vendor org establishes it.
-  const orgPlanMap = await buildOrgPlanMap(input.orgId);
-
-  for (const account of input.accounts ?? []) {
-    const toolKey = canonicalToolKey(account.toolName);
-    if (!findCatalogTool(toolKey)) continue;
-    let effectivePlan = account.plan ?? null;
-    if (!hasReportedVendorPlan(effectivePlan) && account.vendorOrgId?.trim()) {
-      effectivePlan = orgPlanMap.get(`${toolKey}\u0000${account.vendorOrgId.trim()}`) ?? effectivePlan;
-    }
-    const existing = byTool.get(toolKey) ?? {
-      plan: null,
-      email: null,
-      hasVendorPlan: false,
-      authPresent: false,
-    };
-    const hasVendorPlan = hasReportedVendorPlan(effectivePlan);
-    const next = {
-      plan: existing.plan,
-      email: existing.email ?? account.email ?? null,
-      hasVendorPlan: existing.hasVendorPlan || hasVendorPlan,
-      authPresent: existing.authPresent || Boolean(account.authPresent),
-    };
-    // One person can have several logins for a tool (e.g. a personal Pro and a
-    // work Team account). The seat is singular, so keep the strongest plan and
-    // the email that goes with it, rather than letting the last account win.
-    if (hasVendorPlan && effectivePlan) {
-      if (!existing.plan || strongerVendorPlan(toolKey, effectivePlan, existing.plan) === effectivePlan) {
-        next.plan = effectivePlan;
-        next.email = account.email ?? existing.email ?? null;
-      }
-    }
-    byTool.set(toolKey, next);
-  }
-
-  if (byTool.size === 0) return { created: 0, assigned: 0 };
-
   const developer = await prisma.developer.findFirst({
     where: { id: input.developerId, orgId: input.orgId },
     select: { id: true, authUserId: true },
   });
   if (!developer) return { created: 0, assigned: 0 };
 
+  const stored = await prisma.toolAccount.findMany({
+    where: {
+      orgId: input.orgId,
+      userId: developer.id,
+      authPresent: true,
+      device: activeDeviceWhere,
+    },
+    select: { toolName: true, plan: true, email: true, vendorOrgId: true, authPresent: true },
+  });
+  const accounts: DetectedAccount[] = [...stored, ...(input.accounts ?? [])];
+
+  // A login that carries no plan (e.g. a desktop-only Team account whose plan
+  // we never read on this device) is resolved from its vendor org: any login in
+  // this org that did report a plan for the same vendor org establishes it.
+  const orgPlanMap = await buildOrgPlanMap(input.orgId);
+
+  // toolKey -> email ("" for logins without one) -> strongest candidate
+  const byTool = new Map<string, Map<string, SeatCandidate>>();
+  for (const name of input.toolNames ?? []) {
+    const toolKey = canonicalToolKey(name);
+    if (!findCatalogTool(toolKey)) continue;
+    if (!byTool.has(toolKey)) byTool.set(toolKey, new Map());
+  }
+
+  for (const account of accounts) {
+    const toolKey = canonicalToolKey(account.toolName);
+    if (!findCatalogTool(toolKey)) continue;
+    let effectivePlan = account.plan ?? null;
+    if (!hasReportedVendorPlan(effectivePlan) && account.vendorOrgId?.trim()) {
+      effectivePlan = orgPlanMap.get(`${toolKey}\u0000${account.vendorOrgId.trim()}`) ?? effectivePlan;
+    }
+    const hasVendorPlan = hasReportedVendorPlan(effectivePlan);
+    const logins = byTool.get(toolKey) ?? new Map<string, SeatCandidate>();
+    const key = normEmail(account.email);
+    const existing = logins.get(key);
+    const next: SeatCandidate = {
+      email: key || null,
+      plan: existing?.plan ?? null,
+      hasVendorPlan: Boolean(existing?.hasVendorPlan) || hasVendorPlan,
+      authPresent: Boolean(existing?.authPresent) || Boolean(account.authPresent),
+    };
+    if (hasVendorPlan && effectivePlan) {
+      if (!next.plan || strongerVendorPlan(toolKey, effectivePlan, next.plan) === effectivePlan) {
+        next.plan = effectivePlan;
+      }
+    }
+    logins.set(key, next);
+    byTool.set(toolKey, logins);
+  }
+
+  if (byTool.size === 0) return { created: 0, assigned: 0 };
+
   const actorId = developer.authUserId ?? developer.id;
   let created = 0;
   let assigned = 0;
 
-  for (const [toolKey, meta] of byTool) {
+  for (const [toolKey, logins] of byTool) {
     const tool = findCatalogTool(toolKey);
     if (!tool) continue;
 
     try {
-      const existingAssignment = await prisma.developerPlanAssignment.findFirst({
+      const activeAssignments = await prisma.developerPlanAssignment.findMany({
         where: {
           orgId: input.orgId,
           developerId: developer.id,
@@ -383,78 +405,93 @@ export async function syncDetectedPlansForDevice(input: {
         include: { template: { select: { id: true, catalogPlanKey: true, toolKey: true } } },
         orderBy: { createdAt: "desc" },
       });
+      // An admin-confirmed seat means an admin owns this person's coverage.
+      if (activeAssignments.some((assignment) => assignment.source !== "detected")) continue;
+      const detected = [...activeAssignments];
 
-      // Never invent a seat from tool detection alone — require a vendor plan or
-      // authenticated account with a catalog default (e.g. Antigravity → individual).
-      // If a prior auto-detected seat lost both vendor plan and auth, end it.
-      if (!canAutoCreateDetectedSeat(toolKey, meta)) {
-        if (existingAssignment?.source === "detected") {
-          await prisma.developerPlanAssignment.update({
-            where: { id: existingAssignment.id },
-            data: { active: false, endDate: utcDateOnly(), seatStatus: "ended" },
-          });
-          if (existingAssignment.planTemplateId) {
-            await deactivateOrphanDetectedTemplate(input.orgId, existingAssignment.planTemplateId);
-          }
-        } else if (existingAssignment && meta.email && !existingAssignment.vendorAccountEmail) {
-          await prisma.developerPlanAssignment.update({
-            where: { id: existingAssignment.id },
-            data: { vendorAccountEmail: meta.email },
-          });
-        }
-        continue;
-      }
+      const named = [...logins.values()].filter((login) => login.email);
+      const candidates = named.length ? named : [logins.get("") ?? { email: null, plan: null, hasVendorPlan: false, authPresent: false }];
 
-      const catalogPlanKey = mapVendorPlanToCatalog(toolKey, meta.plan);
-
-      const ensured = await ensureTemplate({
-        orgId: input.orgId,
-        toolKey,
-        catalogPlanKey,
-        actorId,
-      });
-      const template = ensured.template;
-      if (ensured.created) created += 1;
-
-      if (existingAssignment?.planTemplateId === template.id) {
-        if (meta.email && existingAssignment.vendorAccountEmail !== meta.email) {
-          await prisma.developerPlanAssignment.update({
-            where: { id: existingAssignment.id },
-            data: { vendorAccountEmail: meta.email },
-          });
-        }
-        continue;
-      }
-
-      if (existingAssignment) {
-        // Keep admin-confirmed coverage; only migrate auto-detected seats when vendor plan differs.
-        if (existingAssignment.source !== "detected") continue;
-        if (existingAssignment.template.catalogPlanKey === catalogPlanKey) continue;
-        const previousTemplateId = existingAssignment.planTemplateId;
+      const endSeat = async (assignment: (typeof detected)[number]) => {
         await prisma.developerPlanAssignment.update({
-          where: { id: existingAssignment.id },
+          where: { id: assignment.id },
           data: { active: false, endDate: utcDateOnly(), seatStatus: "ended" },
         });
-        if (previousTemplateId) {
-          await deactivateOrphanDetectedTemplate(input.orgId, previousTemplateId);
+        detected.splice(detected.indexOf(assignment), 1);
+        if (assignment.planTemplateId) {
+          await deactivateOrphanDetectedTemplate(input.orgId, assignment.planTemplateId);
         }
+      };
+
+      const keptSeatIds = new Set<string>();
+      for (const login of candidates) {
+        const seat = detected.find((assignment) => normEmail(assignment.vendorAccountEmail) === normEmail(login.email));
+
+        // Never invent a seat from tool detection alone — require a vendor plan or
+        // authenticated account with a catalog default (e.g. Antigravity → individual).
+        if (!canAutoCreateDetectedSeat(toolKey, login)) {
+          if (seat) await endSeat(seat);
+          continue;
+        }
+
+        const catalogPlanKey = mapVendorPlanToCatalog(toolKey, login.plan);
+        const ensured = await ensureTemplate({ orgId: input.orgId, toolKey, catalogPlanKey, actorId });
+        if (ensured.created) created += 1;
+
+        if (seat && (seat.planTemplateId === ensured.template.id || seat.template.catalogPlanKey === catalogPlanKey)) {
+          keptSeatIds.add(seat.id);
+          continue;
+        }
+        if (seat) await endSeat(seat);
+
+        await ensureSeatAndAssign({
+          orgId: input.orgId,
+          developerId: developer.id,
+          actorId,
+          toolName: tool.toolName,
+          templateId: ensured.template.id,
+          email: login.email,
+        });
+        assigned += 1;
       }
 
-      await ensureSeatAndAssign({
-        orgId: input.orgId,
-        developerId: developer.id,
-        actorId,
-        toolName: tool.toolName,
-        templateId: template.id,
-        email: meta.email,
-      });
-      assigned += 1;
+      // Seats for logins this person no longer has anywhere (signed out, or the
+      // older single seat that predates per-login seats) end here. Only named
+      // logins are authoritative: a sync with no named login leaves seats alone.
+      if (named.length) {
+        const liveEmails = new Set(named.map((login) => normEmail(login.email)));
+        for (const assignment of [...detected]) {
+          if (keptSeatIds.has(assignment.id)) continue;
+          const email = normEmail(assignment.vendorAccountEmail);
+          if (email && liveEmails.has(email)) continue;
+          await endSeat(assignment);
+        }
+      }
     } catch (error) {
       logServerError("sync-detected", error, { toolKey });
     }
   }
 
   return { created, assigned };
+}
+
+/**
+ * Re-derive every developer's detected seats from what their devices last
+ * reported. Device syncs only re-run seat sync when a report changes, so this
+ * catches seats left behind by a plan-mapping fix or a device that went quiet.
+ */
+export async function reconcileDetectedSeatsForOrg(orgId: string) {
+  const developers = await prisma.toolAccount.findMany({
+    where: { orgId, authPresent: true, device: activeDeviceWhere, user: { removedAt: null } },
+    select: { userId: true },
+    distinct: ["userId"],
+  });
+  let assigned = 0;
+  for (const { userId } of developers) {
+    const result = await syncDetectedPlansForDevice({ orgId, developerId: userId });
+    assigned += result.assigned;
+  }
+  return { developers: developers.length, assigned };
 }
 
 /** Force-migrate a developer's detected seat to the vendor-reported catalog plan. */

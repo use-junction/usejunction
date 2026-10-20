@@ -133,7 +133,6 @@ export function ToolProviderDetail({
   const [error, setError] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PlanRow | null>(null);
-  const [applyingId, setApplyingId] = useState<string | null>(null);
   const [modelView, setModelView] = useState<"model" | "person">("model");
   const [expandedPeople, setExpandedPeople] = useState<Set<string>>(() => new Set());
   const [showAllModels, setShowAllModels] = useState(false);
@@ -190,20 +189,6 @@ export function ToolProviderDetail({
     setSaving(false);
   }
 
-  async function applyDetected(developerId: string) {
-    setApplyingId(developerId);
-    setError(null);
-    const response = await fetch(`/api/tools/${data.toolKey}/apply-detected`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ developerId }),
-    });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) setError(body.error ?? "Could not apply detected plan");
-    else await refresh();
-    setApplyingId(null);
-  }
-
   const peopleByDeveloperId = new Map<string, (typeof data.people)[number]>();
   for (const person of data.people) peopleByDeveloperId.set(person.developerId, person);
 
@@ -221,6 +206,7 @@ export function ToolProviderDetail({
     accountPlanKey: string | null;
     accountPlanName: string | null;
     accountPlanInferred: boolean;
+    requests: number;
     windows: typeof data.quotas;
   };
   const GROUP_SEP = "\u0000";
@@ -252,6 +238,7 @@ export function ToolProviderDetail({
       accountPlanKey: account.mappedCatalogPlanKey,
       accountPlanName: account.mappedCatalogPlanName,
       accountPlanInferred: account.planInferredFromOrg,
+      requests: account.requests ?? 0,
       windows: [],
     });
   }
@@ -274,6 +261,7 @@ export function ToolProviderDetail({
         accountPlanKey: null,
         accountPlanName: null,
         accountPlanInferred: false,
+        requests: 0,
         windows: [],
       };
       quotaGroupMap.set(key, group);
@@ -337,10 +325,11 @@ export function ToolProviderDetail({
       return { ...group, tightest, tightestPercent: tightest ? quotaPercent(tightest) : null };
     })
     .sort((a, b) => (b.tightestPercent ?? -1) - (a.tightestPercent ?? -1) || a.developerName.localeCompare(b.developerName));
-  // One row per person. Their primary login leads — the one closest to a limit,
-  // then one reporting any window, then a named login, then the most recently
-  // seen (quotaGroups keeps account freshness order on ties) — and any other
-  // logins, often stale or secondary, fold underneath it.
+  // One row per person. Their primary login leads — the one they used most in
+  // this period, then the one closest to a limit, then one reporting any
+  // window, then a named login, then the most recently seen (quotaGroups keeps
+  // account freshness order on ties). Every other login, each with its own
+  // plan, folds underneath it.
   const personRows = Array.from(
     quotaGroups
       .reduce((map, group) => {
@@ -352,6 +341,7 @@ export function ToolProviderDetail({
     .map(([key, groups]) => {
       const [primary, ...others] = [...groups].sort(
         (a, b) =>
+          b.requests - a.requests ||
           (b.tightestPercent ?? -1) - (a.tightestPercent ?? -1) ||
           Number(b.windows.length > 0) - Number(a.windows.length > 0) ||
           Number(Boolean(b.accountEmail)) - Number(Boolean(a.accountEmail)),
@@ -476,14 +466,10 @@ export function ToolProviderDetail({
     const windows = [...group.windows].sort(
       (a, b) => (quotaPercent(b) ?? -1) - (quotaPercent(a) ?? -1),
     );
-    // Only surface the plan-mismatch nudge on the login whose detected
-    // plan actually differs from the assigned seat.
-    const showMismatch = Boolean(
-      !isSelf &&
-        person?.planMismatch &&
-        person.mappedCatalogPlanKey &&
-        (group.accountKey == null || group.accountPlanKey === person.mappedCatalogPlanKey),
-    );
+    // Detected seats follow each login, so they never mismatch. Flag only an
+    // admin-assigned seat that none of this person's logins report, once per
+    // person.
+    const showMismatch = Boolean(!isSelf && !nested && person?.planMismatch && person.assignment);
     return (
       <tr key={group.key} className={cn("border-b align-top last:border-b-0", nested && "bg-muted/30")}>
         <td className={cn("px-4 py-3", nested && "pl-8")}>
@@ -499,20 +485,10 @@ export function ToolProviderDetail({
             <p className="truncate text-xs text-muted-foreground">{group.deviceHostname}</p>
           ) : null}
           {toggle}
-          {showMismatch && person ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-              <span className="bg-brand-orange-pale px-1.5 py-0.5 text-brand-orange-dark">
-                Reports {person.mappedCatalogPlanKey}, assigned {person.assignment?.catalogPlanKey ?? "another plan"}
-              </span>
-              <Button
-                size="xs"
-                variant="outline"
-                disabled={applyingId === person.developerId}
-                onClick={() => void applyDetected(person.developerId)}
-              >
-                {applyingId === person.developerId ? <Loader2 className="size-3 animate-spin" /> : "Use detected plan"}
-              </Button>
-            </div>
+          {showMismatch && person?.assignment ? (
+            <p className="mt-2 inline-block bg-brand-orange-pale px-1.5 py-0.5 text-xs text-brand-orange-dark">
+              Assigned {person.assignment.planName}, but none of their logins report it
+            </p>
           ) : null}
         </td>
         <td className="px-4 py-3">

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@usejunction/db";
 import { logServerError } from "@/lib/errors/public";
 import { reconcileDeviceHealth } from "@/lib/sync/remote-sync";
+import { reconcileDetectedSeatsForOrg } from "@/lib/tools/sync-detected";
 
 export const maxDuration = 300;
 
@@ -37,6 +38,7 @@ async function handle(req: NextRequest) {
       repairRequired: 0,
       noticesSent: 0,
       noticesFailed: 0,
+      seatsAssigned: 0,
     };
     for (const org of orgs) {
       const result = await reconcileDeviceHealth({
@@ -49,6 +51,12 @@ async function handle(req: NextRequest) {
       totals.repairRequired += result.repairRequired;
       totals.noticesSent += result.noticesSent;
       totals.noticesFailed += result.noticesFailed;
+      try {
+        const seats = await reconcileDetectedSeatsForOrg(org.id);
+        totals.seatsAssigned += seats.assigned;
+      } catch (error) {
+        logServerError("cron/device-health/detected-seats", error, { orgId: org.id });
+      }
     }
     return NextResponse.json({ ok: true, ...totals });
   } catch (error) {
