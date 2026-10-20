@@ -11,6 +11,7 @@ import { findCatalogPlan, findCatalogTool, subscriptionToolKeys, toolUsageNames 
 import { mapVendorPlanToCatalog } from "@/lib/tools/sync-detected";
 import { strongerVendorPlan } from "@/lib/tools/detected-plan";
 import { isPlaceholderAccount } from "@/lib/privacy/account-collection-policy";
+import { isStaleLogin } from "@/lib/tools/stale-login";
 import { listSubscriptions, type listSubscriptions as ListSubscriptions } from "@/lib/tools/subscriptions";
 import { isPersonCovered } from "@/lib/queries/dashboard/tool-detail-kpi";
 import { provenFreeSeats } from "@/lib/billing/monthly";
@@ -175,7 +176,7 @@ export async function getToolDetail(
         },
         include: {
           user: { select: { id: true, name: true, email: true } },
-          device: { select: { hostname: true } },
+          device: { select: { hostname: true, lastSeenAt: true } },
         },
         orderBy: { updatedAt: "desc" },
       }),
@@ -321,7 +322,7 @@ export async function getToolDetail(
   // seat that none of their logins report is worth flagging.
   const loginPlansByDeveloper = new Map<string, Set<string>>();
   for (const account of accounts) {
-    if (!account.authPresent || !account.plan?.trim()) continue;
+    if (!account.authPresent || !account.plan?.trim() || isStaleLogin(account)) continue;
     const plans = loginPlansByDeveloper.get(account.user.id) ?? new Set<string>();
     plans.add(mapVendorPlanToCatalog(tool.key, account.plan));
     loginPlansByDeveloper.set(account.user.id, plans);
@@ -406,14 +407,17 @@ export async function getToolDetail(
   const peopleCovered = people.filter((person) => person.coverage === "covered").length;
   const peopleInstallOnly = people.filter((person) => person.coverage === "install_only").length;
 
-  // A nameless placeholder login the device no longer reports has been renamed
-  // to its email key (or is gone); drop it and its windows so the same login
-  // does not show twice. Sync deletes these too — this covers rows stored
-  // before that cleanup existed.
+  // Hide logins nobody uses any more, with their windows: anything stale for
+  // 30 days, and a nameless placeholder the device no longer reports (it has
+  // been renamed to its email key, or is gone). Sync deletes placeholders too —
+  // this covers rows stored before that cleanup existed.
   const retiredLogin = (deviceId: string | null, accountKey: string) => `${deviceId ?? ""}\u0000${accountKey}`;
   const retiredLogins = new Set(
     accounts
-      .filter((account) => !account.authPresent && isPlaceholderAccount(account.toolName, account))
+      .filter(
+        (account) =>
+          isStaleLogin(account) || (!account.authPresent && isPlaceholderAccount(account.toolName, account)),
+      )
       .map((account) => retiredLogin(account.deviceId, account.accountKey)),
   );
   const liveAccounts = accounts.filter((account) => !retiredLogins.has(retiredLogin(account.deviceId, account.accountKey)));

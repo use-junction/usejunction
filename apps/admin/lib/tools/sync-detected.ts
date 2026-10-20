@@ -16,6 +16,7 @@ import {
 } from "./detected-plan";
 import { logServerError } from "@/lib/errors/public";
 import { activeDeviceWhere } from "@/lib/devices/decommission";
+import { staleLoginCutoff } from "./stale-login";
 
 export type DetectedAccount = {
   toolName: string;
@@ -250,52 +251,96 @@ async function deactivateOrphanDetectedTemplate(orgId: string, templateId: strin
   });
 }
 
+// Shrink an auto-detected plan's seat count to the seats actually held. Sync
+// grows it as logins appear, so without this it only ever ratchets up and
+// "You pay" keeps charging for seats nobody holds.
+async function fitDetectedCapacity(orgId: string, templateId: string) {
+  const template = await prisma.billingPlanTemplate.findFirst({
+    where: { id: templateId, orgId, priceSource: "detected" },
+    select: { id: true, seatCapacity: true },
+  });
+  if (!template) return;
+  const aggregate = await prisma.developerPlanAssignment.aggregate({
+    where: { orgId, planTemplateId: templateId, active: true, seatStatus: "active" },
+    _sum: { seatCount: true },
+  });
+  const held = Math.max(1, aggregate._sum.seatCount ?? 0);
+  if (template.seatCapacity !== held) {
+    await prisma.billingPlanTemplate.update({ where: { id: templateId }, data: { seatCapacity: held } });
+  }
+}
+
+/**
+ * Create a login's detected seat unless one already exists. Two syncs for the
+ * same person can run at once (a device sync and the reconcile cron, or the
+ * cron firing for two regions against one database), so the check and the
+ * insert run under a per-person advisory lock.
+ */
 async function ensureSeatAndAssign(input: {
   orgId: string;
   developerId: string;
   actorId: string;
   toolName: string;
+  provider: string;
+  product: string;
   templateId: string;
   email: string | null;
-}) {
-  let template = await prisma.billingPlanTemplate.findFirstOrThrow({
-    where: { id: input.templateId, orgId: input.orgId },
-  });
-  const aggregate = await prisma.developerPlanAssignment.aggregate({
-    where: {
-      orgId: input.orgId,
-      planTemplateId: template.id,
-      active: true,
-      seatStatus: "active",
-    },
-    _sum: { seatCount: true },
-  });
-  const assignedSeats = aggregate._sum.seatCount ?? 0;
-  if (assignedSeats + 1 > template.seatCapacity) {
-    template = await prisma.billingPlanTemplate.update({
-      where: { id: template.id },
-      data: { seatCapacity: assignedSeats + 1 },
-    });
-  }
+}): Promise<boolean> {
+  const created = await prisma.$transaction(async (tx) => {
+    const lockKey = `detected-seat:${input.orgId}:${input.developerId}:${input.provider}:${input.product}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
 
-  const snapshot = assignmentSnapshot(template, {});
-  await prisma.developerPlanAssignment.create({
-    data: {
-      ...snapshot,
-      toolName: input.toolName,
-      orgId: input.orgId,
-      developerId: input.developerId,
-      planTemplateId: template.id,
-      startDate: utcDateOnly(),
-      endDate: null,
-      seatCount: 1,
-      seatStatus: "active",
-      source: "detected",
-      vendorAccountEmail: input.email,
-      notes: "Auto-synced from detected device usage",
-      createdByUserId: input.actorId,
-    },
+    const existing = await tx.developerPlanAssignment.findFirst({
+      where: {
+        orgId: input.orgId,
+        developerId: input.developerId,
+        provider: input.provider,
+        product: input.product,
+        active: true,
+        seatStatus: "active",
+        source: "detected",
+        vendorAccountEmail: input.email ? { equals: input.email, mode: "insensitive" } : null,
+      },
+      select: { id: true },
+    });
+    if (existing) return false;
+
+    let template = await tx.billingPlanTemplate.findFirstOrThrow({
+      where: { id: input.templateId, orgId: input.orgId },
+    });
+    const aggregate = await tx.developerPlanAssignment.aggregate({
+      where: { orgId: input.orgId, planTemplateId: template.id, active: true, seatStatus: "active" },
+      _sum: { seatCount: true },
+    });
+    const assignedSeats = aggregate._sum.seatCount ?? 0;
+    if (assignedSeats + 1 > template.seatCapacity) {
+      template = await tx.billingPlanTemplate.update({
+        where: { id: template.id },
+        data: { seatCapacity: assignedSeats + 1 },
+      });
+    }
+
+    const snapshot = assignmentSnapshot(template, {});
+    await tx.developerPlanAssignment.create({
+      data: {
+        ...snapshot,
+        toolName: input.toolName,
+        orgId: input.orgId,
+        developerId: input.developerId,
+        planTemplateId: template.id,
+        startDate: utcDateOnly(),
+        endDate: null,
+        seatCount: 1,
+        seatStatus: "active",
+        source: "detected",
+        vendorAccountEmail: input.email,
+        notes: "Auto-synced from detected device usage",
+        createdByUserId: input.actorId,
+      },
+    });
+    return true;
   });
+  return created;
 }
 
 type SeatCandidate = {
@@ -336,7 +381,8 @@ export async function syncDetectedPlansForDevice(input: {
       orgId: input.orgId,
       userId: developer.id,
       authPresent: true,
-      device: activeDeviceWhere,
+      // A device silent for 30 days no longer holds its logins' seats.
+      device: { ...activeDeviceWhere, lastSeenAt: { gte: staleLoginCutoff() } },
     },
     select: { toolName: true, plan: true, email: true, vendorOrgId: true, authPresent: true },
   });
@@ -386,6 +432,7 @@ export async function syncDetectedPlansForDevice(input: {
   const actorId = developer.authUserId ?? developer.id;
   let created = 0;
   let assigned = 0;
+  const touchedTemplates = new Set<string>();
 
   for (const [toolKey, logins] of byTool) {
     const tool = findCatalogTool(toolKey);
@@ -419,9 +466,19 @@ export async function syncDetectedPlansForDevice(input: {
         });
         detected.splice(detected.indexOf(assignment), 1);
         if (assignment.planTemplateId) {
+          touchedTemplates.add(assignment.planTemplateId);
           await deactivateOrphanDetectedTemplate(input.orgId, assignment.planTemplateId);
         }
       };
+
+      // Earlier concurrent syncs may have left more than one seat for the same
+      // login; keep the oldest and end the rest.
+      const seenLogins = new Set<string>();
+      for (const assignment of [...detected].sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime())) {
+        const login = normEmail(assignment.vendorAccountEmail);
+        if (seenLogins.has(login)) await endSeat(assignment);
+        else seenLogins.add(login);
+      }
 
       const keptSeatIds = new Set<string>();
       for (const login of candidates) {
@@ -444,15 +501,18 @@ export async function syncDetectedPlansForDevice(input: {
         }
         if (seat) await endSeat(seat);
 
-        await ensureSeatAndAssign({
+        const createdSeat = await ensureSeatAndAssign({
           orgId: input.orgId,
           developerId: developer.id,
           actorId,
           toolName: tool.toolName,
+          provider: tool.provider,
+          product: tool.product,
           templateId: ensured.template.id,
           email: login.email,
         });
-        assigned += 1;
+        touchedTemplates.add(ensured.template.id);
+        if (createdSeat) assigned += 1;
       }
 
       // Seats for logins this person no longer has anywhere (signed out, or the
@@ -470,6 +530,10 @@ export async function syncDetectedPlansForDevice(input: {
     } catch (error) {
       logServerError("sync-detected", error, { toolKey });
     }
+  }
+
+  for (const templateId of touchedTemplates) {
+    await fitDetectedCapacity(input.orgId, templateId);
   }
 
   return { created, assigned };
@@ -491,7 +555,40 @@ export async function reconcileDetectedSeatsForOrg(orgId: string) {
     const result = await syncDetectedPlansForDevice({ orgId, developerId: userId });
     assigned += result.assigned;
   }
-  return { developers: developers.length, assigned };
+
+  // A detected seat whose holder was removed, or no longer has any signed-in
+  // login for that tool on a device seen in the last 30 days, is no longer
+  // held by anyone.
+  const liveLogins = await prisma.toolAccount.findMany({
+    where: {
+      orgId,
+      authPresent: true,
+      device: { ...activeDeviceWhere, lastSeenAt: { gte: staleLoginCutoff() } },
+      user: { removedAt: null },
+    },
+    select: { userId: true, toolName: true },
+  });
+  const liveTools = new Set(liveLogins.map((row) => `${row.userId}\u0000${canonicalToolKey(row.toolName)}`));
+  const detectedSeats = await prisma.developerPlanAssignment.findMany({
+    where: { orgId, active: true, seatStatus: "active", source: "detected" },
+    select: { id: true, developerId: true, toolName: true, planTemplateId: true },
+  });
+  let ended = 0;
+  const touched = new Set<string>();
+  for (const seat of detectedSeats) {
+    if (liveTools.has(`${seat.developerId}\u0000${canonicalToolKey(seat.toolName)}`)) continue;
+    await prisma.developerPlanAssignment.update({
+      where: { id: seat.id },
+      data: { active: false, endDate: utcDateOnly(), seatStatus: "ended" },
+    });
+    ended += 1;
+    touched.add(seat.planTemplateId);
+  }
+  for (const templateId of touched) {
+    await deactivateOrphanDetectedTemplate(orgId, templateId);
+    await fitDetectedCapacity(orgId, templateId);
+  }
+  return { developers: developers.length, assigned, ended };
 }
 
 /** Force-migrate a developer's detected seat to the vendor-reported catalog plan. */
@@ -558,6 +655,8 @@ export async function applyDetectedPlanForDeveloper(input: {
     developerId: input.developerId,
     actorId: input.actorUserId,
     toolName: tool.toolName,
+    provider: tool.provider,
+    product: tool.product,
     templateId: ensured.template.id,
     email: account.email,
   });
