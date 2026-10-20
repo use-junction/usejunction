@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { ChevronRight, Loader2, Plus, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -135,6 +135,7 @@ export function ToolProviderDetail({
   const [deleteTarget, setDeleteTarget] = useState<PlanRow | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [modelView, setModelView] = useState<"model" | "person">("model");
+  const [expandedPeople, setExpandedPeople] = useState<Set<string>>(() => new Set());
   const [showAllModels, setShowAllModels] = useState(false);
   const basePath = periodBasePath ?? `/tools/${data.toolKey}`;
   const isSelf = scope === "self";
@@ -336,7 +337,40 @@ export function ToolProviderDetail({
       return { ...group, tightest, tightestPercent: tightest ? quotaPercent(tightest) : null };
     })
     .sort((a, b) => (b.tightestPercent ?? -1) - (a.tightestPercent ?? -1) || a.developerName.localeCompare(b.developerName));
-  const peopleReporting = quotaGroups.filter((group) => group.windows.length > 0).length;
+  // One row per person. Their primary login leads — the one closest to a limit,
+  // then one reporting any window, then a named login, then the most recently
+  // seen (quotaGroups keeps account freshness order on ties) — and any other
+  // logins, often stale or secondary, fold underneath it.
+  const personRows = Array.from(
+    quotaGroups
+      .reduce((map, group) => {
+        const key = group.developerId ?? group.key;
+        return map.set(key, [...(map.get(key) ?? []), group]);
+      }, new Map<string, typeof quotaGroups>())
+      .entries(),
+  )
+    .map(([key, groups]) => {
+      const [primary, ...others] = [...groups].sort(
+        (a, b) =>
+          (b.tightestPercent ?? -1) - (a.tightestPercent ?? -1) ||
+          Number(b.windows.length > 0) - Number(a.windows.length > 0) ||
+          Number(Boolean(b.accountEmail)) - Number(Boolean(a.accountEmail)),
+      );
+      return { key, primary, others };
+    })
+    .sort(
+      (a, b) =>
+        (b.primary.tightestPercent ?? -1) - (a.primary.tightestPercent ?? -1) ||
+        a.primary.developerName.localeCompare(b.primary.developerName),
+    );
+  const peopleReporting = personRows.filter((row) => [row.primary, ...row.others].some((group) => group.windows.length > 0)).length;
+  const togglePerson = (key: string) =>
+    setExpandedPeople((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   const closest = quotaGroups.find((group) => group.tightest) ?? null;
   const closestReset = closest?.tightest ? resetCopy(closest.tightest.resetAt) : null;
 
@@ -433,6 +467,101 @@ export function ToolProviderDetail({
     />
   );
 
+  const renderLoginRow = (
+    group: (typeof quotaGroups)[number],
+    { nested = false, toggle = null }: { nested?: boolean; toggle?: ReactNode } = {},
+  ) => {
+    const { person, name: planName, source } = planForGroup(group);
+    // Show every window, tightest first, rather than hiding all but one.
+    const windows = [...group.windows].sort(
+      (a, b) => (quotaPercent(b) ?? -1) - (quotaPercent(a) ?? -1),
+    );
+    // Only surface the plan-mismatch nudge on the login whose detected
+    // plan actually differs from the assigned seat.
+    const showMismatch = Boolean(
+      !isSelf &&
+        person?.planMismatch &&
+        person.mappedCatalogPlanKey &&
+        (group.accountKey == null || group.accountPlanKey === person.mappedCatalogPlanKey),
+    );
+    return (
+      <tr key={group.key} className={cn("border-b align-top last:border-b-0", nested && "bg-muted/30")}>
+        <td className={cn("px-4 py-3", nested && "pl-8")}>
+          {isSelf || nested ? null : <p className="font-medium">{group.developerName}</p>}
+          <p className={cn("text-xs text-muted-foreground", isSelf && "text-sm text-foreground")}>
+            {planName ? <span className="font-medium text-foreground">{planName}</span> : null}
+            {planName ? " · " : ""}{source}
+          </p>
+          {group.accountEmail && !isSelf ? (
+            <p className="truncate text-xs text-muted-foreground">{group.accountEmail}</p>
+          ) : null}
+          {group.deviceHostname && !isSelf ? (
+            <p className="truncate text-xs text-muted-foreground">{group.deviceHostname}</p>
+          ) : null}
+          {toggle}
+          {showMismatch && person ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span className="bg-brand-orange-pale px-1.5 py-0.5 text-brand-orange-dark">
+                Reports {person.mappedCatalogPlanKey}, assigned {person.assignment?.catalogPlanKey ?? "another plan"}
+              </span>
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={applyingId === person.developerId}
+                onClick={() => void applyDetected(person.developerId)}
+              >
+                {applyingId === person.developerId ? <Loader2 className="size-3 animate-spin" /> : "Use detected plan"}
+              </Button>
+            </div>
+          ) : null}
+        </td>
+        <td className="px-4 py-3">
+          {windows.length ? (
+            <div className="grid gap-x-10 gap-y-3 sm:grid-cols-2">
+              {windows.map((quota) => {
+                const pct = quotaPercent(quota);
+                const tone = quotaTone(pct);
+                const secondary = isSecondaryQuotaWindow(quota.windowType);
+                const reset = resetCopy(quota.resetAt, secondary ? "Expires" : "Resets");
+                return (
+                  <div key={`${quota.windowType}-${quota.deviceHostname ?? "org"}`} className="min-w-0">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="truncate">{quotaWindowLabel(quota.windowType)}</span>
+                      <span className="tabular-nums whitespace-nowrap">
+                        {pct != null ? (
+                          <>
+                            <span className="font-semibold">{Math.round(pct)}%</span>
+                            <span className={cn("ml-2 text-xs", tone.text)}>{tone.label}</span>
+                          </>
+                        ) : (
+                          quotaRemainingLabel(quota.creditsRemaining, quota.windowType) ?? "—"
+                        )}
+                      </span>
+                    </div>
+                    {pct != null ? <div className="mt-1.5"><QuotaMeter quota={quota} percent={pct} /></div> : null}
+                    {reset ? (
+                      <p className="mt-1 text-xs text-muted-foreground" title={reset.absolute}>
+                        {reset.relative}
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">
+              {planName
+                ? data.toolKey === "claude"
+                  ? <>No live limits yet. If this login is used in the Claude desktop app, run <code className="font-mono">usejunction claude-desktop connect</code> on that machine.</>
+                  : "No live limits yet. They appear once the tool is signed in on this machine."
+                : "No limits reported yet"}
+            </span>
+          )}
+        </td>
+      </tr>
+    );
+  };
+
   return (
     <>
       {showBreadcrumb ? <Breadcrumb className="mb-6">
@@ -523,8 +652,8 @@ export function ToolProviderDetail({
               {isSelf ? "Your tightest allowance right now, from your machine." : "Each person's tightest allowance right now, closest to the limit first."}
             </p>
           </div>
-          {quotaGroups.length && !isSelf ? (
-            <p className="text-xs text-muted-foreground">{peopleReporting} of {quotaGroups.length} reporting</p>
+          {personRows.length && !isSelf ? (
+            <p className="text-xs text-muted-foreground">{peopleReporting} of {personRows.length} reporting</p>
           ) : null}
         </div>
         {quotaGroups.length ? (
@@ -537,95 +666,23 @@ export function ToolProviderDetail({
                 </tr>
               </thead>
               <tbody>
-                {quotaGroups.map((group) => {
-                  const { person, name: planName, source } = planForGroup(group);
-                  // Show every window, tightest first, rather than hiding all but one.
-                  const windows = [...group.windows].sort(
-                    (a, b) => (quotaPercent(b) ?? -1) - (quotaPercent(a) ?? -1),
-                  );
-                  // Only surface the plan-mismatch nudge on the login whose detected
-                  // plan actually differs from the assigned seat.
-                  const showMismatch = Boolean(
-                    !isSelf &&
-                      person?.planMismatch &&
-                      person.mappedCatalogPlanKey &&
-                      (group.accountKey == null || group.accountPlanKey === person.mappedCatalogPlanKey),
-                  );
-                  return (
-                    <tr key={group.key} className="border-b align-top last:border-b-0">
-                      <td className="px-4 py-3">
-                        {isSelf ? null : <p className="font-medium">{group.developerName}</p>}
-                        <p className={cn("text-xs text-muted-foreground", isSelf && "text-sm text-foreground")}>
-                          {planName ? <span className="font-medium text-foreground">{planName}</span> : null}
-                          {planName ? " · " : ""}{source}
-                        </p>
-                        {group.accountEmail && !isSelf ? (
-                          <p className="truncate text-xs text-muted-foreground">{group.accountEmail}</p>
-                        ) : null}
-                        {group.deviceHostname && !isSelf ? (
-                          <p className="truncate text-xs text-muted-foreground">{group.deviceHostname}</p>
-                        ) : null}
-                        {showMismatch && person ? (
-                          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                            <span className="bg-brand-orange-pale px-1.5 py-0.5 text-brand-orange-dark">
-                              Reports {person.mappedCatalogPlanKey}, assigned {person.assignment?.catalogPlanKey ?? "another plan"}
-                            </span>
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              disabled={applyingId === person.developerId}
-                              onClick={() => void applyDetected(person.developerId)}
-                            >
-                              {applyingId === person.developerId ? <Loader2 className="size-3 animate-spin" /> : "Use detected plan"}
-                            </Button>
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-3">
-                        {windows.length ? (
-                          <div className="grid gap-x-10 gap-y-3 sm:grid-cols-2">
-                            {windows.map((quota) => {
-                              const pct = quotaPercent(quota);
-                              const tone = quotaTone(pct);
-                              const secondary = isSecondaryQuotaWindow(quota.windowType);
-                              const reset = resetCopy(quota.resetAt, secondary ? "Expires" : "Resets");
-                              return (
-                                <div key={`${quota.windowType}-${quota.deviceHostname ?? "org"}`} className="min-w-0">
-                                  <div className="flex items-baseline justify-between gap-3">
-                                    <span className="truncate">{quotaWindowLabel(quota.windowType)}</span>
-                                    <span className="tabular-nums whitespace-nowrap">
-                                      {pct != null ? (
-                                        <>
-                                          <span className="font-semibold">{Math.round(pct)}%</span>
-                                          <span className={cn("ml-2 text-xs", tone.text)}>{tone.label}</span>
-                                        </>
-                                      ) : (
-                                        quotaRemainingLabel(quota.creditsRemaining, quota.windowType) ?? "—"
-                                      )}
-                                    </span>
-                                  </div>
-                                  {pct != null ? <div className="mt-1.5"><QuotaMeter quota={quota} percent={pct} /></div> : null}
-                                  {reset ? (
-                                    <p className="mt-1 text-xs text-muted-foreground" title={reset.absolute}>
-                                      {reset.relative}
-                                    </p>
-                                  ) : null}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            {planName
-                              ? data.toolKey === "claude"
-                                ? <>No live limits yet. If this login is used in the Claude desktop app, run <code className="font-mono">usejunction claude-desktop connect</code> on that machine.</>
-                                : "No live limits yet. They appear once the tool is signed in on this machine."
-                              : "No limits reported yet"}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
+                {personRows.flatMap(({ key, primary, others }) => {
+                  const expanded = expandedPeople.has(key);
+                  const toggle = others.length ? (
+                    <button
+                      type="button"
+                      aria-expanded={expanded}
+                      onClick={() => togglePerson(key)}
+                      className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                    >
+                      <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} />
+                      {expanded ? "Hide" : "Show"} {others.length} other {others.length === 1 ? "login" : "logins"}
+                    </button>
+                  ) : null;
+                  return [
+                    renderLoginRow(primary, { toggle }),
+                    ...(expanded ? others.map((group) => renderLoginRow(group, { nested: true })) : []),
+                  ];
                 })}
               </tbody>
             </table>
