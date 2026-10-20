@@ -97,7 +97,7 @@ func TestEstimateCostUsesModelRates(t *testing.T) {
 	if standard < 0.4 || standard > 0.6 {
 		t.Fatalf("composer standard should be $0.50/M input: %f", standard)
 	}
-	if PricingVersion != "2026-08-01" {
+	if PricingVersion != "2026-10-20" {
 		t.Fatalf("unexpected pricing version: %s", PricingVersion)
 	}
 }

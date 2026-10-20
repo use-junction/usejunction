@@ -10,11 +10,13 @@ type ModelRate struct {
 	CacheWritePer1M float64
 }
 
-const PricingVersion = "2026-08-01"
+const PricingVersion = "2026-10-20"
 
 var defaultRates = ModelRate{InputPer1M: 2.5, OutputPer1M: 10.0, CacheReadPer1M: 0.25, CacheWritePer1M: 3.125}
 
-// Known published rates (USD / 1M tokens). Matching is substring / prefix based.
+// Known published rates (USD / 1M tokens). Matching is first-substring-wins, so
+// more specific names must precede the broader prefixes they contain.
+// Keep identical (content and order) to apps/admin/lib/metrics/estimate-cost.ts.
 var modelRates = []struct {
 	match string
 	rate  ModelRate
@@ -27,14 +29,25 @@ var modelRates = []struct {
 	{"grok-4.5-high-fast", ModelRate{4, 18, 0.5, 0}},
 	{"grok-4.5-fast", ModelRate{4, 18, 0.5, 0}},
 	{"grok-4.5", ModelRate{2, 6, 0.5, 0}},
+	{"claude-opus-5-5", ModelRate{4, 20, 0.2, 5}},
+	{"claude-opus-5.5", ModelRate{4, 20, 0.2, 5}},
+	{"claude-opus-5", ModelRate{5, 25, 0.5, 6.25}},
 	{"claude-opus-4.6", ModelRate{5, 25, 0.5, 6.25}},
 	{"claude-opus-4", ModelRate{5, 25, 0.5, 6.25}},
+	{"claude-sonnet-5-5", ModelRate{2, 10, 0.2, 2.5}},
+	{"claude-sonnet-5.5", ModelRate{2, 10, 0.2, 2.5}},
+	{"claude-sonnet-5", ModelRate{2, 10, 0.2, 2.5}},
 	{"claude-sonnet-4.6", ModelRate{3, 15, 0.3, 3.75}},
 	{"claude-sonnet-4", ModelRate{3, 15, 0.3, 3.75}},
+	{"claude-haiku-5-5", ModelRate{0.1, 0.5, 0.01, 0.125}},
+	{"claude-haiku-5.5", ModelRate{0.1, 0.5, 0.01, 0.125}},
 	{"claude-haiku-4", ModelRate{1, 5, 0.1, 1.25}},
-	{"claude-sonnet-5", ModelRate{3, 15, 0.3, 3.75}},
-	{"claude-fable", ModelRate{10, 50, 1, 12.5}},
+	{"claude-fable", ModelRate{10, 50, 0.25, 12.5}},
 	{"claude", ModelRate{3, 15, 0.3, 3.75}},
+	{"gpt-6.1-sol", ModelRate{2, 10, 0.1, 0}},
+	{"gpt-6-astra", ModelRate{10, 50, 1, 0}},
+	{"gpt-6-sol", ModelRate{2, 10, 0.2, 0}},
+	{"gpt-6-luna", ModelRate{0.1, 0.5, 0.01, 0}},
 	{"gpt-5.6-sol", ModelRate{5, 30, 0.5, 6.25}},
 	{"gpt-5.6-terra", ModelRate{2.5, 15, 0.25, 3.125}},
 	{"gpt-5.6-luna", ModelRate{1, 6, 0.1, 1.25}},
