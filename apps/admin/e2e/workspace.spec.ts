@@ -145,8 +145,9 @@ test("owner Activity shows Team adoption and You usage with Reports", async ({ p
   await expect(page.getByRole("heading", { name: "Who uses AI, day by day." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Needs a nudge." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Spread by tool." })).toBeVisible();
+  // Sent reports moved off Activity to /reports (checked at the end); Collection health holds the device feed.
   await page.locator("summary", { hasText: "Collection health" }).click();
-  await expect(page.getByRole("heading", { name: "Reports." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Device activity." })).toBeVisible();
 
   const audience = page.getByRole("tablist", { name: "Audience" });
   await Promise.all([
