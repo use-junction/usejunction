@@ -13,7 +13,7 @@ import {
   githubAuthorScopeFromConnection,
   githubMemberLoginsFromConfig,
   githubUserIdFromMetadata,
-  isInScopeGitHubLogin,
+  isInAnyGitHubAuthorScope,
   matchDeveloperForGitHubAuthor,
   mergeGithubIdentityMetadata,
   nextGitHubAuthorResolution,
@@ -167,8 +167,9 @@ export async function resolveAuthors(
   orgId: string,
   connectionId: string,
   hints: AuthorHint[],
-  scope: GitHubAuthorScope,
+  scope: GitHubAuthorScope | GitHubAuthorScope[],
 ) {
+  const scopes = Array.isArray(scope) ? scope : [scope];
   const identities = await prisma.externalIdentity.findMany({
     where: { orgId, provider: "github" },
   });
@@ -219,10 +220,11 @@ export async function resolveAuthors(
     const ranked = nextGitHubAuthorResolution({
       existingMatchedBy: existing?.matchedBy,
       existingDeveloperId: existing?.developerId,
-      inScope: isInScopeGitHubLogin(login, scope),
+      inScope: isInAnyGitHubAuthorScope(login, scopes),
       matched: matched.developerId
         ? matched
-        : soleDeveloperMatch(developers, scope, login),
+        : scopes.map((item) => soleDeveloperMatch(developers, item, login)).find((item) => item.developerId)
+          ?? { developerId: null, matchedBy: null },
     });
     if (!ranked.persist) {
       resolved.set(login, ranked.developerId);
@@ -696,24 +698,26 @@ export async function runCommitUsageMapping(
   window: { from: Date; to: Date },
   options: { connectionId?: string; developerIds?: string[]; scope?: GitHubAuthorScope } = {},
 ) {
-  const connection = await prisma.providerConnection.findFirst({
-    where: {
-      orgId,
-      provider: "github",
-      status: { not: "disconnected" },
-      ...(options.connectionId ? { id: options.connectionId } : {}),
-    },
+  // Restamping is workspace-wide, so an author is judged against every connected
+  // account: one only in scope on a personal install must survive an org install's run.
+  const connections = await prisma.providerConnection.findMany({
+    where: { orgId, provider: "github", status: { not: "disconnected" } },
+    orderBy: { createdAt: "asc" },
   });
+  const connection = connections.find((row) => row.id === options.connectionId) ?? connections[0];
   if (connection) {
-    const config = configOf(connection);
     const developers = await prisma.developer.findMany({
       where: { orgId, removedAt: null },
       select: { email: true },
     });
-    const scope = options.scope ?? githubAuthorScopeFromConnection({
-      accountType: normalizeGitHubAccountType(config.accountType) ?? "Organization",
-      memberLogins: githubMemberLoginsFromConfig(connection.config),
-      developers,
+    const scopes = connections.map((row) => {
+      if (row.id === connection.id && options.scope) return options.scope;
+      const config = configOf(row);
+      return githubAuthorScopeFromConnection({
+        accountType: normalizeGitHubAccountType(config.accountType) ?? "Organization",
+        memberLogins: githubMemberLoginsFromConfig(row.config),
+        developers,
+      });
     });
     const [authorLogins, identities] = await Promise.all([
       prisma.gitCommit.groupBy({
@@ -733,7 +737,7 @@ export async function runCommitUsageMapping(
         githubUserId: githubUserIdFromMetadata(identity.metadata),
       })),
     ];
-    const resolved = await resolveAuthors(orgId, connection.id, hints, scope);
+    const resolved = await resolveAuthors(orgId, connection.id, hints, scopes);
     for (const [login, developerId] of resolved) {
       await restampGitAuthor(orgId, login, developerId);
     }
