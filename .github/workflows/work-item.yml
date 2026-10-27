@@ -1,0 +1,26 @@
+name: Work item
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  linked-issue:
+    name: PR closes a tracked issue
+    runs-on: ubuntu-latest
+    if: ${{ !endsWith(github.event.pull_request.user.login, '[bot]') }}
+    steps:
+      - name: Require a closing issue reference
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if printf '%s\n%s\n' "$TITLE" "$BODY" | grep -Eiq '(close[sd]?|fix(e[sd])?|resolve[sd]?) +([a-z0-9_.-]+/[a-z0-9_.-]+)?#[0-9]+'; then
+            echo "Linked issue found."
+          else
+            echo "::error::Add 'Closes #<issue>' to the PR description. Every change is tracked on the project board so Work & spend can show cost per task (docs/testing.md → Track every change)."
+            exit 1
+          fi

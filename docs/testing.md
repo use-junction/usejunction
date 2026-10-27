@@ -128,6 +128,17 @@ pnpm exec playwright show-trace test-results/<folder>/trace.zip
 
 ---
 
+## Track every change
+
+Every change ships against a GitHub issue on the UseJunction project board. That link is what lets our own Work & spend page show AI spend per task: it matches PRs to project items through their closing references (`apps/admin/lib/features/github-project-links.ts`).
+
+1. **Before starting**, open (or pick) an issue and add it to the project: `gh issue create --title "…" --project "<project>"`.
+2. **Branch** as `<issue>-short-slug` (for example `101-people-roster-count`).
+3. **PR description** starts with `Closes #<issue>` — the PR template has the line. The `Work item` check (`.github/workflows/work-item.yml`) fails a PR without one; bot PRs are exempt.
+4. **Tests ride with the change.** A behavior fix adds a test that fails without it. Numbers that appear on more than one page also get a `cross-page` check in `scripts/lib/run-calculation-verification.ts` (for example Usage → People must equal the People roster).
+
+After merge, the issue closes and the project item moves to Done; the task's AI spend shows on **Work & spend** once the GitHub integration has synced.
+
 ## Vitest
 
 ```sh

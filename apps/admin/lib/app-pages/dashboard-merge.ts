@@ -30,7 +30,8 @@ export function mergeOrgOverviewShellMetrics(
     tools,
     coverage: {
       ...shell.coverage,
-      activeDevelopers: metrics.coverage.activeDevelopers,
+      // Usage history can include people since removed; never report more active than on the roster.
+      activeDevelopers: Math.min(metrics.coverage.activeDevelopers, shell.coverage.developers),
     },
   };
 }

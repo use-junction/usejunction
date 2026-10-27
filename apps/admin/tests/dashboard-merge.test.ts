@@ -62,4 +62,14 @@ describe("mergeOrgOverviewShellMetrics", () => {
     expect(merged.hasActivity).toBe(true);
     expect(merged.attention[0]?.title).toBe("Missing plan");
   });
+
+  it("never reports more active people than are on the roster", () => {
+    // Usage from people removed since still counts as active in the window.
+    const merged = mergeOrgOverviewShellMetrics(
+      { ...shell, coverage: { ...shell.coverage, developers: 4 } },
+      { ...metrics, coverage: { activeDevelopers: 6 } },
+    );
+    expect(merged.coverage.developers).toBe(4);
+    expect(merged.coverage.activeDevelopers).toBe(4);
+  });
 });
