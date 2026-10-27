@@ -37,6 +37,54 @@ export function reposOwnedByInstallation<T extends { owner?: { login?: string | 
   return repos.filter((repo) => repo.owner?.login?.toLowerCase() === owner);
 }
 
+export type SyncableRepo = {
+  name: string;
+  owner?: { login?: string | null } | null;
+  fork?: boolean | null;
+  archived?: boolean | null;
+  /** ISO timestamp of the last push GitHub saw for the repository. */
+  pushed_at?: string | null;
+};
+
+export type RepoSkipReason = "fork" | "archived" | "stale";
+
+export type RepoSyncSelection<T> = {
+  selected: T[];
+  skipped: Array<{ repo: T; reason: RepoSkipReason }>;
+};
+
+/**
+ * Narrow the repositories a sync run walks. Personal installs expose everything the
+ * user owns (forks of large upstreams, archives, abandoned experiments), so those are
+ * dropped for User installs. Every install skips repositories whose last push predates
+ * the cost window: they cannot hold work inside it, and paging their history is what
+ * pushes a run past the function time limit. A missing `pushed_at` keeps the repo.
+ */
+export function selectReposForSync<T extends SyncableRepo>(
+  repos: T[],
+  input: { accountType: "User" | "Organization"; cutoff: Date },
+): RepoSyncSelection<T> {
+  const selected: T[] = [];
+  const skipped: Array<{ repo: T; reason: RepoSkipReason }> = [];
+  for (const repo of repos) {
+    if (input.accountType === "User" && repo.fork) {
+      skipped.push({ repo, reason: "fork" });
+      continue;
+    }
+    if (input.accountType === "User" && repo.archived) {
+      skipped.push({ repo, reason: "archived" });
+      continue;
+    }
+    const pushedAt = repo.pushed_at ? new Date(repo.pushed_at) : null;
+    if (pushedAt && Number.isFinite(pushedAt.getTime()) && pushedAt < input.cutoff) {
+      skipped.push({ repo, reason: "stale" });
+      continue;
+    }
+    selected.push(repo);
+  }
+  return { selected, skipped };
+}
+
 export function isInScopeGitHubLogin(login: string, scope: GitHubAuthorScope): boolean {
   const normalized = login.toLowerCase();
   if (scope.kind === "organization") {

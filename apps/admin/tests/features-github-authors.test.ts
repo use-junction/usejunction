@@ -10,6 +10,7 @@ import {
   nextGitHubAuthorResolution,
   uniqueDeveloperLoginMap,
   reposOwnedByInstallation,
+  selectReposForSync,
   soleDeveloperMatch,
 } from "@/lib/features/github-authors";
 
@@ -170,6 +171,27 @@ test("organization installs keep only that org's repositories", () => {
     ["usejunction"],
   );
   assert.equal(reposOwnedByInstallation(repos, "dinuda", "User").length, 3);
+});
+
+test("personal installs skip forks, archives and repositories untouched inside the window", () => {
+  const cutoff = new Date("2026-07-29T00:00:00.000Z");
+  const repos = [
+    { owner: { login: "Dinuda" }, name: "active", pushed_at: "2026-10-20T00:00:00.000Z" },
+    { owner: { login: "Dinuda" }, name: "next.js", fork: true, pushed_at: "2026-10-20T00:00:00.000Z" },
+    { owner: { login: "Dinuda" }, name: "old-site", archived: true, pushed_at: "2026-10-20T00:00:00.000Z" },
+    { owner: { login: "Dinuda" }, name: "experiment", pushed_at: "2025-01-01T00:00:00.000Z" },
+    { owner: { login: "Dinuda" }, name: "unknown-push" },
+  ];
+  const personal = selectReposForSync(repos, { accountType: "User", cutoff });
+  assert.deepEqual(personal.selected.map((repo) => repo.name), ["active", "unknown-push"]);
+  assert.deepEqual(
+    personal.skipped.map(({ repo, reason }) => `${repo.name}:${reason}`),
+    ["next.js:fork", "old-site:archived", "experiment:stale"],
+  );
+
+  const organization = selectReposForSync(repos, { accountType: "Organization", cutoff });
+  assert.deepEqual(organization.selected.map((repo) => repo.name), ["active", "next.js", "old-site", "unknown-push"]);
+  assert.deepEqual(organization.skipped.map(({ reason }) => reason), ["stale"]);
 });
 
 test("sole org member maps to the sole workspace developer", () => {

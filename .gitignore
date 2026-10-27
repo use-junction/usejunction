@@ -24,3 +24,4 @@ packages/db/prisma/migrations/**/migration_lock.toml
 apps/admin/.env.prod
 apps/admin/.env.production
 apps/admin/blog-src/
+.claude/

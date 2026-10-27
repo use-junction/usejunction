@@ -2,17 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Download, Info, Loader2, MoreHorizontal, RefreshCw, Users } from "lucide-react";
-import {
-  GitHubProjectsBadge,
-  GitHubProjectsButtonLabel,
-  IntegrationProviderLogoStack,
-  IntegrationProviderMark,
-} from "@/components/features/integration-provider-logos";
+import { ArrowLeft, Download, Info, Loader2, MoreHorizontal, RefreshCw } from "lucide-react";
+import { IntegrationProviderLogoStack } from "@/components/features/integration-provider-logos";
 import { toast } from "sonner";
 import { AppPageError, AppPageSkeleton, isBlockingAppQueryError, useAppQueryErrorToast } from "@/components/app-data-state";
 import { GithubInstallReview } from "@/components/features/github-install-review";
-import { GitHubAccountsList } from "@/components/features/github-accounts-list";
+import { GitHubAccountsList, IntegrationRow, IntegrationSectionHeader } from "@/components/features/github-accounts-list";
 import { ProjectToolConnectDialog } from "@/components/features/project-tool-connect-dialog";
 import { WorkSpendExplorer } from "@/components/features/work-spend-explorer";
 import { WorkSpendDestinations } from "@/components/features/work-spend-destinations";
@@ -199,23 +194,32 @@ export default function WorkSpendClientScreen() {
       </div>} />
 
     <Dialog open={connectionOpen} onOpenChange={setConnectionOpen}>
-      <DialogContent onCloseAutoFocus={(event) => { event.preventDefault(); connectionButton.current?.focus(); }} className="max-h-[90dvh] overflow-y-auto sm:max-w-lg [&_[data-slot=dialog-close]]:rounded-none">
-        <DialogHeader><DialogTitle className="flex items-center gap-2"><IntegrationProviderLogoStack size="md" />Integrations</DialogTitle><DialogDescription>Manage connected tools, repository access, project boards, and sync health.</DialogDescription></DialogHeader>
-        <section className="space-y-3" aria-labelledby="github-connection-heading">
-          <h2 id="github-connection-heading" className="flex items-center gap-2 text-sm font-semibold"><span className="flex size-6 shrink-0 items-center justify-center border border-border/50 bg-white" aria-hidden><IntegrationProviderMark provider="github" size={14} /></span>GitHub accounts</h2>
-          <GitHubAccountsList
-            connections={data.connections}
-            canManage={canManage}
-            installHref="/api/integrations/github/connect?returnTo=/work-spend"
-            availableInstalls={githubInstalls?.installations ?? []}
-            onDisconnect={(connection) => { setDisconnectTarget(connection); setDisconnectError(null); setConnectionOpen(false); setDisconnectOpen(true); }}
-          />
-          {repositoryErrors.length ? <ul className="space-y-2 text-xs">{repositoryErrors.map((repo) => <li key={repo.id}><strong>{repo.fullName}</strong><p className="mt-0.5 break-words text-muted-foreground">{repo.lastError || "Latest sync failed. Last successful data is still available."}</p></li>)}</ul> : null}
+      <DialogContent onCloseAutoFocus={(event) => { event.preventDefault(); connectionButton.current?.focus(); }} className="max-h-[90dvh] overflow-y-auto sm:max-w-xl [&_[data-slot=dialog-close]]:rounded-none">
+        <DialogHeader><DialogTitle>Integrations</DialogTitle><DialogDescription>Tools connected to this workspace and what they sync.</DialogDescription></DialogHeader>
+        <GitHubAccountsList
+          connections={data.connections}
+          canManage={canManage}
+          installHref="/api/integrations/github/connect?returnTo=/work-spend"
+          availableInstalls={githubInstalls?.installations ?? []}
+          onDisconnect={(connection) => { setDisconnectTarget(connection); setDisconnectError(null); setConnectionOpen(false); setDisconnectOpen(true); }}
+        />
+        {repositoryErrors.length ? <ul className="space-y-2 text-xs">{repositoryErrors.map((repo) => <li key={repo.id}><strong>{repo.fullName}</strong><p className="mt-0.5 break-words text-muted-foreground">{repo.lastError || "Latest sync failed. Last successful data is still available."}</p></li>)}</ul> : null}
+        <section className="space-y-2 border-t pt-4" aria-labelledby="projects-heading">
+          <IntegrationSectionHeader id="projects-heading" title="GitHub Projects" action={<ProjectToolConnectDialog approveUrl={data.connections.find((row) => row.accountType === "Organization")?.approveUrl ?? data.connection.approveUrl} appPermissionsUrl={data.connection.appPermissionsUrl}><Button type="button" variant="outline" size="sm" className="rounded-none">{projectsNeedAttention ? "Review access" : data.projects.selected.length ? "Manage" : "Connect"}</Button></ProjectToolConnectDialog>} />
+          <p className="text-sm text-muted-foreground">{data.projects.state === "permission_required" ? "Read access to Projects needs approval. Repository work keeps syncing." : data.projects.state === "personal_account" ? "Available for organization installations only." : data.projects.selected.length ? "Selected Projects add issue titles and status to linked work." : "Add issue titles and Project status to work already in your repositories."}</p>
+          {data.projects.selected.length ? <ul className="divide-y border">{data.projects.selected.map((project) => {
+            const failed = project.syncStatus === "error" || project.syncStatus === "permission_required";
+            return <IntegrationRow key={project.id} title={project.title} href={project.url ?? undefined} meta={<>
+              <span>Project</span><span aria-hidden>·</span>
+              <span className="inline-flex items-center gap-1.5"><span className={failed ? "size-1.5 shrink-0 bg-amber-500" : "size-1.5 shrink-0 bg-primary"} aria-hidden />{project.syncStatus === "available" ? "Synced" : project.syncStatus === "permission_required" ? "Permissions needed" : failed ? "Sync failed" : project.syncStatus.replaceAll("_", " ")}</span>
+              {project.lastSyncedAt ? <><span aria-hidden>·</span><span>Synced {shortDate(project.lastSyncedAt)}</span></> : null}
+            </>}>{project.lastError ? <p role="alert" className="mt-2 break-words pl-8 text-sm text-destructive">{project.lastError}</p> : null}</IntegrationRow>;
+          })}</ul> : null}
         </section>
-        <section className="space-y-2 border-t pt-4" aria-labelledby="projects-heading"><h2 id="projects-heading"><GitHubProjectsBadge className="text-sm" /></h2><p className="text-sm text-muted-foreground">{data.projects.state === "permission_required" ? "GitHub Projects read access needs approval. Repository work is still available." : data.projects.state === "personal_account" ? "GitHub Projects are available for organization installations." : data.projects.selected.length ? `${data.projects.selected.length} selected GitHub Projects add issue titles and status to linked work.` : "Add issue titles and GitHub Project status to work already in your repositories."}</p>
-          <ProjectToolConnectDialog approveUrl={data.connections.find((row) => row.accountType === "Organization")?.approveUrl ?? data.connection.approveUrl} appPermissionsUrl={data.connection.appPermissionsUrl}><Button type="button" variant="outline" size="sm" className="rounded-none"><GitHubProjectsButtonLabel>{projectsNeedAttention ? "Review GitHub Projects access" : data.projects.selected.length ? "Manage GitHub Projects" : "Connect GitHub Projects"}</GitHubProjectsButtonLabel></Button></ProjectToolConnectDialog>
-        </section>
-        {data.attention.unmappedAuthors.length ? <div className="border-t pt-4"><Button type="button" size="sm" variant="ghost" className="rounded-none" onClick={() => { setConnectionOpen(false); setAuthorsOpen(true); }}><span className="flex size-6 items-center justify-center bg-brand-yellow-pale" aria-hidden><Users className="size-3.5" /></span>Match authors ({data.attention.unmappedAuthors.length})</Button></div> : null}
+        {data.attention.unmappedAuthors.length ? <section className="space-y-2 border-t pt-4" aria-labelledby="authors-heading">
+          <IntegrationSectionHeader id="authors-heading" title="Authors" action={<Button type="button" size="sm" variant="outline" className="rounded-none" onClick={() => { setConnectionOpen(false); setAuthorsOpen(true); }}>Match authors</Button>} />
+          <p className="text-sm text-muted-foreground">{data.attention.unmappedAuthors.length === 1 ? "1 GitHub author isn’t matched to a team member yet." : `${data.attention.unmappedAuthors.length} GitHub authors aren’t matched to team members yet.`}</p>
+        </section> : null}
       </DialogContent>
     </Dialog>
 

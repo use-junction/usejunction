@@ -860,7 +860,7 @@ export default function DashboardPage() {
                 hero
                 compactMobile
                 className="h-full px-3 sm:px-4"
-                sub={`${data.coverage.activeDevelopers} active · ${cycleViewPeriodLabel(data.cycleView, rollingPeriod)}`}
+                sub={`${Math.min(data.coverage.activeDevelopers, data.coverage.developers)} active · ${cycleViewPeriodLabel(data.cycleView, rollingPeriod)}`}
               />
               <Kpi
                 label="Estimated usage"

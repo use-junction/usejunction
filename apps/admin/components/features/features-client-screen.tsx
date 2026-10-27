@@ -245,7 +245,7 @@ export default function FeaturesClientScreen() {
           <Dialog open={connectionOpen} onOpenChange={setConnectionOpen}>
             <DialogTrigger asChild><Button ref={connectionButton} variant="ghost" size="sm"><Github aria-hidden />GitHub connection</Button></DialogTrigger>
             <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
-              <DialogHeader><DialogTitle>GitHub accounts</DialogTitle><DialogDescription>Manage connected organizations and personal accounts.</DialogDescription></DialogHeader>
+              <DialogHeader><DialogTitle>GitHub connection</DialogTitle><DialogDescription>Accounts synced into this workspace.</DialogDescription></DialogHeader>
               <GitHubAccountsList
                 connections={accounts}
                 canManage={data.canMapIdentities}

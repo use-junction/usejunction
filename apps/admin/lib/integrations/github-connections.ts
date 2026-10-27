@@ -120,10 +120,12 @@ export function githubConnectionView(
   const lastError = sanitizeGitHubSyncError(rawError);
   const pullRequestsFailed = pullRequestsCapability?.status === "error"
     && !isGitHubEmptyRepositoryError(pullRequestsCapability.lastError);
+  // "partial" is recorded when a run stopped at its time budget; the rest resumes next sync.
+  const pullRequestsIncomplete = pullRequestsCapability?.status === "partial";
   let state: GitHubConnectionState = "ready";
   if (!githubCodePermissionsGranted(connection.permissions) || needsMembers) state = "permission_required";
   else if (!connection.lastSyncedAt || pullRequestsCapability?.status === "unknown") state = "syncing";
-  else if (pullRequestsFailed || options.hasRepoErrors) state = "partial";
+  else if (pullRequestsFailed || pullRequestsIncomplete || options.hasRepoErrors) state = "partial";
   return {
     id: connection.id,
     githubOrg,

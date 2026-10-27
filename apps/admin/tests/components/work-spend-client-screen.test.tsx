@@ -86,3 +86,70 @@ test("reports partial GitHub sync without claiming completion", async () => {
   expect(mocks.toast.success).not.toHaveBeenCalled();
   expect(screen.getByRole("status")).toHaveTextContent(/1 repositories could not be checked/);
 });
+
+async function openIntegrations(data = multipleRepositoriesPayload) {
+  await renderScreen(data);
+  fireEvent.click(screen.getByRole("button", { name: /Integrations/ }));
+  return screen.findByRole("dialog", { name: "Integrations" });
+}
+
+test("the Integrations dialog lists GitHub accounts and Projects as sections with one action each", async () => {
+  const dialog = await openIntegrations();
+  expect(within(dialog).getByRole("heading", { name: "GitHub accounts" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("link", { name: "Connect account" })).toHaveAttribute("href", "/api/integrations/github/connect?returnTo=/work-spend");
+  const accounts = within(dialog).getByRole("region", { name: "GitHub accounts" });
+  expect(within(accounts).getAllByRole("listitem")).toHaveLength(1);
+  expect(within(accounts).getByRole("listitem")).toHaveTextContent("fixture-org");
+  expect(within(dialog).getByRole("heading", { name: "GitHub Projects" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("button", { name: "Connect project tool" })).toBeInTheDocument();
+  expect(within(dialog).getByText("Add issue titles and Project status to work already in your repositories.")).toBeInTheDocument();
+  expect(within(dialog).queryByRole("heading", { name: "Authors" })).not.toBeInTheDocument();
+});
+
+test("selected GitHub Projects are listed as rows with their sync state", async () => {
+  const dialog = await openIntegrations({ ...multipleRepositoriesPayload, projects: { state: "partial", canManage: true, selected: [
+    { id: "p1", title: "Roadmap", url: "https://github.com/orgs/fixture-org/projects/1", syncStatus: "available", lastSyncedAt: "2026-09-24T09:00:00.000Z", lastError: null },
+    { id: "p2", title: "Bugs", url: "https://github.com/orgs/fixture-org/projects/2", syncStatus: "error", lastSyncedAt: null, lastError: "Project items could not be read." },
+  ] } });
+  const projects = within(dialog).getByRole("region", { name: "GitHub Projects" });
+  expect(within(projects).getByText("Selected Projects add issue titles and status to linked work.")).toBeInTheDocument();
+  const [roadmap, bugs] = within(projects).getAllByRole("listitem");
+  expect(within(roadmap).getByRole("link", { name: "Roadmap" })).toHaveAttribute("href", "https://github.com/orgs/fixture-org/projects/1");
+  expect(roadmap).toHaveTextContent("Synced");
+  expect(bugs).toHaveTextContent("Sync failed");
+  expect(within(bugs).getByRole("alert")).toHaveTextContent("Project items could not be read.");
+});
+
+test("Projects copy explains blocked states instead of listing rows", async () => {
+  const dialog = await openIntegrations({ ...multipleRepositoriesPayload, projects: { state: "permission_required", canManage: true, selected: [] } });
+  expect(within(dialog).getByText("Read access to Projects needs approval. Repository work keeps syncing.")).toBeInTheDocument();
+  expect(within(within(dialog).getByRole("region", { name: "GitHub Projects" })).queryByRole("list")).not.toBeInTheDocument();
+});
+
+test("unlinked GitHub installations appear in the accounts list with a Link action", async () => {
+  mocks.fetch.mockResolvedValue(new Response(JSON.stringify({ installations: [
+    { id: "123", login: "fixture-org", accountType: "Organization", linked: true },
+    { id: "456", login: "fixture-labs", accountType: "Organization", linked: false },
+  ] }), { status: 200 }));
+  const dialog = await openIntegrations();
+  const accounts = within(dialog).getByRole("region", { name: "GitHub accounts" });
+  const link = await within(accounts).findByRole("link", { name: "Link" });
+  expect(link).toHaveAttribute("href", "/api/integrations/github/callback?installation_id=456");
+  expect(within(accounts).getAllByRole("listitem")).toHaveLength(2);
+  expect(within(accounts).getAllByRole("listitem")[1]).toHaveTextContent("fixture-labs");
+});
+
+test("an Authors section appears when GitHub authors are unmatched and opens the matching dialog", async () => {
+  const dialog = await openIntegrations({ ...multipleRepositoriesPayload, attention: { ...multipleRepositoriesPayload.attention, unmappedAuthors: [{ identityId: "id-1", login: "ghost", commitCount: 4, suggestedDeveloperId: null }] } });
+  const authors = within(dialog).getByRole("region", { name: "Authors" });
+  expect(authors).toHaveTextContent("1 GitHub author isn’t matched to a team member yet.");
+  fireEvent.click(within(authors).getByRole("button", { name: "Match authors" }));
+  expect(await screen.findByRole("dialog", { name: "Match GitHub authors" })).toBeInTheDocument();
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Integrations" })).not.toBeInTheDocument());
+});
+
+test("failed repositories are called out under the accounts list", async () => {
+  const dialog = await openIntegrations(partialCoveragePayload);
+  expect(within(dialog).getByText("fixture-org/api")).toBeInTheDocument();
+  expect(within(dialog).getByText("GitHub request timed out. Last successful data is shown.")).toBeInTheDocument();
+});

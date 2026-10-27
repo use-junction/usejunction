@@ -41,17 +41,20 @@ function AccountedCost({
     return <p className="text-sm font-semibold tabular-nums">—</p>;
   }
 
+  const total = verified + estimated;
+  const label = estimated > 0 ? (verified > 0 ? "Accounted + est." : "Estimated") : "Accounted";
+
   return (
     <div className="text-right">
       <p className="text-sm font-semibold tabular-nums">
-        {formatUsd(verified)}
+        {formatUsd(total)}
       </p>
       <p className="mt-0.5 text-[0.65rem] uppercase tracking-[0.08em] text-muted-foreground">
-        Accounted
+        {label}
       </p>
-      {estimated > 0 ? (
+      {verified > 0 && estimated > 0 ? (
         <p className="mt-1 text-xs tabular-nums text-muted-foreground">
-          Est. {formatUsd(estimated)}
+          {formatUsd(verified)} accounted · Est. {formatUsd(estimated)}
         </p>
       ) : null}
     </div>

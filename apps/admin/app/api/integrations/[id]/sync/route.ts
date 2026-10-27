@@ -4,6 +4,8 @@ import { syncConnection } from "@/lib/integrations/sync";
 import { requireOrgRole, audit, rolesFor } from "@/lib/rbac";
 import { logServerError } from "@/lib/errors/public";
 
+export const maxDuration = 300;
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireOrgRole(req, rolesFor("settings_billing"));
   if (auth instanceof NextResponse) return auth;
