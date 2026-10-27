@@ -12,7 +12,7 @@ To run a copy yourself (Vercel Deploy button, local Postgres, agent install), st
 | Product database | Managed Postgres (`DATABASE_URL` on Vercel) |
 | Agent binaries (OTA) | GitHub Releases + protect promote workflow — see [agent-releases.md](./agent-releases.md) |
 
-There is **no** GitHub Actions workflow that deploys the web app. Merges to `main` (with the Vercel Git integration) deploy production. Agent updates are a separate tag → promote path.
+There is **no** GitHub Actions workflow that deploys the web app. Merges to `main` deploy production through the Vercel Git integration; check that it is connected (below) before relying on it. Agent updates are a separate tag → promote path.
 
 ## Vercel project settings
 
@@ -23,12 +23,40 @@ Confirm in the Vercel dashboard (or local `.vercel/project.json`):
 - Install Command: `cd ../.. && corepack enable && pnpm install --frozen-lockfile`
 - Build: `apps/admin/vercel.json` generates Prisma, applies migrations when `DATABASE_URL` is set, enforces client/server import boundaries, runs `next build`, then asserts that application UI routes were prerendered
 - Function region: `iad1`
-- Git: `Dinuda/usejunction`, production branch `main`
+- Git: `use-junction/usejunction`, production branch `main`
 - Domains: `usejunction.dev` (www / `.com` redirect to apex via `next.config.ts`); staging uses `staging.usejunction.dev` on the `staging` branch
+
+### Git connection
+
+Merges to `main` (and pushes to `staging`) only deploy while the project is connected to `use-junction/usejunction`. The repo moved from `Dinuda/usejunction`, which left the old link without webhooks: merges stopped deploying and nothing reported it.
+
+To connect, or after the repo moves again:
+
+1. A `use-junction` org owner installs the [Vercel GitHub app](https://github.com/apps/vercel/installations/new) on the org with access to `usejunction`.
+2. From the repo root (linked through `.vercel/project.json`):
+
+   ```sh
+   vercel git connect https://github.com/use-junction/usejunction.git
+   ```
+
+3. Merge something to `main` and confirm a new Production deployment in `vercel ls --prod`.
+
+### Manual production deploy
+
+Use this when the Git connection is down. The CLI uploads the local working tree, uncommitted files included, so deploy from a clean checkout of `main`, never from a working copy:
+
+```sh
+git fetch origin
+git worktree add --detach ../usejunction-deploy origin/main
+mkdir -p ../usejunction-deploy/.vercel && cp .vercel/project.json ../usejunction-deploy/.vercel/
+cd ../usejunction-deploy && vercel deploy --prod
+```
+
+Then check `vercel inspect <deployment-url>` lists `usejunction.dev` under Aliases, and remove the worktree.
 
 ## Staging
 
-Staging lives on the **same** Vercel project (`admin`), not a second app. Push the `staging` git branch, check the deployment at `https://staging.usejunction.dev`, then use **Promote to Production** in the Vercel dashboard. That reuses the already-built deployment. Merges to `main` can still deploy production through the Git integration.
+Staging lives on the **same** Vercel project (`admin`), not a second app. Push the `staging` git branch, check the deployment at `https://staging.usejunction.dev`, then use **Promote to Production** in the Vercel dashboard. That reuses the already-built deployment. Merges to `main` also deploy production through the Git integration, while it is connected.
 
 | Piece | Staging value |
 |-------|----------------|
