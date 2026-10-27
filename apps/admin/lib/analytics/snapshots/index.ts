@@ -7,6 +7,7 @@ export {
   materializeDirtyOrgUsageDays,
   rematerializeOrgSnapshots,
   ensureOrgUsageDaySnapshots,
+  ensureOrgSnapshotCoverage,
   markActiveOrgsTodayDirty,
   snapshotUtcDay,
   snapshotIsoDay,

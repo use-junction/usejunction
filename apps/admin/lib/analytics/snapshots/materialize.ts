@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import { Prisma, prisma } from "@usejunction/db";
 import { logServerError } from "@/lib/errors/public";
 import { CALCULATION_VERSION, PRICING_VERSION } from "@/lib/metrics/source-priority";
+import { DEFAULT_USAGE_RETENTION_DAYS } from "@/lib/legal/versions";
 
 export const ORG_DAY_SNAPSHOT_VERSION = `org-day-snap-v2:${CALCULATION_VERSION}:${PRICING_VERSION}`;
 export const ORG_DAY_WATERMARK_KIND = "org_usage_day";
@@ -639,6 +640,35 @@ export async function materializeDirtyOrgUsageDays(
 }
 
 /**
+ * Make sure every day with usage facts has a sealed org-total under the current
+ * snapshot version, marking the gaps dirty so the drain that follows fills them.
+ *
+ * Page reads filter by `ORG_DAY_SNAPSHOT_VERSION`, and that key changes whenever
+ * the calculation or pricing version is bumped. Without this step a deploy that
+ * bumps either version leaves dashboards reading an empty version until each day
+ * happens to be dirtied again, so history vanishes and trickles back a day at a
+ * time. The window runs from the org's earliest usage (capped at retention) to today.
+ */
+export async function ensureOrgSnapshotCoverage(
+  orgId: string,
+  options: { metricVersion?: string; now?: Date } = {},
+): Promise<{ from: string | null; to: string | null; pendingDirty: number; stubbed: number }> {
+  const metricVersion = options.metricVersion ?? ORG_DAY_SNAPSHOT_VERSION;
+  const today = utcDay(options.now ?? new Date());
+  const earliest = await prisma.usageDaily.findFirst({
+    where: { orgId },
+    orderBy: { date: "asc" },
+    select: { date: true },
+  });
+  if (!earliest) return { from: null, to: null, pendingDirty: 0, stubbed: 0 };
+  const retentionStart = new Date(today.getTime() - DEFAULT_USAGE_RETENTION_DAYS * 86_400_000);
+  const from = new Date(Math.max(utcDay(earliest.date).getTime(), retentionStart.getTime()));
+  if (from.getTime() > today.getTime()) return { from: null, to: null, pendingDirty: 0, stubbed: 0 };
+  const result = await ensureOrgUsageDaySnapshots(orgId, from, today, { metricVersion });
+  return { from: isoDay(from), to: isoDay(today), pendingDirty: result.pendingDirty, stubbed: result.stubbed };
+}
+
+/**
  * Cron / Sync-now entry point: rematerialize dirty days, and always refresh today
  * (plus yesterday) so rolling dashboards advance without hot-path rematerialize.
  * Loops until no dirty days remain (or a safety cap) so one Sync clears backlogs.
@@ -654,6 +684,17 @@ export async function rematerializeOrgSnapshots(
     typeof options.maxDurationMs === "number" && options.maxDurationMs > 0
       ? Date.now() + options.maxDurationMs
       : null;
+
+  // Every drain starts by finding days the current version has never sealed, so a
+  // version bump (or any lost materialization) heals on the next sync or cron tick.
+  try {
+    const coverage = await ensureOrgSnapshotCoverage(orgId, { metricVersion, now: today });
+    if (coverage.pendingDirty > 0) {
+      console.info("[snapshots/coverage]", { orgId, metricVersion, from: coverage.from, to: coverage.to, pendingDirty: coverage.pendingDirty, stubbed: coverage.stubbed });
+    }
+  } catch (error) {
+    alertSnapshotFailsafe("analytics/snapshots_coverage_failed", orgId, error, { metricVersion });
+  }
 
   if (options.includeToday !== false) {
     await markOrgUsageDaysDirty(orgId, [yesterday, today], metricVersion);

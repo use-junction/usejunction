@@ -50,9 +50,23 @@ async function handle(req: NextRequest) {
       take: 100,
     });
 
+    // Orgs sealed only under an earlier snapshot version (a calculation or pricing
+    // bump since their last activity) would otherwise read as empty until they sync.
+    const staleVersionOrgs = await prisma.$queryRaw<Array<{ org_id: string }>>`
+      SELECT DISTINCT s.org_id
+      FROM org_usage_day_snapshots s
+      WHERE s.metric_version <> ${ORG_DAY_SNAPSHOT_VERSION}
+        AND NOT EXISTS (
+          SELECT 1 FROM org_usage_day_snapshots c
+          WHERE c.org_id = s.org_id AND c.metric_version = ${ORG_DAY_SNAPSHOT_VERSION}
+        )
+      LIMIT 100
+    `;
+
     const orgIds = [...new Set([
       ...dirtyOrgs.map((row) => row.orgId),
       ...activeOrgs.map((row) => row.orgId),
+      ...staleVersionOrgs.map((row) => row.org_id),
     ])];
 
     let orgs = 0;

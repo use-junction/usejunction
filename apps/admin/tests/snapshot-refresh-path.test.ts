@@ -700,3 +700,65 @@ test("ensure enqueues undercounted snaps (codex-only while cursor vendor exists)
     await prisma.organization.delete({ where: { id: org.id } });
   }
 });
+
+test("a drain reseals history under a new snapshot version instead of leaving it empty", { skip: !runDb }, async () => {
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const org = await prisma.organization.create({
+    data: { name: `Version Bump Org ${suffix}`, slug: `bump-${suffix}` },
+  });
+  const developer = await prisma.developer.create({
+    data: { orgId: org.id, email: `bump-${suffix}@example.com`, name: "Bump Dev", role: "user" },
+  });
+  const previousVersion = `org-day-snap-v2:usage-v2:previous-${suffix}`;
+  const firstDay = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()) - 5 * 86_400_000);
+  const days = [0, 1, 2].map((offset) => new Date(firstDay.getTime() + offset * 86_400_000));
+
+  try {
+    for (const [index, date] of days.entries()) {
+      await prisma.usageDaily.create({
+        data: {
+          orgId: org.id,
+          developerId: developer.id,
+          date,
+          provider: "cursor",
+          product: "cursor",
+          toolName: "cursor",
+          model: "gpt-4.1",
+          source: "device_observed",
+          requests: 5,
+          inputTokens: BigInt(50),
+          outputTokens: BigInt(10),
+          costMicros: BigInt(80_000),
+          costKind: "estimated_api",
+          dedupeKey: `bump-test:${suffix}:${index}`,
+          observedAt: date,
+        },
+      });
+    }
+
+    // History was sealed under the version that ran before the deploy.
+    await materializeOrgUsageRange(org.id, days[0]!, days[2]!, previousVersion);
+    const underCurrentBefore = await prisma.orgUsageDaySnapshot.count({
+      where: { orgId: org.id, metricVersion: ORG_DAY_SNAPSHOT_VERSION, toolName: "", developerId: "", date: { in: days } },
+    });
+    assert.equal(underCurrentBefore, 0, "the new version starts with no sealed days");
+
+    const { rematerializeOrgSnapshots } = await import("@/lib/analytics/snapshots");
+    const result = await rematerializeOrgSnapshots(org.id, { includeToday: false });
+    assert.ok(result.dirtyDays >= 3, `expected the three usage days to be resealed, got ${result.dirtyDays}`);
+    assert.equal(result.dirtyRemaining, 0);
+
+    const resealed = await prisma.orgUsageDaySnapshot.findMany({
+      where: { orgId: org.id, metricVersion: ORG_DAY_SNAPSHOT_VERSION, toolName: "", developerId: "", modelName: "", date: { in: days } },
+      orderBy: { date: "asc" },
+    });
+    assert.equal(resealed.length, 3);
+    for (const row of resealed) assert.equal(row.requests, 5);
+
+    // A second drain finds nothing left to heal.
+    const again = await rematerializeOrgSnapshots(org.id, { includeToday: false });
+    assert.equal(again.dirtyDays, 0);
+  } finally {
+    await prisma.organization.delete({ where: { id: org.id } });
+  }
+});

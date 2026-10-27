@@ -56,7 +56,7 @@ Key read-path contract (`apps/admin/lib/analytics/snapshots/read.ts`):
 
 > Dirty days are reported as importing/partial — never recomputed via live CTEs. Default `ensure: false` on page readers.
 
-After a snapshot version bump, cron / Sync now rematerialize fills new grains before model/productivity fields appear.
+`ORG_DAY_SNAPSHOT_VERSION` embeds `CALCULATION_VERSION` and `PRICING_VERSION`, so bumping either makes every sealed row invisible to readers until it is resealed. The first drain after such a deploy (sync commit, Sync now, or the daily cron) runs `ensureOrgSnapshotCoverage`, which marks every usage day without a current-version seal dirty and then drains them newest-first; dashboards show `partialData` until that finishes.
 
 ---
 
@@ -96,7 +96,7 @@ Snapshots refresh during **materialization**: a CTE over `usage_daily` writes se
 | **Manual "Sync now" drain** | `POST /api/app/dashboard/refresh-snapshots` | Yes |
 | **Daily cron `usage-daily-refresh`** | `15 0 * * *` UTC | Queue drain — up to 80 jobs / 45 s |
 | **Daily cron `materialize-org-day-snapshots`** | `45 0 * * *` UTC | Up to 100 dirty + 100 active orgs |
-| **Calculation / pricing version bump** | Deploy | `enqueueVersionBumpRematerialize` for all orgs |
+| **Calculation / pricing version bump** | First drain after the deploy | Every drain (`rematerializeOrgSnapshots`) starts with `ensureOrgSnapshotCoverage`, which marks dirty each usage day the current version has never sealed; the daily cron also picks up orgs sealed only under an older version |
 | **Read-path corruption detect** | `ensureOrgUsageDaySnapshots` finds stub conflicts | Mark dirty + enqueue only (never inline) |
 
 ### Sync pipeline timeline
