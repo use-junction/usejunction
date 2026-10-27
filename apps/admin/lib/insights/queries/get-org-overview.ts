@@ -460,7 +460,8 @@ function mapSubscriptionCycleSources(
 export async function getOrgOverviewShell(orgId: string): Promise<OrgOverviewShellData> {
   const [totalDevelopers, deviceCoverage, configuredTools, trackedTools, health, detectedInstallations] =
     await Promise.all([
-      prisma.developer.count({ where: { orgId } }),
+      // Same roster the People page shows; removed people only live on in history.
+      prisma.developer.count({ where: { orgId, removedAt: null } }),
       readDeviceCoverage(orgId),
       prisma.toolInstallation.count({ where: { orgId, detected: true, configured: true } }),
       prisma.toolInstallation.count({ where: { orgId, detected: true } }),
