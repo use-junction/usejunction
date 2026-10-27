@@ -31,7 +31,7 @@ Generate with `openssl rand -base64 48` unless noted.
 
 `DATABASE_URL` comes from Neon. Do not paste the production usejunction.dev database URL.
 
-Optional after it boots: Resend (`RESEND_API_KEY`, `AUTH_EMAIL_FROM`) for invites; GitHub/Google OAuth; Lemon Squeezy. Full production list: [Production deployment](production-deployment.md#required-environment-variables-vercel-production).
+Optional after it boots: Resend (`RESEND_API_KEY`, `AUTH_EMAIL_FROM`) for invites; GitHub/Google OAuth; the [GitHub App](#connect-github-work--spend) for Work & spend; Lemon Squeezy. Full production list: [Production deployment](production-deployment.md#required-environment-variables-vercel-production).
 
 Do not set `USEJUNCTION_ALLOW_INSECURE_DEVELOPMENT=true`.
 
@@ -69,6 +69,74 @@ pnpm dev
 Admin UI: [http://localhost:3001](http://localhost:3001)
 
 Schema changes after first setup: [Database migrations](database-migrations.md).
+
+## Connect GitHub (Work & spend)
+
+Work & spend reads pull requests, commits, issues and Projects through a GitHub App you register yourself. This is separate from the `AUTH_GITHUB_*` OAuth app used for sign-in. Skip this section if you don't use Work & spend.
+
+### 1. Register the App
+
+Create it under the account that should own it:
+
+- Organization: `github.com/organizations/{org}/settings/apps/new`
+- Personal account: `github.com/settings/apps/new`
+
+| Field | Value |
+|-------|-------|
+| Homepage URL | Your `NEXT_PUBLIC_APP_URL` |
+| Callback URL | Leave empty |
+| Request user authorization (OAuth) during installation | Off (GitHub disables the Setup URL when it's on) |
+| Setup URL | `{NEXT_PUBLIC_APP_URL}/api/integrations/github/callback` |
+| Redirect on update | On |
+| Webhook → Active | Off. UseJunction polls with installation tokens and has no GitHub webhook endpoint. |
+| Where can this GitHub App be installed? | **Any account**, unless only the owning account will ever connect |
+
+Permissions, all **Read-only**:
+
+| Scope | Permission | Used for |
+|-------|------------|----------|
+| Repository | Contents | Commits |
+| Repository | Pull requests | Pull requests |
+| Repository | Issues | Linked issues |
+| Organization | Members | Matching commit authors to people |
+| Organization | Projects | Selected GitHub Projects |
+
+Metadata is granted automatically. Add every permission before anyone installs: each permission added later has to be approved again on every existing installation.
+
+### 2. Set the environment variables
+
+| Variable | Value |
+|----------|-------|
+| `GITHUB_APP_ID` | **App ID** from the App's General page |
+| `GITHUB_APP_SLUG` | The `{slug}` in `github.com/apps/{slug}`. This is the App's own slug, not the owner's login. |
+| `GITHUB_APP_OWNER_ORG` | The organization's login if an organization owns the App; leave unset for a personal App |
+| `GITHUB_APP_PRIVATE_KEY` | Contents of the `.pem` from **Generate a private key** |
+
+Vercel accepts the PEM pasted as-is. For a single-line `.env` file, escape the newlines:
+
+```bash
+awk 'NF {printf "%s\\n", $0}' path/to/app.private-key.pem
+```
+
+The Client ID, client secret and webhook secret are not used.
+
+### 3. Connect
+
+In UseJunction, open **Work & spend** and click **Connect GitHub**. You'll be sent to `github.com/apps/{slug}/installations/new`, where you pick the account and repositories. GitHub then returns you to the Setup URL and the first sync starts.
+
+Don't link people to `github.com/settings/apps/{slug}/installations` or the organization equivalent. Those are the owner's settings pages and return 404 for everyone else.
+
+For local development, register a second App whose Setup URL is `http://localhost:3001/api/integrations/github/callback`. A GitHub App has only one Setup URL.
+
+### Troubleshooting
+
+| Symptom | Cause |
+|---------|-------|
+| `GITHUB_APP_SLUG is not configured` (503) | `GITHUB_APP_SLUG` is unset in this environment |
+| GitHub 404 after clicking Connect | `GITHUB_APP_SLUG` holds the owner's login instead of the App's slug, or the App is private and you're installing on another account |
+| GitHub doesn't redirect back after install | Setup URL is wrong, or OAuth during installation is on |
+| "Configure App permissions" link 404s | `GITHUB_APP_OWNER_ORG` is missing for an org-owned App |
+| Members or Projects show as needing approval | The permission was added after install. An owner of the installed account approves it under that account's **Settings → GitHub Apps**. |
 
 ## Install the agent
 

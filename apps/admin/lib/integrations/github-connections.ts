@@ -134,7 +134,7 @@ export function githubConnectionView(
     state,
     needsMembers,
     approveUrl: githubOrg && installationId ? githubPermissionUpdateUrl(githubOrg, installationId, accountType) : null,
-    appPermissionsUrl: process.env.GITHUB_APP_SLUG ? githubAppPermissionsUrl(process.env.GITHUB_APP_SLUG) : null,
+    appPermissionsUrl: process.env.GITHUB_APP_SLUG ? githubAppPermissionsUrl(process.env.GITHUB_APP_SLUG, process.env.GITHUB_APP_OWNER_ORG) : null,
     lastSyncedAt: connection.lastSyncedAt?.toISOString() ?? null,
     lastError,
   };
@@ -150,7 +150,7 @@ export function summarizeGitHubConnections(views: GitHubConnectionView[]): GitHu
       state: "none",
       needsMembers: false,
       approveUrl: null,
-      appPermissionsUrl: process.env.GITHUB_APP_SLUG ? githubAppPermissionsUrl(process.env.GITHUB_APP_SLUG) : null,
+      appPermissionsUrl: process.env.GITHUB_APP_SLUG ? githubAppPermissionsUrl(process.env.GITHUB_APP_SLUG, process.env.GITHUB_APP_OWNER_ORG) : null,
       lastSyncedAt: null,
       lastError: null,
       connections: [],

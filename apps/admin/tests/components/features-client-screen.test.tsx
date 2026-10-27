@@ -232,3 +232,13 @@ test("a complete sync reports actual repository and commit counts", async () => 
   expect(screen.getByRole("status")).toHaveTextContent(/2/);
   expect(mocks.toast.error).not.toHaveBeenCalled();
 });
+
+test("the GitHub connection dialog reuses the accounts list under its own title", async () => {
+  await renderFeatures();
+  fireEvent.click(screen.getByRole("button", { name: "GitHub connection" }));
+  const dialog = await screen.findByRole("dialog", { name: "GitHub connection" });
+  expect(within(dialog).getByRole("heading", { name: "GitHub accounts" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("link", { name: "Connect account" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("link", { name: /Configure/ })).toHaveAttribute("href", "https://github.com/organizations/acme/settings/installations/42");
+  expect(within(dialog).getByRole("button", { name: "Disconnect acme…" })).toBeInTheDocument();
+});

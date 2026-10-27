@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { githubAppOwnerInstallationsUrl, listGitHubAppInstallations } from "@/lib/integrations/github-app";
+import { githubAppInstallUrl, listGitHubAppInstallations } from "@/lib/integrations/github-app";
 import { listLinkedGitHubInstallationIds } from "@/lib/integrations/github-connections";
 import { requireOrgRole, rolesFor } from "@/lib/rbac";
 import { logServerError } from "@/lib/errors/public";
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
         if (linked.otherWorkspaces.has(installation.id)) return [];
         return [{ ...installation, linked: linked.thisWorkspace.has(installation.id) }];
       }),
-      installAppUrl: slug ? githubAppOwnerInstallationsUrl(slug) : null,
+      installAppUrl: slug ? githubAppInstallUrl(slug) : null,
     });
   } catch (error) {
     logServerError("integrations/github/installations", error);

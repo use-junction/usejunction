@@ -55,7 +55,7 @@ vi.mock("@/lib/integrations/linear", () => ({
 vi.mock("@/lib/integrations/sync", () => ({ syncConnection: mocks.syncConnection }));
 vi.mock("@/lib/integrations/github-app", () => ({
   listGitHubAppInstallations: mocks.listGitHubAppInstallations,
-  githubAppOwnerInstallationsUrl: (slug: string) => `https://github.com/apps/${slug}/installations/new`,
+  githubAppInstallUrl: (slug: string) => `https://github.com/apps/${slug}/installations/new`,
 }));
 vi.mock("@/lib/integrations/github-connections", () => ({
   listLinkedGitHubInstallationIds: mocks.listLinkedGitHubInstallationIds,
