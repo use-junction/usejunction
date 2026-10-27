@@ -3,6 +3,7 @@ import { prisma } from "@usejunction/db";
 import { requireAppPrincipal } from "@/lib/api/app-auth";
 import { appData, appError } from "@/lib/api/app-response";
 import { syncConnection } from "@/lib/integrations/sync";
+import { clearProviderSyncStop, providerSyncStopRequested } from "@/lib/integrations/sync-stop";
 import { audit, rolesFor } from "@/lib/rbac";
 import { logServerError } from "@/lib/errors/public";
 import { browserMutationGuard } from "@/lib/security/http";
@@ -50,6 +51,12 @@ export async function POST(request: NextRequest) {
       if (deadline.getTime() - Date.now() < MIN_CONNECTION_BUDGET_MS) {
         // Connections not reached stay due, so the scheduled sync picks them up next.
         mergeCounts(counts, { deferredConnections: 1 });
+        continue;
+      }
+      // Stop applies to the whole batch: a request made while an earlier connection ran skips the rest.
+      if (await providerSyncStopRequested(connection.id)) {
+        await clearProviderSyncStop(connection.id);
+        mergeCounts(counts, { deferredConnections: 1, githubStopped: true });
         continue;
       }
       const result = await syncConnection(connection.id, { forceAuthorWake: true, forceProjects: true, deadline });

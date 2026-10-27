@@ -49,6 +49,35 @@ test("Disconnect is labelled per account and hands the connection back", () => {
   expect(screen.getByRole("button", { name: "Disconnect acme…" })).toBeInTheDocument();
 });
 
+test("Sync now runs one account and turns into Stop while that account syncs", () => {
+  const onSync = vi.fn();
+  const onStop = vi.fn();
+  const { rerender } = render(<GitHubAccountsList connections={[org, personal]} canManage installHref="/x" onDisconnect={vi.fn()} onSync={onSync} onStop={onStop} />);
+  fireEvent.click(screen.getByRole("button", { name: "Sync ada now" }));
+  expect(onSync).toHaveBeenCalledWith(personal);
+
+  rerender(<GitHubAccountsList connections={[org, personal]} canManage installHref="/x" onDisconnect={vi.fn()} onSync={onSync} onStop={onStop} syncingId={personal.id} />);
+  expect(screen.queryByRole("button", { name: "Sync ada now" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Sync acme now" })).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "Stop the ada sync" }));
+  expect(onStop).toHaveBeenCalledWith(personal);
+
+  rerender(<GitHubAccountsList connections={[org, personal]} canManage installHref="/x" onDisconnect={vi.fn()} onSync={onSync} onStop={onStop} syncingId={personal.id} stopping />);
+  expect(screen.getByRole("button", { name: "Stop the ada sync" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Stop the ada sync" })).toHaveTextContent("Stopping…");
+});
+
+test("a paused account offers Resume sync", () => {
+  const note = "Synced 6 of 15 repositories before this run's time budget ran out; the remaining 9 continue on the next sync, or right away if you press Sync now.";
+  mount({ connections: [{ ...personal, state: "partial", lastError: note }], onSync: vi.fn() });
+  expect(screen.getByRole("button", { name: "Sync ada now" })).toHaveTextContent("Resume sync");
+});
+
+test("viewers who cannot manage accounts get no sync controls", () => {
+  mount({ connections: [personal], canManage: false, onSync: vi.fn() });
+  expect(screen.queryByRole("button", { name: "Sync ada now" })).not.toBeInTheDocument();
+});
+
 test("a sync cut short by its time budget reads as needing attention with the progress note", () => {
   const note = "Synced 6 of 40 repositories before this run's time budget ran out; the remaining 34 continue on the next sync.";
   mount({ connections: [{ ...personal, state: "partial", lastError: note }] });

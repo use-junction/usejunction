@@ -76,6 +76,8 @@ export type GitHubCodeSyncResult = {
   skippedRepositories?: number;
   /** Repositories not reached before the run's time budget ended; the next sync starts with them. */
   deferredRepositories?: number;
+  /** True when an admin asked for the run to stop; the deferred count covers what was left. */
+  stopped?: boolean;
 };
 
 /** Wall-clock budget for one GitHub code sync; callers may pass an earlier deadline. */
@@ -89,7 +91,12 @@ const CODE_SYNC_RESERVE_MS = 20_000;
 
 export function githubBudgetExhaustedMessage(synced: number, total: number) {
   const remaining = total - synced;
-  return `Synced ${synced} of ${total} repositories before this run's time budget ran out; the remaining ${remaining} continue on the next sync.`;
+  return `Synced ${synced} of ${total} repositories before this run's time budget ran out; the remaining ${remaining} continue on the next sync, or right away if you press Sync now.`;
+}
+
+export function githubSyncStoppedMessage(synced: number, total: number) {
+  const remaining = total - synced;
+  return `Sync stopped at your request after ${synced} of ${total} repositories; the remaining ${remaining} continue on the next sync, or right away if you press Sync now.`;
 }
 
 async function recordCapability(
@@ -764,9 +771,18 @@ async function wakeMappedAuthorDaemons(
   }
 }
 
+export type GitHubCodeSyncOptions = {
+  initial?: boolean;
+  reset?: boolean;
+  forceAuthorWake?: boolean;
+  deadline?: Date;
+  /** Polled between repositories; a true result ends the run after the current repository. */
+  stopRequested?: () => Promise<boolean>;
+};
+
 export async function syncGitHubCode(
   connection: ProviderConnection,
-  options: { initial?: boolean; reset?: boolean; forceAuthorWake?: boolean; deadline?: Date } = {},
+  options: GitHubCodeSyncOptions = {},
 ): Promise<GitHubCodeSyncResult> {
   try {
     return await syncGitHubCodeInner(connection, options);
@@ -777,7 +793,7 @@ export async function syncGitHubCode(
 
 async function syncGitHubCodeInner(
   connection: ProviderConnection,
-  options: { initial?: boolean; reset?: boolean; deadline?: Date },
+  options: Omit<GitHubCodeSyncOptions, "forceAuthorWake">,
 ): Promise<GitHubCodeSyncResult> {
   const startedAt = Date.now();
   const budgetEnd = startedAt + githubCodeSyncBudgetMs();
@@ -913,12 +929,18 @@ async function syncGitHubCodeInner(
   let commitCount = 0;
   let syncedRepositories = 0;
   let deferredRepositories = 0;
+  let stopped = false;
   const repoErrors: string[] = [];
 
   for (const { repo, repositoryId } of ordered) {
     const owner = repo.owner?.login;
     if (!owner || !repo.name) continue;
-    if (Date.now() >= stopStartingReposAt) {
+    if (stopped || Date.now() >= stopStartingReposAt) {
+      deferredRepositories += 1;
+      continue;
+    }
+    if (options.stopRequested && await options.stopRequested()) {
+      stopped = true;
       deferredRepositories += 1;
       continue;
     }
@@ -983,7 +1005,9 @@ async function syncGitHubCodeInner(
   const attempted = ordered.length;
   const failedAllAttempted = repoErrors.length > 0 && syncedRepositories === 0 && deferredRepositories === 0;
   const notes = [
-    ...(deferredRepositories > 0 ? [githubBudgetExhaustedMessage(attempted - deferredRepositories, attempted)] : []),
+    ...(deferredRepositories > 0
+      ? [(stopped ? githubSyncStoppedMessage : githubBudgetExhaustedMessage)(attempted - deferredRepositories, attempted)]
+      : []),
     ...repoErrors.slice(0, 5),
   ];
   await recordPullRequestsCapability(connection, {
@@ -1003,5 +1027,6 @@ async function syncGitHubCodeInner(
     failedRepositories: repoErrors.length,
     skippedRepositories: selection.skipped.length,
     deferredRepositories,
+    stopped,
   };
 }

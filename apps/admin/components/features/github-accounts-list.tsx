@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, Plus } from "lucide-react";
+import { ArrowUpRight, Loader2, Plus, RefreshCw, Square } from "lucide-react";
 import { IntegrationProviderMark } from "@/components/features/integration-provider-logos";
 import { Button } from "@/components/ui/button";
 import type { GitHubConnectionView } from "@/lib/integrations/github-connections";
@@ -52,6 +52,11 @@ export function GitHubAccountsList({
   installHref,
   availableInstalls = [],
   onDisconnect,
+  onSync,
+  onStop,
+  syncingId = null,
+  stopping = false,
+  syncDisabled = false,
   heading = "GitHub accounts",
 }: {
   connections: GitHubConnectionView[];
@@ -59,9 +64,37 @@ export function GitHubAccountsList({
   installHref: string;
   availableInstalls?: Array<{ id: string; login: string; accountType: string; linked?: boolean }>;
   onDisconnect: (connection: GitHubConnectionView) => void;
+  /** Run this account's sync right away with the full request budget. */
+  onSync?: (connection: GitHubConnectionView) => void;
+  /** Ask the running sync for this account to stop after its current repository. */
+  onStop?: (connection: GitHubConnectionView) => void;
+  /** Connection whose manual sync is in flight, if any. */
+  syncingId?: string | null;
+  /** A stop has been requested and the run has not returned yet. */
+  stopping?: boolean;
+  /** Another sync (for example the whole-workspace one) is running. */
+  syncDisabled?: boolean;
   heading?: string;
 }) {
   const addable = canManage ? availableInstalls.filter((install) => !install.linked) : [];
+  function syncAction(connection: GitHubConnectionView) {
+    if (!onSync) return null;
+    const name = connection.githubOrg || "GitHub";
+    if (syncingId === connection.id) {
+      return (
+        <Button type="button" size="sm" variant="outline" className="rounded-none" aria-label={`Stop the ${name} sync`} disabled={stopping || !onStop} onClick={() => onStop?.(connection)}>
+          {stopping ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Square className="size-3.5" aria-hidden />}
+          {stopping ? "Stopping…" : "Stop"}
+        </Button>
+      );
+    }
+    return (
+      <Button type="button" size="sm" variant="outline" className="rounded-none" aria-label={`Sync ${name} now`} disabled={Boolean(syncingId) || syncDisabled} onClick={() => onSync(connection)}>
+        <RefreshCw className="size-3.5" aria-hidden />
+        {connection.state === "partial" && connection.lastError ? "Resume sync" : "Sync now"}
+      </Button>
+    );
+  }
   return (
     <section className="space-y-2" aria-labelledby="github-accounts-heading">
       <IntegrationSectionHeader
@@ -87,6 +120,7 @@ export function GitHubAccountsList({
               </span>
             </>}
             actions={canManage ? <>
+              {syncAction(connection)}
               {connection.approveUrl ? (
                 <Button asChild size="sm" variant="outline" className="rounded-none">
                   <a href={connection.approveUrl} target="_blank" rel="noreferrer">Configure <ArrowUpRight className="size-3.5" aria-hidden /></a>

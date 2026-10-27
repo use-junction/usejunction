@@ -4,6 +4,7 @@ import { resolveProviderApiKeyMapping } from "@/lib/integrations/api-key-mapping
 import { getAdapter } from "@/lib/integrations/adapters";
 import { githubInstallationToken } from "@/lib/integrations/github-app";
 import { syncGitHubCode } from "@/lib/features/github-code-sync";
+import { clearProviderSyncStop, providerSyncStopRequested } from "@/lib/integrations/sync-stop";
 import { syncGitHubProjectsIfDue } from "@/lib/integrations/github-projects";
 import type { IntegrationConfig, ProviderApiKey, ProviderMember, ProviderUsage } from "@/lib/integrations/types";
 import { decryptSecret } from "@/lib/security";
@@ -291,11 +292,19 @@ export async function syncConnection(
           initial: !connection.lastSyncedAt,
           forceAuthorWake: options.forceAuthorWake,
           deadline: options.deadline,
+          stopRequested: async () => {
+            const requested = await providerSyncStopRequested(connection.id);
+            // Consume the request so it cannot halt the run that resumes this work.
+            if (requested) await clearProviderSyncStop(connection.id);
+            return requested;
+          },
         });
-        resumeSoon = (code.deferredRepositories ?? 0) > 0;
+        // A run cut short by its budget comes back quickly; one an admin stopped waits for the normal schedule.
+        resumeSoon = (code.deferredRepositories ?? 0) > 0 && !code.stopped;
         codeCounts = {
           githubRepos: code.repositories, githubPullRequests: code.pullRequests, githubCommits: code.commits, githubSkipped: code.skipped, githubReason: code.reason ?? null,
           githubFailedRepos: code.failedRepositories ?? 0, githubSkippedRepos: code.skippedRepositories ?? 0, githubDeferredRepos: code.deferredRepositories ?? 0,
+          githubStopped: Boolean(code.stopped),
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
