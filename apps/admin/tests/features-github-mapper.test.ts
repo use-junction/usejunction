@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 import { mapCommitNode, mapPullRequestNode, mapRestCommit, mergeCommitRecords, PULL_REQUEST_COMMITS_QUERY } from "@/lib/features/github-mapper";
-import { githubAppInstallUrl, githubAppOwnerInstallationsUrl, githubAppPermissionsUrl, githubCodePermissionsGranted, githubMembersReadGranted, githubPermissionUpdateUrl, normalizeGitHubAccountType, normalizeGitHubPrivateKey } from "@/lib/integrations/github-app";
+import { githubAppInstallUrl, githubAppPermissionsUrl, githubCodePermissionsGranted, githubMembersReadGranted, githubPermissionUpdateUrl, normalizeGitHubAccountType, normalizeGitHubPrivateKey } from "@/lib/integrations/github-app";
 
 test("maps a GraphQL pull request and its commits", () => {
   const mapped = mapPullRequestNode({
@@ -96,19 +96,18 @@ test("permission update URL differs for personal vs organization installs", () =
   assert.equal(normalizeGitHubAccountType("user"), "User");
   assert.equal(normalizeGitHubAccountType("Organization"), "Organization");
   assert.equal(normalizeGitHubAccountType("bot"), null);
-  const install = githubAppInstallUrl("usejunction-dinuda", "state.token");
-  assert.equal(install, "https://github.com/settings/apps/usejunction-dinuda/installations");
   assert.equal(
-    githubAppOwnerInstallationsUrl("usejunction-dinuda"),
-    "https://github.com/settings/apps/usejunction-dinuda/installations",
+    githubAppInstallUrl("use-junction", "state.token"),
+    "https://github.com/apps/use-junction/installations/new?state=state.token",
   );
-  assert.equal(
-    githubAppOwnerInstallationsUrl("usejunction-dinuda"),
-    "https://github.com/settings/apps/usejunction-dinuda/installations",
-  );
+  assert.equal(githubAppInstallUrl("use-junction"), "https://github.com/apps/use-junction/installations/new");
   assert.equal(
     githubAppPermissionsUrl("usejunction-dinuda"),
     "https://github.com/settings/apps/usejunction-dinuda/permissions",
+  );
+  assert.equal(
+    githubAppPermissionsUrl("use-junction", "use-junction"),
+    "https://github.com/organizations/use-junction/settings/apps/use-junction/permissions",
   );
   const oneLinePem = "-----BEGIN RSA PRIVATE KEY----- ABCDEFGHIJKLMNOPQRSTUVWXYZ -----END RSA PRIVATE KEY-----";
   assert.match(normalizeGitHubPrivateKey(oneLinePem), /^-----BEGIN RSA PRIVATE KEY-----\n/);
