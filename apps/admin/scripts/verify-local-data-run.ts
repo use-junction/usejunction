@@ -684,6 +684,14 @@ async function main() {
         roundMoney(d.kpis.estimatedApiCost.value),
         roundMoney(activity.kpis.estimatedApiCost),
       ),
+      check("cross-page", view.label, "dashboard.people == team.roster", roster.developers.length, d.coverage.developers),
+      check(
+        "cross-page",
+        view.label,
+        "dashboard.activePeople <= dashboard.people",
+        true,
+        d.coverage.activeDevelopers <= d.coverage.developers,
+      ),
     );
 
     // Soft check: device cache is a subset of org DB (this machine's uploads only).

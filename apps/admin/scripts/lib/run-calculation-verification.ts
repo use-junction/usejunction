@@ -496,6 +496,8 @@ export async function runCalculationVerification(
     const rosterDev = roster.developers.find((x) => x.id === developerId);
     checks.push(
       check("/team", view.label, "memberCount", 2, roster.developers.length),
+      check("cross-page", view.label, "dashboard.people == team.roster", roster.developers.length, d.coverage.developers),
+      check("cross-page", view.label, "dashboard.activePeople <= dashboard.people", true, d.coverage.activeDevelopers <= d.coverage.developers),
       check("/team", view.label, "e2e-developer.requests", memberIndep.requests, rosterDev?.requests ?? null),
     );
 
