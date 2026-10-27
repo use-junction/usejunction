@@ -9,6 +9,11 @@ import { browserMutationGuard } from "@/lib/security/http";
 
 export const maxDuration = 300;
 
+/** Leave headroom under maxDuration so the last connection can still write its result. */
+const REQUEST_BUDGET_MS = 270_000;
+/** Don't start a connection that cannot do useful work before the request ends. */
+const MIN_CONNECTION_BUDGET_MS = 30_000;
+
 function mergeCounts(into: Record<string, unknown>, from: Record<string, unknown>) {
   for (const [key, value] of Object.entries(from)) {
     if (typeof value === "number") {
@@ -40,8 +45,14 @@ export async function POST(request: NextRequest) {
   if (!connections.length) return appError("NOT_FOUND", "Connect GitHub first.", 404);
   try {
     const counts: Record<string, unknown> = {};
+    const deadline = new Date(Date.now() + REQUEST_BUDGET_MS);
     for (const connection of connections) {
-      const result = await syncConnection(connection.id, { forceAuthorWake: true, forceProjects: true });
+      if (deadline.getTime() - Date.now() < MIN_CONNECTION_BUDGET_MS) {
+        // Connections not reached stay due, so the scheduled sync picks them up next.
+        mergeCounts(counts, { deferredConnections: 1 });
+        continue;
+      }
+      const result = await syncConnection(connection.id, { forceAuthorWake: true, forceProjects: true, deadline });
       mergeCounts(counts, result as Record<string, unknown>);
       await audit({
         orgId: principal.orgId,

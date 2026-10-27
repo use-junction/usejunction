@@ -210,7 +210,7 @@ async function credentialForConnection(connection: ProviderConnection) {
 
 export async function syncConnection(
   connectionId: string,
-  options: { forceAuthorWake?: boolean; forceProjects?: boolean } = {},
+  options: { forceAuthorWake?: boolean; forceProjects?: boolean; deadline?: Date } = {},
 ) {
   const connection = await prisma.providerConnection.findUnique({ where: { id: connectionId } });
   if (!connection || connection.status === "disconnected") throw new Error("connection not available");
@@ -284,13 +284,19 @@ export async function syncConnection(
     if (data.members.length > 0) await recordCapability({ connection, capability: "members", endpoint: "provider-members", dataThrough: new Date() });
     if (data.seats.length > 0) await recordCapability({ connection, capability: "seats", endpoint: "provider-seats", dataThrough: new Date() });
     let codeCounts: Record<string, unknown> = {};
+    let resumeSoon = false;
     if (connection.provider === "github") {
       try {
         const code = await syncGitHubCode(connection, {
           initial: !connection.lastSyncedAt,
           forceAuthorWake: options.forceAuthorWake,
+          deadline: options.deadline,
         });
-        codeCounts = { githubRepos: code.repositories, githubPullRequests: code.pullRequests, githubCommits: code.commits, githubSkipped: code.skipped, githubReason: code.reason ?? null, githubFailedRepos: code.failedRepositories ?? 0 };
+        resumeSoon = (code.deferredRepositories ?? 0) > 0;
+        codeCounts = {
+          githubRepos: code.repositories, githubPullRequests: code.pullRequests, githubCommits: code.commits, githubSkipped: code.skipped, githubReason: code.reason ?? null,
+          githubFailedRepos: code.failedRepositories ?? 0, githubSkippedRepos: code.skippedRepositories ?? 0, githubDeferredRepos: code.deferredRepositories ?? 0,
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         codeCounts = { githubError: message.slice(0, 500) };
@@ -314,7 +320,8 @@ export async function syncConnection(
         permissions: latest?.permissions ? json(latest.permissions) : json(data.permissions ?? []),
         lastSyncedAt: now, lastCostSyncedAt: data.costSyncSucceeded ? now : undefined,
         costDataThrough: data.costSyncSucceeded ? (data.costDataThrough ?? now) : undefined,
-        nextSyncAt: new Date(now.getTime() + 15 * 60_000), leaseUntil: null, lastError: null,
+        // A run cut short by its time budget comes back on the next cron tick instead of waiting 15 minutes.
+        nextSyncAt: new Date(now.getTime() + (resumeSoon ? 60_000 : 15 * 60_000)), leaseUntil: null, lastError: null,
       } }),
       prisma.providerSyncRun.update({ where: { id: run.id }, data: { status: "success", finishedAt: now, counts } }),
     ]);
@@ -334,6 +341,11 @@ export async function syncConnection(
     ]);
     throw error;
   }
+}
+
+/** Hand a claimed connection back when the request ran out of time before reaching it. */
+export async function releaseConnectionLease(connectionId: string) {
+  await prisma.providerConnection.updateMany({ where: { id: connectionId }, data: { leaseUntil: null } });
 }
 
 export async function claimDueConnections(limit = 5) {

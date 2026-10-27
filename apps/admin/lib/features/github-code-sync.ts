@@ -18,6 +18,7 @@ import {
   mergeGithubIdentityMetadata,
   nextGitHubAuthorResolution,
   reposOwnedByInstallation,
+  selectReposForSync,
   soleDeveloperMatch,
   uniqueDeveloperLoginMap,
   type GitHubAuthorScope,
@@ -71,7 +72,25 @@ export type GitHubCodeSyncResult = {
   pullRequests: number;
   commits: number;
   failedRepositories?: number;
+  /** Repositories left out on purpose: forks, archives, or nothing pushed inside the window. */
+  skippedRepositories?: number;
+  /** Repositories not reached before the run's time budget ended; the next sync starts with them. */
+  deferredRepositories?: number;
 };
+
+/** Wall-clock budget for one GitHub code sync; callers may pass an earlier deadline. */
+export function githubCodeSyncBudgetMs() {
+  const raw = Number(process.env.GITHUB_CODE_SYNC_BUDGET_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : 120_000;
+}
+
+/** Time kept back after the repository loop for author mapping and cost allocation. */
+const CODE_SYNC_RESERVE_MS = 20_000;
+
+export function githubBudgetExhaustedMessage(synced: number, total: number) {
+  const remaining = total - synced;
+  return `Synced ${synced} of ${total} repositories before this run's time budget ran out; the remaining ${remaining} continue on the next sync.`;
+}
 
 async function recordCapability(
   connection: ProviderConnection,
@@ -747,7 +766,7 @@ async function wakeMappedAuthorDaemons(
 
 export async function syncGitHubCode(
   connection: ProviderConnection,
-  options: { initial?: boolean; reset?: boolean; forceAuthorWake?: boolean } = {},
+  options: { initial?: boolean; reset?: boolean; forceAuthorWake?: boolean; deadline?: Date } = {},
 ): Promise<GitHubCodeSyncResult> {
   try {
     return await syncGitHubCodeInner(connection, options);
@@ -758,8 +777,12 @@ export async function syncGitHubCode(
 
 async function syncGitHubCodeInner(
   connection: ProviderConnection,
-  options: { initial?: boolean; reset?: boolean },
+  options: { initial?: boolean; reset?: boolean; deadline?: Date },
 ): Promise<GitHubCodeSyncResult> {
+  const startedAt = Date.now();
+  const budgetEnd = startedAt + githubCodeSyncBudgetMs();
+  const deadline = options.deadline ? Math.min(options.deadline.getTime(), budgetEnd) : budgetEnd;
+  const stopStartingReposAt = deadline - CODE_SYNC_RESERVE_MS;
   const config = configOf(connection);
   const installationId = String(config.installationId ?? "");
   if (!installationId) {
@@ -866,15 +889,39 @@ async function syncGitHubCodeInner(
   const installationRepos = await listInstallationRepositories(token);
   const repos = reposOwnedByInstallation(installationRepos, accountLogin, accountType);
   const repoIds = await reconcileGitHubRepositoryAccess(connection.orgId, connection.id, repos);
+  const selection = selectReposForSync(repos, { accountType, cutoff });
+  const skippedIds = selection.skipped
+    .map(({ repo }) => repoIds.get(`${repo.owner?.login ?? ""}/${repo.name}`.toLowerCase()))
+    .filter((id): id is string => Boolean(id));
+  if (skippedIds.length > 0) {
+    await prisma.gitHubRepositoryAccess.updateMany({
+      where: { connectionId: connection.id, repositoryId: { in: skippedIds }, NOT: { syncStatus: "skipped" } },
+      data: { syncStatus: "skipped", lastError: null },
+    });
+  }
+  // Resume where the last run stopped: never-synced repositories first, then the stalest.
+  const grants = await prisma.gitHubRepositoryAccess.findMany({
+    where: { connectionId: connection.id },
+    select: { repositoryId: true, lastSuccessAt: true },
+  });
+  const lastSuccessByRepo = new Map(grants.map((row) => [row.repositoryId, row.lastSuccessAt?.getTime() ?? 0]));
+  const ordered = selection.selected
+    .map((repo) => ({ repo, repositoryId: repoIds.get(`${repo.owner?.login ?? ""}/${repo.name}`.toLowerCase()) ?? null }))
+    .filter((entry): entry is { repo: typeof entry.repo; repositoryId: string } => Boolean(entry.repositoryId))
+    .sort((left, right) => (lastSuccessByRepo.get(left.repositoryId) ?? 0) - (lastSuccessByRepo.get(right.repositoryId) ?? 0));
   let pullRequestCount = 0;
   let commitCount = 0;
+  let syncedRepositories = 0;
+  let deferredRepositories = 0;
   const repoErrors: string[] = [];
 
-  for (const repo of repos) {
+  for (const { repo, repositoryId } of ordered) {
     const owner = repo.owner?.login;
     if (!owner || !repo.name) continue;
-    const repositoryId = repoIds.get(`${owner}/${repo.name}`.toLowerCase());
-    if (!repositoryId) continue;
+    if (Date.now() >= stopStartingReposAt) {
+      deferredRepositories += 1;
+      continue;
+    }
     const attemptedAt = new Date();
     await prisma.gitHubRepositoryAccess.update({
       where: { connectionId_repositoryId: { connectionId: connection.id, repositoryId } },
@@ -900,12 +947,14 @@ async function syncGitHubCodeInner(
       });
       pullRequestCount += pullRequests.length;
       commitCount += commits.length;
+      syncedRepositories += 1;
       await prisma.gitHubRepositoryAccess.update({
         where: { connectionId_repositoryId: { connectionId: connection.id, repositoryId } },
         data: { syncStatus: "available", lastSuccessAt: new Date(), lastError: null },
       });
     } catch (error) {
       if (isGitHubEmptyRepositoryError(error)) {
+        syncedRepositories += 1;
         await prisma.gitHubRepositoryAccess.update({
           where: { connectionId_repositoryId: { connectionId: connection.id, repositoryId } },
           data: { syncStatus: "available", lastSuccessAt: new Date(), lastError: null },
@@ -931,14 +980,28 @@ async function syncGitHubCodeInner(
     return { skipped: true, reason: "no_repositories", repositories: 0, pullRequests: 0, commits: 0 };
   }
 
+  const attempted = ordered.length;
+  const failedAllAttempted = repoErrors.length > 0 && syncedRepositories === 0 && deferredRepositories === 0;
+  const notes = [
+    ...(deferredRepositories > 0 ? [githubBudgetExhaustedMessage(attempted - deferredRepositories, attempted)] : []),
+    ...repoErrors.slice(0, 5),
+  ];
   await recordPullRequestsCapability(connection, {
-    status: repoErrors.length && commitCount === 0 && pullRequestCount === 0 ? "error" : "available",
-    error: sanitizeGitHubSyncError(repoErrors.length ? repoErrors.slice(0, 5).join("; ") : null),
+    status: deferredRepositories > 0 ? "partial" : failedAllAttempted ? "error" : "available",
+    error: sanitizeGitHubSyncError(notes.length ? notes.join("; ") : null),
     cursor: new Date().toISOString(),
   });
   await runCommitUsageMapping(connection.orgId, featureCostWindow(new Date(), FEATURE_COST_WINDOW_DAYS), {
     connectionId: connection.id,
     scope: authorScope,
   });
-  return { skipped: false, repositories: repos.length, pullRequests: pullRequestCount, commits: commitCount, failedRepositories: repoErrors.length };
+  return {
+    skipped: false,
+    repositories: attempted,
+    pullRequests: pullRequestCount,
+    commits: commitCount,
+    failedRepositories: repoErrors.length,
+    skippedRepositories: selection.skipped.length,
+    deferredRepositories,
+  };
 }
