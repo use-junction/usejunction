@@ -4,7 +4,7 @@ import { PRICING_VERSION as SOURCE_PRICING_VERSION } from "@/lib/metrics/source-
 
 describe("cursor composer and grok fast pricing", () => {
   test("pricing version is aligned across admin modules", () => {
-    expect(PRICING_VERSION).toBe("2026-08-01");
+    expect(PRICING_VERSION).toBe("2026-10-20");
     expect(SOURCE_PRICING_VERSION).toBe(PRICING_VERSION);
   });
 
