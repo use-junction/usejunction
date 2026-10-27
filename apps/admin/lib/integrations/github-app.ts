@@ -198,9 +198,14 @@ export function normalizeGitHubAccountType(value: unknown): GitHubAccountType | 
   return null;
 }
 
-/** App registration page where the owner adds permissions such as Organization Members: read. */
-export function githubAppPermissionsUrl(slug: string) {
-  return `https://github.com/settings/apps/${encodeURIComponent(slug)}/permissions`;
+/**
+ * App registration page where the owner adds permissions such as Organization Members: read.
+ * Org-owned Apps live under the organization's settings; personal Apps under the user's.
+ */
+export function githubAppPermissionsUrl(slug: string, ownerOrg?: string | null) {
+  const app = encodeURIComponent(slug);
+  if (ownerOrg) return `https://github.com/organizations/${encodeURIComponent(ownerOrg)}/settings/apps/${app}/permissions`;
+  return `https://github.com/settings/apps/${app}/permissions`;
 }
 
 /** Settings URL where an admin approves newly requested App permissions. */
@@ -218,21 +223,12 @@ export function githubPermissionUpdateUrl(
 export const GITHUB_CONNECT_COOKIE = "uj_github_connect";
 
 /**
- * GitHub skips /installations/new and /select_target when a personal install
- * already exists. The App's Install App page lists every account (user + orgs)
- * with Install/Configure.
+ * Public install page: any signed-in GitHub user can open it, pick an account,
+ * then repositories. GitHub forwards `state` to the Setup URL callback.
+ * (`/settings/apps/{slug}/installations` is owner-only and 404s for everyone else.)
  */
-export function githubAppInstallUrl(slug: string, _state?: string) {
-  return githubAppOwnerInstallationsUrl(slug);
-}
-
-/** App-owner page that lists every account GitHub will allow this App to install on. */
-export function githubAppOwnerInstallationsUrl(slug: string) {
-  return `https://github.com/settings/apps/${encodeURIComponent(slug)}/installations`;
-}
-
-export function githubAppOrgInstallUrl(slug: string, orgLogin: string, state?: string) {
-  const url = new URL(`https://github.com/organizations/${encodeURIComponent(orgLogin)}/settings/apps/${encodeURIComponent(slug)}/install`);
+export function githubAppInstallUrl(slug: string, state?: string) {
+  const url = new URL(`https://github.com/apps/${encodeURIComponent(slug)}/installations/new`);
   if (state) url.searchParams.set("state", state);
   return url.toString();
 }

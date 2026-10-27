@@ -15,7 +15,7 @@ vi.mock("@/lib/rbac", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.AUTH_SECRET = "a".repeat(32);
-  process.env.GITHUB_APP_SLUG = "usejunction-dinuda";
+  process.env.GITHUB_APP_SLUG = "use-junction";
   mocks.requireOrgRole.mockResolvedValue({
     orgId: "org-1",
     userId: "owner-1",
@@ -24,7 +24,7 @@ beforeEach(() => {
   });
 });
 
-test("Connect GitHub sends the user to the App's account list", async () => {
+test("Connect GitHub sends the user to the public install page with state", async () => {
   vi.resetModules();
   const { GET } = await import("@/app/api/integrations/github/connect/route");
   const response = await GET(
@@ -32,7 +32,8 @@ test("Connect GitHub sends the user to the App's account list", async () => {
   );
   assert.equal(response.status, 307);
   const location = new URL(response.headers.get("location") ?? "");
-  assert.equal(location.href, "https://github.com/settings/apps/usejunction-dinuda/installations");
+  assert.equal(`${location.origin}${location.pathname}`, "https://github.com/apps/use-junction/installations/new");
+  assert.equal(location.searchParams.get("state"), response.cookies.get("uj_github_connect")?.value);
   assert.ok(response.cookies.get("uj_github_connect")?.value);
   const state = verifyGitHubState(response.cookies.get("uj_github_connect")?.value ?? "");
   assert.equal(state.returnTo, "/features");
