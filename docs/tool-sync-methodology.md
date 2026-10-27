@@ -219,6 +219,7 @@ Org admins connect integrations under Settings → Integrations. The control pla
 - **Lookback:** initial sync 90 days; incremental 3 days (GitHub Copilot initial: 28 days)
 - **Claiming:** lease-based (`claimDueConnections`, 5 min lease, up to 5 per cron tick)
 - **Time budget:** each GitHub repository sync (`apps/admin/lib/features/github-code-sync.ts`) stops starting new repositories after `GITHUB_CODE_SYNC_BUDGET_MS` (default 120 s) or the calling request's deadline (cron and Sync now reserve 270 s of their 300 s `maxDuration`). A cut-short run records `pull_requests` as `partial` with a "Synced N of M repositories" note, sets `nextSyncAt = now + 1 min`, and resumes with the never-synced and stalest repositories first.
+- **Stale self-heal:** loading Work & spend (`GET /api/app/work-spend`) claims any GitHub connection in the workspace that is more than 20 min past due with no live lease (`apps/admin/lib/integrations/stale-resync.ts`) and syncs it after the response via Next `after`, so a connection the cron missed does not stay on "Syncing". The page refetches every 15 s while a connection is syncing.
 - **Repository selection:** repositories whose `pushed_at` predates the 90-day window are skipped on every install; personal (User) installs also skip forks and archived repositories. Skipped grants carry `syncStatus: skipped`.
 
 ### What gets synced

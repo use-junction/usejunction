@@ -40,7 +40,10 @@ export default function WorkSpendClientScreen() {
   if (searchParams.get("days")) summaryParams.set("days", searchParams.get("days")!);
   if (searchParams.get("repositoryId")) summaryParams.set("repositoryId", searchParams.get("repositoryId")!);
   const queryString = summaryParams.toString();
-  const query = useAppPageQuery<WorkSpendPayload>(workSpendKey(queryString), `/api/app/work-spend${queryString ? `?${queryString}` : ""}`);
+  const query = useAppPageQuery<WorkSpendPayload>(workSpendKey(queryString), `/api/app/work-spend${queryString ? `?${queryString}` : ""}`, {
+    // While a connection is syncing (including one the server just resumed), keep the page current.
+    refetchInterval: (current) => current.state.data?.connection.connections.some((item) => item.state === "syncing") ? 15_000 : false,
+  });
   useAppQueryErrorToast(query.error);
   const invalidate = useInvalidateAppData();
   const operation = useRef(false);
