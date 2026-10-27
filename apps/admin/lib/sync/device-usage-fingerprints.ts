@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { Prisma, prisma } from "@usejunction/db";
+import { chunkRows } from "@/lib/concurrency";
 
 export type DeviceUsageFingerprintRow = {
   partitionKey: string;
@@ -11,11 +12,6 @@ function newFingerprintId() {
   return `c${randomBytes(12).toString("hex")}`;
 }
 
-function chunkRows<T>(rows: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < rows.length; i += size) out.push(rows.slice(i, i + size));
-  return out;
-}
 
 /** Collapse duplicate partition keys; last-write wins (matches per-row upsert semantics). */
 export function collapseDeviceUsageFingerprints(rows: DeviceUsageFingerprintRow[]): DeviceUsageFingerprintRow[] {
