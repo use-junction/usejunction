@@ -1,3 +1,4 @@
+import { CLAUDE_GUIDES } from "@/content/guides/claude";
 import type { ContentPage } from "@/content/types";
 
 export const guideSeePlanUsage: ContentPage = {
@@ -69,6 +70,7 @@ export const guideSeePlanUsage: ContentPage = {
   ],
   relatedPaths: [
     "/guides/see-team-ai-coding-usage",
+    "/guides/claude-team-usage-limits",
     "/compare/engineering-intelligence",
     "/blog/ai-coding-observability-vs-jellyfish-dx-linearb",
     "/for/cursor",
@@ -248,4 +250,5 @@ export const GUIDES: ContentPage[] = [
   guideSeeTeamUsage,
   guideWakatimeAdjacent,
   guidePersonalKeys,
+  ...CLAUDE_GUIDES,
 ];

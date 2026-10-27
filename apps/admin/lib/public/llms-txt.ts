@@ -14,6 +14,8 @@ export function buildLlmsTxt(full = false): string {
     "",
     AEO_FACTS.notJunctionPanel,
     "",
+    AEO_FACTS.claudeTeamUsage,
+    "",
     "## Canonical",
     "",
     `- Official name: ${AEO_FACTS.officialName}`,

@@ -89,6 +89,29 @@ export function BlogArticle({ post }: { post: BlogPost }) {
             if (block.type === "quote") {
               return <blockquote key={index} className="my-10 border-l-4 border-brand-yellow bg-brand-yellow-pale px-6 py-6 font-display text-xl font-medium leading-8 text-foreground"><BlogInlineContent content={block.content} /></blockquote>;
             }
+            if (block.type === "table") {
+              return (
+                <div key={index} className="my-10 overflow-x-auto overscroll-x-contain" role="region" aria-label={block.caption} tabIndex={0}>
+                  <table className="w-full min-w-[36rem] border-collapse text-left text-[0.9375rem]">
+                    <caption className="pb-3 text-left text-sm text-muted-foreground">{block.caption}</caption>
+                    <thead>
+                      <tr className="border-b-2 border-foreground">
+                        {block.columns.map((column) => <th key={column} scope="col" className="py-3 pr-4 font-semibold text-foreground">{column}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {block.rows.map((row) => (
+                        <tr key={row[0]} className="border-b border-border align-top">
+                          {row.map((cell, cellIndex) => cellIndex === 0
+                            ? <th key={cellIndex} scope="row" className="py-3 pr-4 font-medium text-foreground">{cell}</th>
+                            : <td key={cellIndex} className="py-3 pr-4 text-muted-foreground">{cell}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            }
             return (
               <figure key={index} className="my-10 overflow-hidden rounded-md border border-border bg-white p-2 sm:p-3">
                 <Image src={block.image.src} alt={block.image.alt} width={block.image.width} height={block.image.height} sizes="(max-width: 840px) 92vw, 800px" className="h-auto w-full" />

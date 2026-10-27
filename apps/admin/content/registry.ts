@@ -91,4 +91,6 @@ export const AEO_CITE_PATHS = [
   "/solutions/ai-coding-seat-utilization",
   "/guides/see-plan-usage-and-waste",
   "/blog/what-is-ai-coding-observability",
+  "/blog/check-claude-team-usage",
+  "/guides/claude-premium-vs-standard-seat",
 ] as const;

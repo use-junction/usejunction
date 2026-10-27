@@ -49,12 +49,12 @@ export function ContentArticle({ page }: { page: ContentPage }) {
 
         {page.compareRows && page.compareOtherName ? (
           <div className="mt-12 overflow-x-auto overscroll-x-contain" role="region" aria-label="Feature comparison" tabIndex={0}>
-            <h2 className="text-xl font-semibold tracking-tight md:text-2xl">Feature comparison</h2>
+            <h2 className="text-xl font-semibold tracking-tight md:text-2xl">{page.compareHeading ?? "Feature comparison"}</h2>
             <table className="mt-4 w-full min-w-[32rem] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-border">
                   <th className="py-3 pr-4 font-medium">Feature</th>
-                  <th className="py-3 pr-4 font-medium">{siteConfig.name}</th>
+                  <th className="py-3 pr-4 font-medium">{page.compareOwnName ?? siteConfig.name}</th>
                   <th className="py-3 font-medium">{page.compareOtherName}</th>
                 </tr>
               </thead>
