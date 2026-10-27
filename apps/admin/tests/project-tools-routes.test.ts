@@ -63,7 +63,11 @@ vi.mock("@/lib/integrations/github-connections", () => ({
 vi.mock("@/lib/public-url", () => ({ getPublicAppUrl: () => "http://localhost:3001" }));
 vi.mock("@/lib/app-pages/work-spend", () => ({ loadWorkSpendPage: mocks.loadWorkSpendPage }));
 vi.mock("@usejunction/db", () => ({
-  prisma: { providerConnection: { findMany: mocks.connections } },
+  prisma: {
+    providerConnection: { findMany: mocks.connections },
+    // The batch sync checks for stop requests between connections; none are pending here.
+    appRuntimeSetting: { findUnique: vi.fn().mockResolvedValue(null), deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+  },
 }));
 
 function json(url: string, method: string, body?: unknown) {

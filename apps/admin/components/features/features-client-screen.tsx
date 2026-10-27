@@ -5,8 +5,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AppPageError, AppPageSkeleton, isBlockingAppQueryError, useAppQueryErrorToast } from "@/components/app-data-state";
 import { GithubInstallReview } from "@/components/features/github-install-review";
 import { GitHubAccountsList } from "@/components/features/github-accounts-list";
-import { AlertCircle, CheckCircle2, Github, Info, Loader2, RefreshCw, Users } from "lucide-react";
+import { AlertCircle, CheckCircle2, Github, Info, Loader2, RefreshCw, Square, Users } from "lucide-react";
 import { toast } from "sonner";
+import { describeConnectionSync, requestConnectionSyncStop, syncConnectionNow } from "@/lib/features/connection-sync-client";
 import { FeatureWorkExplorer } from "@/components/features/feature-work-explorer";
 import { FeatureSpendOverview } from "@/components/features/feature-spend-overview";
 import { ProjectToolConnectDialog } from "@/components/features/project-tool-connect-dialog";
@@ -32,6 +33,8 @@ export default function FeaturesClientScreen() {
   useAppQueryErrorToast(query.error);
   const invalidate = useInvalidateAppData();
   const [syncing, setSyncing] = useState(false);
+  const [connectionSyncing, setConnectionSyncing] = useState<string | null>(null);
+  const [stopping, setStopping] = useState(false);
   const operation = useRef(false);
   const connectionButton = useRef<HTMLButtonElement>(null);
   const connectedNotice = useRef(false);
@@ -133,6 +136,51 @@ export default function FeaturesClientScreen() {
     } finally {
       operation.current = false;
       setSyncing(false);
+      setStopping(false);
+    }
+  }
+
+  async function syncAccountNow(connection: GitHubConnectionView) {
+    if (operation.current) return;
+    const name = connection.githubOrg || "GitHub";
+    operation.current = true;
+    setConnectionSyncing(connection.id);
+    setNotice(null);
+    const toastId = toast.loading(`Syncing ${name}…`, { description: "Repositories not yet covered go first. Press Stop to end after the current repository." });
+    try {
+      const counts = await syncConnectionNow(connection.id);
+      await invalidate();
+      const outcome = describeConnectionSync(name, counts);
+      if (outcome.kind === "success") {
+        setNotice({ kind: "success", title: outcome.title, description: outcome.description });
+        toast.success(outcome.title, { id: toastId, description: outcome.description });
+      } else if (outcome.kind === "warning") {
+        setNotice({ kind: "warning", title: outcome.title, description: outcome.description });
+        toast.warning(outcome.title, { id: toastId, description: outcome.description });
+      } else {
+        toast.info(outcome.title, { id: toastId, description: outcome.description });
+      }
+    } catch (error) {
+      const description = error instanceof Error ? error.message : "Please try again.";
+      setNotice({ kind: "error", title: `Couldn’t sync ${name}`, description });
+      toast.error(`Couldn’t sync ${name}`, { id: toastId, description });
+    } finally {
+      operation.current = false;
+      setConnectionSyncing(null);
+      setStopping(false);
+    }
+  }
+
+  async function stopSync(connection?: GitHubConnectionView) {
+    if (stopping) return;
+    setStopping(true);
+    const ids = connection ? [connection.id] : accounts.map((row) => row.id);
+    try {
+      await requestConnectionSyncStop(ids);
+      toast.info("Stopping after the current repository…", { description: "Progress so far is kept; the rest continues on the next sync." });
+    } catch {
+      setStopping(false);
+      toast.error("Couldn’t request a stop. The sync keeps running.");
     }
   }
 
@@ -225,10 +273,16 @@ export default function FeaturesClientScreen() {
                   <SelectItem value="90">Last 90 days</SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="button" variant="outline" onClick={() => void syncNow()} disabled={syncing || disconnecting || !!mappingLogin}>
+              <Button type="button" variant="outline" onClick={() => void syncNow()} disabled={syncing || !!connectionSyncing || disconnecting || !!mappingLogin}>
                 <RefreshCw className={syncing ? "size-4 animate-spin motion-reduce:animate-none" : "size-4"} aria-hidden />
                 {syncing ? "Syncing…" : "Sync now"}
               </Button>
+              {syncing ? (
+                <Button type="button" variant="outline" aria-label="Stop the GitHub sync" onClick={() => void stopSync()} disabled={stopping}>
+                  {stopping ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Square className="size-4" aria-hidden />}
+                  {stopping ? "Stopping…" : "Stop"}
+                </Button>
+              ) : null}
             </div>
           }
         />
@@ -252,6 +306,11 @@ export default function FeaturesClientScreen() {
                 installHref={connectHref}
                 availableInstalls={githubInstalls?.installations ?? []}
                 onDisconnect={(connection) => { setDisconnectTarget(connection); setDisconnectError(null); setConnectionOpen(false); setDisconnectOpen(true); }}
+                onSync={(connection) => void syncAccountNow(connection)}
+                onStop={(connection) => void stopSync(connection)}
+                syncingId={connectionSyncing}
+                stopping={stopping}
+                syncDisabled={syncing || disconnecting}
               />
             </DialogContent>
           </Dialog>

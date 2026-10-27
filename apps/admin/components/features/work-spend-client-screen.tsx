@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Download, Info, Loader2, MoreHorizontal, RefreshCw } from "lucide-react";
+import { ArrowLeft, Download, Info, Loader2, MoreHorizontal, RefreshCw, Square } from "lucide-react";
+import { describeConnectionSync, requestConnectionSyncStop, syncConnectionNow } from "@/lib/features/connection-sync-client";
 import { IntegrationProviderLogoStack } from "@/components/features/integration-provider-logos";
 import { toast } from "sonner";
 import { AppPageError, AppPageSkeleton, isBlockingAppQueryError, useAppQueryErrorToast } from "@/components/app-data-state";
@@ -50,6 +51,8 @@ export default function WorkSpendClientScreen() {
   const callbackNotice = useRef(false);
   const connectionButton = useRef<HTMLButtonElement>(null);
   const [syncing, setSyncing] = useState(false);
+  const [connectionSyncing, setConnectionSyncing] = useState<string | null>(null);
+  const [stopping, setStopping] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [connectionOpen, setConnectionOpen] = useState(false);
   const [disconnectOpen, setDisconnectOpen] = useState(false);
@@ -149,7 +152,39 @@ export default function WorkSpendClientScreen() {
       const description = error instanceof Error ? error.message : "Please try again.";
       setNotice({ kind: "error", title: "Couldn’t sync GitHub", description });
       toast.error("Couldn’t sync GitHub", { id: toastId, description });
-    } finally { operation.current = false; setSyncing(false); }
+    } finally { operation.current = false; setSyncing(false); setStopping(false); }
+  }
+
+  async function syncAccountNow(connection: GitHubConnectionView) {
+    if (operation.current) return;
+    const name = connection.githubOrg || "GitHub";
+    operation.current = true; setConnectionSyncing(connection.id); setNotice(null);
+    const toastId = toast.loading(`Syncing ${name}…`, { description: "Repositories not yet covered go first. Press Stop to end after the current repository." });
+    try {
+      const counts = await syncConnectionNow(connection.id);
+      await invalidate();
+      const outcome = describeConnectionSync(name, counts);
+      if (outcome.kind === "success") { setNotice({ kind: "success", title: outcome.title, description: outcome.description }); toast.success(outcome.title, { id: toastId, description: outcome.description }); }
+      else if (outcome.kind === "warning") { setNotice({ kind: "warning", title: outcome.title, description: outcome.description }); toast.warning(outcome.title, { id: toastId, description: outcome.description }); }
+      else toast.info(outcome.title, { id: toastId, description: outcome.description });
+    } catch (error) {
+      const description = error instanceof Error ? error.message : "Please try again.";
+      setNotice({ kind: "error", title: `Couldn’t sync ${name}`, description });
+      toast.error(`Couldn’t sync ${name}`, { id: toastId, description });
+    } finally { operation.current = false; setConnectionSyncing(null); setStopping(false); }
+  }
+
+  async function stopSync(connection?: GitHubConnectionView) {
+    if (stopping) return;
+    setStopping(true);
+    const ids = connection ? [connection.id] : data.connections.map((row) => row.id);
+    try {
+      await requestConnectionSyncStop(ids);
+      toast.info("Stopping after the current repository…", { description: "Progress so far is kept; the rest continues on the next sync." });
+    } catch {
+      setStopping(false);
+      toast.error("Couldn’t request a stop. The sync keeps running.");
+    }
   }
 
   async function disconnectGithub() {
@@ -191,7 +226,8 @@ export default function WorkSpendClientScreen() {
   return <div className="min-w-0 pb-8">
       <PageHeader title="Work." description="Where AI spend landed: repositories, pull requests and issues." actions={<div className="flex flex-wrap items-center gap-2">
         <Select value={selectedDays} onValueChange={setDays}><SelectTrigger aria-label="Date range" className="h-9 w-28 sm:w-36"><SelectValue><span className="sm:hidden">{selectedDays} days</span><span className="hidden sm:inline">Last {selectedDays} days</span></SelectValue></SelectTrigger><SelectContent><SelectItem value="30">Last 30 days</SelectItem><SelectItem value="90">Last 90 days</SelectItem></SelectContent></Select>
-        <Button type="button" size="sm" variant="outline" onClick={() => void syncNow()} disabled={syncing || disconnecting || !!mappingLogin}><RefreshCw className={syncing ? "size-4 animate-spin" : "size-4"} aria-hidden />{syncing ? "Syncing…" : "Sync now"}</Button>
+        <Button type="button" size="sm" variant="outline" onClick={() => void syncNow()} disabled={syncing || !!connectionSyncing || disconnecting || !!mappingLogin}><RefreshCw className={syncing ? "size-4 animate-spin" : "size-4"} aria-hidden />{syncing ? "Syncing…" : "Sync now"}</Button>
+        {syncing ? <Button type="button" size="sm" variant="outline" aria-label="Stop the GitHub sync" onClick={() => void stopSync()} disabled={stopping}>{stopping ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Square className="size-4" aria-hidden />}{stopping ? "Stopping…" : "Stop"}</Button> : null}
         <Button ref={connectionButton} type="button" size="sm" variant="outline" className="rounded-none border-brand-olive-border bg-brand-olive/5 hover:bg-brand-olive/10" onClick={() => setConnectionOpen(true)}><IntegrationProviderLogoStack />Integrations{attentionCount ? <span aria-label={`${attentionCount} items need attention`} className="inline-flex min-w-5 items-center justify-center rounded-full bg-brand-yellow-pale px-1.5 text-xs text-foreground">{attentionCount}</span> : null}</Button>
         <DropdownMenu><DropdownMenuTrigger asChild><Button type="button" size="sm" variant="ghost" aria-label="More options"><MoreHorizontal className="size-4" aria-hidden /><span className="sm:hidden">More</span></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="min-w-48"><DropdownMenuItem asChild><a href={`/api/app/work-spend/export?days=${selectedDays}`}><Download className="size-4" aria-hidden />Export CSV</a></DropdownMenuItem><p className="px-2 py-1.5 text-xs text-muted-foreground">Synced {shortDate(data.connection.lastSyncedAt)}</p></DropdownMenuContent></DropdownMenu>
       </div>} />
@@ -205,6 +241,11 @@ export default function WorkSpendClientScreen() {
           installHref="/api/integrations/github/connect?returnTo=/work-spend"
           availableInstalls={githubInstalls?.installations ?? []}
           onDisconnect={(connection) => { setDisconnectTarget(connection); setDisconnectError(null); setConnectionOpen(false); setDisconnectOpen(true); }}
+          onSync={(connection) => void syncAccountNow(connection)}
+          onStop={(connection) => void stopSync(connection)}
+          syncingId={connectionSyncing}
+          stopping={stopping}
+          syncDisabled={syncing || disconnecting}
         />
         {repositoryErrors.length ? <ul className="space-y-2 text-xs">{repositoryErrors.map((repo) => <li key={repo.id}><strong>{repo.fullName}</strong><p className="mt-0.5 break-words text-muted-foreground">{repo.lastError || "Latest sync failed. Last successful data is still available."}</p></li>)}</ul> : null}
         <section className="space-y-2 border-t pt-4" aria-labelledby="projects-heading">

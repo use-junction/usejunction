@@ -6,6 +6,9 @@ import { logServerError } from "@/lib/errors/public";
 
 export const maxDuration = 300;
 
+/** An admin asked for this sync, so give it the whole request instead of the default per-run budget. */
+const MANUAL_SYNC_BUDGET_MS = 270_000;
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireOrgRole(req, rolesFor("settings_billing"));
   if (auth instanceof NextResponse) return auth;
@@ -13,7 +16,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const connection = await prisma.providerConnection.findFirst({ where: { id, orgId: auth.orgId }, select: { id: true } });
   if (!connection) return NextResponse.json({ error: "integration not found" }, { status: 404 });
   try {
-    const counts = await syncConnection(id);
+    const counts = await syncConnection(id, {
+      deadline: new Date(Date.now() + MANUAL_SYNC_BUDGET_MS),
+      forceAuthorWake: true,
+    });
     await audit({ orgId: auth.orgId, actorType: "user", actorId: auth.userId, action: "integration.synced", targetType: "provider_connection", targetId: id, metadata: counts });
     return NextResponse.json({ ok: true, counts });
   } catch (error) {

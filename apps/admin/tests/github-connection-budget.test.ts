@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { githubBudgetExhaustedMessage, githubCodeSyncBudgetMs } from "@/lib/features/github-code-sync";
+import { githubBudgetExhaustedMessage, githubCodeSyncBudgetMs, githubSyncStoppedMessage } from "@/lib/features/github-code-sync";
 import { githubConnectionView } from "@/lib/integrations/github-connections";
 
 const granted = { pull_requests: "read", contents: "read", metadata: "read" };
@@ -27,6 +27,14 @@ test("a run stopped at its time budget shows as partial with the progress note",
   assert.equal(view.lastError, note);
   assert.match(note, /40 of 120/);
   assert.match(note, /remaining 80/);
+  assert.match(note, /Sync now/);
+
+  const stoppedNote = githubSyncStoppedMessage(6, 15);
+  assert.match(stoppedNote, /stopped at your request after 6 of 15/);
+  assert.match(stoppedNote, /remaining 9/);
+  assert.equal(githubConnectionView(connection({
+    capabilities: [{ capability: "pull_requests", status: "partial", lastError: stoppedNote }],
+  })).state, "partial");
 });
 
 test("a completed personal sync is ready, and a never-finished one still reads as syncing", () => {
