@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { githubBudgetExhaustedMessage, githubCodeSyncBudgetMs, githubSyncStoppedMessage } from "@/lib/features/github-code-sync";
+import { githubBudgetExhaustedMessage, githubCodeSyncBudgetMs, githubCodeSyncConcurrency, githubSyncStoppedMessage } from "@/lib/features/github-code-sync";
 import { githubConnectionView } from "@/lib/integrations/github-connections";
 
 const granted = { pull_requests: "read", contents: "read", metadata: "read" };
@@ -44,6 +44,22 @@ test("a completed personal sync is ready, and a never-finished one still reads a
   assert.equal(ready.state, "ready");
   const pending = githubConnectionView(connection({ lastSyncedAt: null }));
   assert.equal(pending.state, "syncing");
+});
+
+test("repository concurrency defaults to three and is clamped to one through four", () => {
+  const previous = process.env.GITHUB_CODE_SYNC_CONCURRENCY;
+  delete process.env.GITHUB_CODE_SYNC_CONCURRENCY;
+  assert.equal(githubCodeSyncConcurrency(), 3);
+  process.env.GITHUB_CODE_SYNC_CONCURRENCY = "1";
+  assert.equal(githubCodeSyncConcurrency(), 1);
+  process.env.GITHUB_CODE_SYNC_CONCURRENCY = "9";
+  assert.equal(githubCodeSyncConcurrency(), 4);
+  process.env.GITHUB_CODE_SYNC_CONCURRENCY = "0";
+  assert.equal(githubCodeSyncConcurrency(), 3);
+  process.env.GITHUB_CODE_SYNC_CONCURRENCY = "nope";
+  assert.equal(githubCodeSyncConcurrency(), 3);
+  if (previous === undefined) delete process.env.GITHUB_CODE_SYNC_CONCURRENCY;
+  else process.env.GITHUB_CODE_SYNC_CONCURRENCY = previous;
 });
 
 test("code sync budget defaults to two minutes and honours the env override", () => {

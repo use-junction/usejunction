@@ -8,6 +8,7 @@ import {
   providerForTool,
 } from "@/lib/usage/classify";
 import { shouldPreserveProductivityRequests } from "@/lib/metrics/local-usage-inventory";
+import { chunkRows } from "@/lib/concurrency";
 
 export {
   inferCostKind,
@@ -278,11 +279,6 @@ export async function resolveRepositoryIdMap(
   return map;
 }
 
-function chunkRows<T>(rows: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < rows.length; i += size) out.push(rows.slice(i, i + size));
-  return out;
-}
 
 function metadataJson(value: Prisma.InputJsonValue): string {
   return JSON.stringify(value);

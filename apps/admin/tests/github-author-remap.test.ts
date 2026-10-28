@@ -3,15 +3,23 @@ import { beforeEach, expect, test, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   providerConnection: { findFirst: vi.fn(), findMany: vi.fn() },
   developer: { findMany: vi.fn() },
-  gitCommit: { groupBy: vi.fn(), updateMany: vi.fn(), findMany: vi.fn() },
-  gitPullRequest: { updateMany: vi.fn() },
-  externalIdentity: { findMany: vi.fn(), findFirst: vi.fn(), upsert: vi.fn() },
+  gitCommit: { groupBy: vi.fn(), findMany: vi.fn() },
+  externalIdentity: { findMany: vi.fn(), findFirst: vi.fn() },
   account: { findMany: vi.fn() },
   featureCostAllocation: { deleteMany: vi.fn(), createMany: vi.fn() },
   $transaction: vi.fn(),
+  restampGitAuthors: vi.fn(),
+  bulkUpsertGitHubIdentities: vi.fn(),
 }));
 
-vi.mock("@usejunction/db", () => ({ prisma: mocks }));
+vi.mock("@usejunction/db", async () => {
+  const actual = await vi.importActual<typeof import("@prisma/client")>("@prisma/client");
+  return { prisma: mocks, Prisma: actual.Prisma };
+});
+vi.mock("@/lib/features/github-code-writes", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/features/github-code-writes")>("@/lib/features/github-code-writes");
+  return { ...actual, restampGitAuthors: mocks.restampGitAuthors, bulkUpsertGitHubIdentities: mocks.bulkUpsertGitHubIdentities };
+});
 vi.mock("@/lib/analytics/query/read", () => ({
   readUsageMetrics: vi.fn(async () => ({ data: { rows: [] } })),
   dimension: () => null,
@@ -44,14 +52,15 @@ beforeEach(() => {
   mocks.gitCommit.findMany.mockResolvedValue([]);
   mocks.externalIdentity.findMany.mockResolvedValue([]);
   mocks.externalIdentity.findFirst.mockResolvedValue({ id: "identity-dinuda" });
-  mocks.externalIdentity.upsert.mockImplementation(async ({ create }: { create: { externalUserId: string; developerId: string | null } }) => create);
+  mocks.bulkUpsertGitHubIdentities.mockImplementation(async (rows: Array<{ login: string; email: string | null; developerId: string | null; matchedBy: string | null; metadata: unknown }>) =>
+    rows.map((row) => ({ id: `identity-${row.login}`, externalUserId: row.login, email: row.email, developerId: row.developerId, matchedBy: row.matchedBy, metadata: row.metadata })));
   mocks.account.findMany.mockResolvedValue([]);
   mocks.$transaction.mockImplementation(async (run: (tx: typeof mocks) => Promise<unknown>) => run(mocks));
 });
 
 function stampFor(login: string) {
-  const call = mocks.gitCommit.updateMany.mock.calls.find(([args]) => args.where.authorLogin === login);
-  return call?.[0].data.authorDeveloperId;
+  const entries = mocks.restampGitAuthors.mock.calls.flatMap(([, rows]: [string, Array<{ login: string; developerId: string | null }>]) => rows);
+  return entries.find((entry) => entry.login === login)?.developerId;
 }
 
 test("a device usage sync keeps authors who are in scope only on another GitHub connection", async () => {

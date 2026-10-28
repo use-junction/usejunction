@@ -56,6 +56,18 @@ import type { IntegrationConfig } from "@/lib/integrations/types";
 import { JUNCTION_EXTRACTION_SCHEMA_VERSION } from "@usejunction/usage-schema";
 import { wakeGitHubAuthorDaemons } from "@/lib/features/autosync";
 import { logServerError } from "@/lib/errors/public";
+import { mapWithConcurrency, serialize, type SerialGate } from "@/lib/concurrency";
+import { githubFullRefetchRequested, repoFetchCutoff } from "@/lib/features/github-sync-window";
+import {
+  bulkUpsertCommits,
+  bulkUpsertGitHubIdentities,
+  bulkUpsertPullRequests,
+  restampGitAuthors,
+  type CommitRow,
+  type IdentityCacheRow,
+  type IdentityRow,
+  type PullRequestRow,
+} from "@/lib/features/github-code-writes";
 
 function configOf(connection: ProviderConnection): IntegrationConfig {
   return (connection.config ?? {}) as IntegrationConfig;
@@ -88,6 +100,20 @@ export function githubCodeSyncBudgetMs() {
 
 /** Time kept back after the repository loop for author mapping and cost allocation. */
 const CODE_SYNC_RESERVE_MS = 20_000;
+
+/**
+ * Repositories fetched and written side by side. Each worker holds at most one
+ * pool connection at a time, so 3 leaves room in the 5-connection pool for the
+ * identity gate, the stop poll and whatever else the instance is serving.
+ */
+export function githubCodeSyncConcurrency() {
+  const raw = Number(process.env.GITHUB_CODE_SYNC_CONCURRENCY);
+  if (!Number.isFinite(raw) || raw < 1) return 3;
+  return Math.min(4, Math.floor(raw));
+}
+
+/** Developers whose usage is read side by side during allocation. */
+const ALLOCATION_READ_CONCURRENCY = 3;
 
 export function githubBudgetExhaustedMessage(synced: number, total: number) {
   const remaining = total - synced;
@@ -163,21 +189,33 @@ async function listInstallationRepositories(token: string) {
 
 type AuthorHint = { login: string | null; email: string | null; githubUserId: string | number | null };
 
-export async function resolveAuthors(
-  orgId: string,
-  connectionId: string,
-  hints: AuthorHint[],
-  scope: GitHubAuthorScope | GitHubAuthorScope[],
-) {
-  const scopes = Array.isArray(scope) ? scope : [scope];
-  const identities = await prisma.externalIdentity.findMany({
-    where: { orgId, provider: "github" },
-  });
-  const byLogin = new Map(identities.map((identity) => [identity.externalUserId.toLowerCase(), identity]));
-  const developers = await prisma.developer.findMany({
-    where: { orgId, removedAt: null },
-    select: { id: true, email: true, authUserId: true },
-  });
+/**
+ * Everything author resolution needs, loaded once per sync run and shared by every
+ * repository: the org's GitHub identities, its roster, and the lookups built from
+ * them. `gate` serialises writers so two repositories never race on one login.
+ */
+export type AuthorResolutionContext = {
+  orgId: string;
+  byLogin: Map<string, IdentityCacheRow>;
+  developers: Array<{ id: string; email: string; authUserId: string | null }>;
+  byEmail: Map<string, string>;
+  byUniqueLogin: Map<string, string>;
+  byGithubUserId: Map<string, string>;
+  gate: SerialGate;
+};
+
+export async function loadAuthorResolutionContext(orgId: string): Promise<AuthorResolutionContext> {
+  const [identities, developers] = await Promise.all([
+    prisma.externalIdentity.findMany({
+      where: { orgId, provider: "github" },
+      select: { id: true, externalUserId: true, email: true, developerId: true, matchedBy: true, metadata: true },
+    }),
+    prisma.developer.findMany({
+      where: { orgId, removedAt: null },
+      select: { id: true, email: true, authUserId: true },
+    }),
+  ]);
+  const byLogin = new Map<string, IdentityCacheRow>(identities.map((identity) => [identity.externalUserId.toLowerCase(), identity]));
   const byEmail = new Map(developers.map((developer) => [developer.email, developer.id]));
   const byUniqueLogin = uniqueDeveloperLoginMap(developers);
   const authUserIds = developers.map((developer) => developer.authUserId).filter((id): id is string => Boolean(id));
@@ -195,71 +233,84 @@ export async function resolveAuthors(
       if (developerId && account.providerAccountId) byGithubUserId.set(account.providerAccountId, developerId);
     }
   }
+  return { orgId, byLogin, developers, byEmail, byUniqueLogin, byGithubUserId, gate: serialize() };
+}
 
-  const resolved = new Map<string, string | null>();
-  const ordered = [...hints].sort((left, right) => {
-    const idRank = Number(Boolean(right.githubUserId)) - Number(Boolean(left.githubUserId));
-    if (idRank !== 0) return idRank;
-    return Number(Boolean(right.email)) - Number(Boolean(left.email));
-  });
+/**
+ * Match GitHub authors to workspace developers and persist the identities.
+ * Without `context` the lookups are loaded for this call alone; the sync passes a
+ * shared context so one run reads the identity table once and writes each
+ * repository's new or changed identities in a single statement.
+ */
+export async function resolveAuthors(
+  orgId: string,
+  connectionId: string,
+  hints: AuthorHint[],
+  scope: GitHubAuthorScope | GitHubAuthorScope[],
+  context?: AuthorResolutionContext,
+) {
+  const scopes = Array.isArray(scope) ? scope : [scope];
+  const ctx = context ?? await loadAuthorResolutionContext(orgId);
+  return ctx.gate(async () => {
+    const resolved = new Map<string, string | null>();
+    const pending: IdentityRow[] = [];
+    const ordered = [...hints].sort((left, right) => {
+      const idRank = Number(Boolean(right.githubUserId)) - Number(Boolean(left.githubUserId));
+      if (idRank !== 0) return idRank;
+      return Number(Boolean(right.email)) - Number(Boolean(left.email));
+    });
 
-  for (const hint of ordered) {
-    const login = hint.login?.toLowerCase() ?? parseNoreply(hint.email)?.login?.toLowerCase() ?? null;
-    if (!login || isBotLogin(login) || resolved.has(login)) continue;
-    const existing = byLogin.get(login);
-    const email = hint.email ? normalizeEmail(hint.email) : existing?.email ?? null;
-    const githubUserId = hint.githubUserId ?? githubUserIdFromMetadata(existing?.metadata);
-    const matched = matchDeveloperForGitHubAuthor({
-      login,
-      email,
-      githubUserId,
-      byGithubUserId,
-      byEmail,
-      byUniqueLogin,
-    });
-    const ranked = nextGitHubAuthorResolution({
-      existingMatchedBy: existing?.matchedBy,
-      existingDeveloperId: existing?.developerId,
-      inScope: isInAnyGitHubAuthorScope(login, scopes),
-      matched: matched.developerId
-        ? matched
-        : scopes.map((item) => soleDeveloperMatch(developers, item, login)).find((item) => item.developerId)
-          ?? { developerId: null, matchedBy: null },
-    });
-    if (!ranked.persist) {
-      resolved.set(login, ranked.developerId);
-      continue;
-    }
-    const developerId = ranked.developerId;
-    const matchedBy = ranked.matchedBy;
-    const corporateEmail = email && !email.endsWith("@users.noreply.github.com") ? email : null;
-    const metadata = mergeGithubIdentityMetadata(existing?.metadata, githubUserId);
-    const identity = await prisma.externalIdentity.upsert({
-      where: { orgId_provider_externalUserId: { orgId, provider: "github", externalUserId: login } },
-      update: {
-        connectionId,
-        email: corporateEmail ?? existing?.email ?? null,
-        developerId: developerId ?? undefined,
-        matchedBy,
-        metadata: json(metadata),
-        observedAt: new Date(),
-      },
-      create: {
+    for (const hint of ordered) {
+      const login = hint.login?.toLowerCase() ?? parseNoreply(hint.email)?.login?.toLowerCase() ?? null;
+      if (!login || isBotLogin(login) || resolved.has(login)) continue;
+      const existing = ctx.byLogin.get(login);
+      const email = hint.email ? normalizeEmail(hint.email) : existing?.email ?? null;
+      const githubUserId = hint.githubUserId ?? githubUserIdFromMetadata(existing?.metadata);
+      const matched = matchDeveloperForGitHubAuthor({
+        login,
+        email,
+        githubUserId,
+        byGithubUserId: ctx.byGithubUserId,
+        byEmail: ctx.byEmail,
+        byUniqueLogin: ctx.byUniqueLogin,
+      });
+      const ranked = nextGitHubAuthorResolution({
+        existingMatchedBy: existing?.matchedBy,
+        existingDeveloperId: existing?.developerId,
+        inScope: isInAnyGitHubAuthorScope(login, scopes),
+        matched: matched.developerId
+          ? matched
+          : scopes.map((item) => soleDeveloperMatch(ctx.developers, item, login)).find((item) => item.developerId)
+            ?? { developerId: null, matchedBy: null },
+      });
+      if (!ranked.persist) {
+        resolved.set(login, ranked.developerId);
+        continue;
+      }
+      const corporateEmail = email && !email.endsWith("@users.noreply.github.com") ? email : null;
+      pending.push({
         orgId,
         connectionId,
-        provider: "github",
-        externalUserId: login,
-        email: corporateEmail,
-        developerId,
-        source: "vendor_verified",
-        matchedBy,
-        metadata: json(metadata),
-      },
-    });
-    byLogin.set(login, identity);
-    resolved.set(login, identity.developerId);
-  }
-  return resolved;
+        login,
+        email: corporateEmail ?? existing?.email ?? null,
+        developerId: ranked.developerId,
+        matchedBy: ranked.matchedBy,
+        metadata: mergeGithubIdentityMetadata(existing?.metadata, githubUserId),
+      });
+      // An assigned developer is never cleared by a later match, so the stored
+      // value is the new one when present, else whatever was already there.
+      resolved.set(login, ranked.developerId ?? existing?.developerId ?? null);
+    }
+
+    if (pending.length > 0) {
+      for (const row of await bulkUpsertGitHubIdentities(pending)) {
+        const login = row.externalUserId.toLowerCase();
+        ctx.byLogin.set(login, row);
+        resolved.set(login, row.developerId);
+      }
+    }
+    return resolved;
+  });
 }
 
 type GraphqlPageInfo = { hasNextPage?: boolean; endCursor?: string | null };
@@ -404,104 +455,82 @@ async function persistRepoWork(input: {
   commits: MappedCommit[];
   authors: Map<string, string | null>;
 }) {
+  const developerFor = (login: string | null) => (login ? input.authors.get(login.toLowerCase()) ?? null : null);
+
+  const pullRequestRows: PullRequestRow[] = input.pullRequests.map((pr) => ({
+    orgId: input.orgId,
+    connectionId: input.connectionId,
+    repositoryId: input.repositoryId,
+    number: pr.number,
+    title: pr.title,
+    state: pr.state,
+    headRefName: pr.headRefName,
+    baseRefName: pr.baseRefName,
+    authorLogin: pr.authorLogin,
+    authorDeveloperId: developerFor(pr.authorLogin),
+    url: pr.url,
+    githubCreatedAt: pr.createdAt,
+    mergedAt: pr.mergedAt,
+    closedAt: pr.closedAt,
+    additions: pr.additions,
+    deletions: pr.deletions,
+    changedFiles: pr.changedFiles,
+    ticketKeys: pr.ticketKeys,
+    closingIssues: pr.closingIssues,
+  }));
   const prIds = new Map<number, string>();
-  for (const pr of input.pullRequests) {
-    const row = await prisma.gitPullRequest.upsert({
-      where: { repositoryId_number: { repositoryId: input.repositoryId, number: pr.number } },
-      update: {
-        title: pr.title,
-        state: pr.state,
-        headRefName: pr.headRefName,
-        baseRefName: pr.baseRefName,
-        authorLogin: pr.authorLogin,
-        authorDeveloperId: pr.authorLogin ? input.authors.get(pr.authorLogin.toLowerCase()) ?? null : null,
-        url: pr.url,
-        githubCreatedAt: pr.createdAt,
-        mergedAt: pr.mergedAt,
-        closedAt: pr.closedAt,
-        additions: pr.additions,
-        deletions: pr.deletions,
-        changedFiles: pr.changedFiles,
-        ticketKeys: pr.ticketKeys,
-        closingIssues: json(pr.closingIssues),
-        syncedAt: new Date(),
-      },
-      create: {
-        orgId: input.orgId,
-        connectionId: input.connectionId,
-        repositoryId: input.repositoryId,
-        number: pr.number,
-        title: pr.title,
-        state: pr.state,
-        headRefName: pr.headRefName,
-        baseRefName: pr.baseRefName,
-        authorLogin: pr.authorLogin,
-        authorDeveloperId: pr.authorLogin ? input.authors.get(pr.authorLogin.toLowerCase()) ?? null : null,
-        url: pr.url,
-        githubCreatedAt: pr.createdAt,
-        mergedAt: pr.mergedAt,
-        closedAt: pr.closedAt,
-        additions: pr.additions,
-        deletions: pr.deletions,
-        changedFiles: pr.changedFiles,
-        ticketKeys: pr.ticketKeys,
-        closingIssues: json(pr.closingIssues),
-      },
-    });
-    prIds.set(pr.number, row.id);
-  }
+  for (const row of await bulkUpsertPullRequests(pullRequestRows)) prIds.set(row.number, row.id);
 
   const bySha = new Map<string, MappedCommit>();
   for (const commit of input.commits) {
     bySha.set(commit.sha, mergeCommitRecords(bySha.get(commit.sha), commit));
   }
-  for (const commit of bySha.values()) {
-    if (commit.isBot) continue;
-    await prisma.gitCommit.upsert({
-      where: { repositoryId_sha: { repositoryId: input.repositoryId, sha: commit.sha } },
-      update: {
-        authoredAt: commit.authoredAt,
-        committedAt: commit.committedAt,
-        authorEmail: commit.authorEmail,
-        authorLogin: commit.authorLogin,
-        authorDeveloperId: commit.authorLogin ? input.authors.get(commit.authorLogin.toLowerCase()) ?? null : null,
-        messageHeadline: commit.messageHeadline,
-        additions: commit.additions,
-        deletions: commit.deletions,
-        pullRequestId: commit.pullRequestNumber ? prIds.get(commit.pullRequestNumber) ?? null : null,
-        isDirectPush: commit.isDirectPush,
-        isBot: commit.isBot,
-        ticketKeys: commit.ticketKeys,
-      },
-      create: {
-        orgId: input.orgId,
-        repositoryId: input.repositoryId,
-        sha: commit.sha,
-        authoredAt: commit.authoredAt,
-        committedAt: commit.committedAt,
-        authorEmail: commit.authorEmail,
-        authorLogin: commit.authorLogin,
-        authorDeveloperId: commit.authorLogin ? input.authors.get(commit.authorLogin.toLowerCase()) ?? null : null,
-        messageHeadline: commit.messageHeadline,
-        additions: commit.additions,
-        deletions: commit.deletions,
-        pullRequestId: commit.pullRequestNumber ? prIds.get(commit.pullRequestNumber) ?? null : null,
-        isDirectPush: commit.isDirectPush,
-        isBot: commit.isBot,
-        ticketKeys: commit.ticketKeys,
-      },
+  const commits = [...bySha.values()].filter((commit) => !commit.isBot);
+
+  // Branch history can reference pull requests this run did not fetch (unchanged
+  // since the last incremental cutoff); look their ids up so the link is kept.
+  const unknownNumbers = [...new Set(
+    commits.map((commit) => commit.pullRequestNumber).filter((number): number is number => Boolean(number) && !prIds.has(number!)),
+  )];
+  if (unknownNumbers.length > 0) {
+    const known = await prisma.gitPullRequest.findMany({
+      where: { repositoryId: input.repositoryId, number: { in: unknownNumbers } },
+      select: { id: true, number: true },
     });
+    for (const row of known) prIds.set(row.number, row.id);
   }
+
+  const commitRows: CommitRow[] = commits.map((commit) => ({
+    orgId: input.orgId,
+    repositoryId: input.repositoryId,
+    sha: commit.sha,
+    authoredAt: commit.authoredAt,
+    committedAt: commit.committedAt,
+    authorEmail: commit.authorEmail,
+    authorLogin: commit.authorLogin,
+    authorDeveloperId: developerFor(commit.authorLogin),
+    messageHeadline: commit.messageHeadline,
+    additions: commit.additions,
+    deletions: commit.deletions,
+    pullRequestId: commit.pullRequestNumber ? prIds.get(commit.pullRequestNumber) ?? null : null,
+    isDirectPush: commit.isDirectPush,
+    isBot: commit.isBot,
+    ticketKeys: commit.ticketKeys,
+  }));
+  await bulkUpsertCommits(commitRows);
 }
 
 export async function runFeatureCostAllocation(
   orgId: string,
   window: { from: Date; to: Date },
   developerIds?: string[],
+  options: { context?: AuthorResolutionContext } = {},
 ) {
   const developers = developerIds?.length
     ? developerIds
-    : (await prisma.developer.findMany({ where: { orgId, removedAt: null }, select: { id: true } })).map((row) => row.id);
+    : options.context
+      ? options.context.developers.map((row) => row.id)
+      : (await prisma.developer.findMany({ where: { orgId, removedAt: null }, select: { id: true } })).map((row) => row.id);
   if (developers.length === 0) return { rows: 0 };
   const from = window.from;
   const to = window.to;
@@ -532,8 +561,9 @@ export async function runFeatureCostAllocation(
     commitCandidatesByDev.set(commit.authorDeveloperId, list);
   }
 
-  const rows: AllocationRow[] = [];
-  for (const developerId of developers) {
+  // Usage reads are independent per developer; rows keep developer order so the insert is deterministic.
+  const perDeveloper = await mapWithConcurrency(developers, ALLOCATION_READ_CONCURRENCY, async (developerId) => {
+    const rows: AllocationRow[] = [];
     const envelope = await readUsageMetrics({
       orgId,
       developerId,
@@ -565,7 +595,9 @@ export async function runFeatureCostAllocation(
         }),
       );
     }
-  }
+    return rows;
+  });
+  const rows = perDeveloper.flat();
 
   await prisma.$transaction(async (tx) => {
     await tx.featureCostAllocation.deleteMany({
@@ -681,68 +713,59 @@ export async function removeGitHubConnectionWork(
   }
 }
 
+/** Stamp one login's developer onto its commits and pull requests. */
 export async function restampGitAuthor(orgId: string, login: string, developerId: string | null) {
-  const normalized = login.toLowerCase();
-  await prisma.gitPullRequest.updateMany({
-    where: { orgId, authorLogin: normalized },
-    data: { authorDeveloperId: developerId },
-  });
-  await prisma.gitCommit.updateMany({
-    where: { orgId, authorLogin: normalized },
-    data: { authorDeveloperId: developerId },
-  });
+  await restampGitAuthors(orgId, [{ login, developerId }]);
 }
 
 export async function runCommitUsageMapping(
   orgId: string,
   window: { from: Date; to: Date },
-  options: { connectionId?: string; developerIds?: string[]; scope?: GitHubAuthorScope } = {},
+  options: {
+    connectionId?: string;
+    developerIds?: string[];
+    scope?: GitHubAuthorScope;
+    /** Shared per-run lookups from the sync; with `scope` it skips reloading the roster and identities. */
+    context?: AuthorResolutionContext;
+  } = {},
 ) {
   // Restamping is workspace-wide, so an author is judged against every connected
   // account: one only in scope on a personal install must survive an org install's run.
   const connections = await prisma.providerConnection.findMany({
     where: { orgId, provider: "github", status: { not: "disconnected" } },
     orderBy: { createdAt: "asc" },
+    select: { id: true, config: true },
   });
   const connection = connections.find((row) => row.id === options.connectionId) ?? connections[0];
-  if (connection) {
-    const developers = await prisma.developer.findMany({
-      where: { orgId, removedAt: null },
-      select: { email: true },
+  if (!connection) return runFeatureCostAllocation(orgId, window, options.developerIds, { context: options.context });
+  const context = options.context ?? await loadAuthorResolutionContext(orgId);
+  // The sync hands over the scope it already built for its own connection.
+  const scopes = connections.map((row) => {
+    if (row.id === connection.id && options.scope) return options.scope;
+    const config = (row.config ?? {}) as IntegrationConfig;
+    return githubAuthorScopeFromConnection({
+      accountType: normalizeGitHubAccountType(config.accountType) ?? "Organization",
+      memberLogins: githubMemberLoginsFromConfig(row.config),
+      developers: context.developers,
     });
-    const scopes = connections.map((row) => {
-      if (row.id === connection.id && options.scope) return options.scope;
-      const config = configOf(row);
-      return githubAuthorScopeFromConnection({
-        accountType: normalizeGitHubAccountType(config.accountType) ?? "Organization",
-        memberLogins: githubMemberLoginsFromConfig(row.config),
-        developers,
-      });
-    });
-    const [authorLogins, identities] = await Promise.all([
-      prisma.gitCommit.groupBy({
-        by: ["authorLogin"],
-        where: { orgId, isBot: false, authorLogin: { not: null } },
-      }),
-      prisma.externalIdentity.findMany({
-        where: { orgId, provider: "github" },
-        select: { externalUserId: true, email: true, metadata: true },
-      }),
-    ]);
-    const hints: AuthorHint[] = [
-      ...authorLogins.map((row) => ({ login: row.authorLogin, email: null, githubUserId: null })),
-      ...identities.map((identity) => ({
-        login: identity.externalUserId,
-        email: identity.email,
-        githubUserId: githubUserIdFromMetadata(identity.metadata),
-      })),
-    ];
-    const resolved = await resolveAuthors(orgId, connection.id, hints, scopes);
-    for (const [login, developerId] of resolved) {
-      await restampGitAuthor(orgId, login, developerId);
-    }
-  }
-  return runFeatureCostAllocation(orgId, window, options.developerIds);
+  });
+  const authorLogins = await prisma.gitCommit.groupBy({
+    by: ["authorLogin"],
+    where: { orgId, isBot: false, authorLogin: { not: null } },
+  });
+  const hints: AuthorHint[] = [
+    ...authorLogins.map((row) => ({ login: row.authorLogin, email: null, githubUserId: null })),
+    ...[...context.byLogin.values()].map((identity) => ({
+      login: identity.externalUserId,
+      email: identity.email,
+      githubUserId: githubUserIdFromMetadata(identity.metadata),
+    })),
+  ];
+  const resolved = await resolveAuthors(orgId, connection.id, hints, scopes, context);
+  // A full pass, as before: every resolved login is stamped (nulls included) so
+  // identities changed outside this run stay consistent; unchanged rows are skipped in SQL.
+  await restampGitAuthors(orgId, [...resolved].map(([login, developerId]) => ({ login, developerId })));
+  return runFeatureCostAllocation(orgId, window, options.developerIds, { context });
 }
 
 export async function remapGitHubAuthorAfterUsageSync(orgId: string, developerId: string) {
@@ -826,10 +849,9 @@ async function syncGitHubCodeInner(
   const token = await githubInstallationToken(installationId);
   const accountLogin = String(installation.account?.login ?? config.org ?? connection.externalOrgId ?? "");
   const accountType = normalizeGitHubAccountType(installation.account?.type ?? config.accountType) ?? "Organization";
-  const developers = await prisma.developer.findMany({
-    where: { orgId: connection.orgId, removedAt: null },
-    select: { email: true },
-  });
+  // One read of the identity table and roster for the whole run; repositories share it.
+  const authorContext = await loadAuthorResolutionContext(connection.orgId);
+  const developers = authorContext.developers.map(({ email }) => ({ email }));
 
   let memberLogins: string[] | null = null;
   if (accountType === "Organization") {
@@ -922,31 +944,43 @@ async function syncGitHubCodeInner(
   // Resume where the last run stopped: never-synced repositories first, then the stalest.
   const grants = await prisma.gitHubRepositoryAccess.findMany({
     where: { connectionId: connection.id },
-    select: { repositoryId: true, lastSuccessAt: true },
+    select: { repositoryId: true, lastSuccessAt: true, syncStatus: true },
   });
-  const lastSuccessByRepo = new Map(grants.map((row) => [row.repositoryId, row.lastSuccessAt?.getTime() ?? 0]));
+  const grantByRepo = new Map(grants.map((row) => [row.repositoryId, row]));
   const ordered = selection.selected
     .map((repo) => ({ repo, repositoryId: repoIds.get(`${repo.owner?.login ?? ""}/${repo.name}`.toLowerCase()) ?? null }))
     .filter((entry): entry is { repo: typeof entry.repo; repositoryId: string } => Boolean(entry.repositoryId))
-    .sort((left, right) => (lastSuccessByRepo.get(left.repositoryId) ?? 0) - (lastSuccessByRepo.get(right.repositoryId) ?? 0));
+    .sort((left, right) =>
+      (grantByRepo.get(left.repositoryId)?.lastSuccessAt?.getTime() ?? 0) - (grantByRepo.get(right.repositoryId)?.lastSuccessAt?.getTime() ?? 0),
+    );
   let pullRequestCount = 0;
   let commitCount = 0;
   let syncedRepositories = 0;
   let deferredRepositories = 0;
   let stopped = false;
   const repoErrors: string[] = [];
+  const fullRefetch = githubFullRefetchRequested();
 
-  for (const { repo, repositoryId } of ordered) {
+  // Workers pick repositories in order; the budget and stop checks run under one
+  // gate so a stop request is consumed exactly once and every later pick defers.
+  const startGate = serialize();
+  async function mayStart(): Promise<boolean> {
+    return startGate(async () => {
+      if (stopped || Date.now() >= stopStartingReposAt) return false;
+      if (options.stopRequested && await options.stopRequested()) {
+        stopped = true;
+        return false;
+      }
+      return true;
+    });
+  }
+
+  await mapWithConcurrency(ordered, githubCodeSyncConcurrency(), async ({ repo, repositoryId }) => {
     const owner = repo.owner?.login;
-    if (!owner || !repo.name) continue;
-    if (stopped || Date.now() >= stopStartingReposAt) {
+    if (!owner || !repo.name) return;
+    if (!(await mayStart())) {
       deferredRepositories += 1;
-      continue;
-    }
-    if (options.stopRequested && await options.stopRequested()) {
-      stopped = true;
-      deferredRepositories += 1;
-      continue;
+      return;
     }
     const attemptedAt = new Date();
     await prisma.gitHubRepositoryAccess.update({
@@ -954,15 +988,25 @@ async function syncGitHubCodeInner(
       data: { syncStatus: "syncing", lastAttemptAt: attemptedAt, lastError: null },
     });
     try {
-      const pullRequests = await fetchPullRequests(token, owner, repo.name, cutoff);
-      let history = await fetchDefaultBranchCommits(token, owner, repo.name, cutoff);
-      if (history.length === 0) history = await fetchRestCommits(token, owner, repo.name, cutoff);
+      const grant = grantByRepo.get(repositoryId);
+      const { cutoff: fetchCutoff } = repoFetchCutoff({
+        windowCutoff: cutoff,
+        lastSuccessAt: grant?.lastSuccessAt ?? null,
+        syncStatus: grant?.syncStatus ?? null,
+        fullRefetch,
+        now: attemptedAt,
+      });
+      const [pullRequests, branchHistory] = await Promise.all([
+        fetchPullRequests(token, owner, repo.name, fetchCutoff),
+        fetchDefaultBranchCommits(token, owner, repo.name, fetchCutoff),
+      ]);
+      const history = branchHistory.length > 0 ? branchHistory : await fetchRestCommits(token, owner, repo.name, fetchCutoff);
       const commits = [...pullRequests.flatMap((pr) => pr.commits), ...history];
       const hints: AuthorHint[] = [
         ...pullRequests.map((pr) => ({ login: pr.authorLogin, email: null, githubUserId: pr.authorGithubUserId })),
         ...commits.map((commit) => ({ login: commit.authorLogin, email: commit.authorEmail, githubUserId: commit.authorGithubUserId })),
       ];
-      const authors = await resolveAuthors(connection.orgId, connection.id, hints, authorScope);
+      const authors = await resolveAuthors(connection.orgId, connection.id, hints, authorScope, authorContext);
       await persistRepoWork({
         orgId: connection.orgId,
         connectionId: connection.id,
@@ -974,18 +1018,20 @@ async function syncGitHubCodeInner(
       pullRequestCount += pullRequests.length;
       commitCount += commits.length;
       syncedRepositories += 1;
+      // Record when the fetch started, not when it finished: the next incremental
+      // run overlaps from here, so nothing pushed during this run is missed.
       await prisma.gitHubRepositoryAccess.update({
         where: { connectionId_repositoryId: { connectionId: connection.id, repositoryId } },
-        data: { syncStatus: "available", lastSuccessAt: new Date(), lastError: null },
+        data: { syncStatus: "available", lastSuccessAt: attemptedAt, lastError: null },
       });
     } catch (error) {
       if (isGitHubEmptyRepositoryError(error)) {
         syncedRepositories += 1;
         await prisma.gitHubRepositoryAccess.update({
           where: { connectionId_repositoryId: { connectionId: connection.id, repositoryId } },
-          data: { syncStatus: "available", lastSuccessAt: new Date(), lastError: null },
+          data: { syncStatus: "available", lastSuccessAt: attemptedAt, lastError: null },
         });
-        continue;
+        return;
       }
       const message = error instanceof Error ? error.message.slice(0, 300) : "repo sync failed";
       repoErrors.push(`${owner}/${repo.name}: ${message}`);
@@ -994,7 +1040,7 @@ async function syncGitHubCodeInner(
         data: { syncStatus: "error", lastError: message },
       });
     }
-  }
+  });
 
   if (repos.length === 0) {
     await recordPullRequestsCapability(connection, {
@@ -1022,6 +1068,7 @@ async function syncGitHubCodeInner(
   await runCommitUsageMapping(connection.orgId, featureCostWindow(new Date(), FEATURE_COST_WINDOW_DAYS), {
     connectionId: connection.id,
     scope: authorScope,
+    context: authorContext,
   });
   return {
     skipped: false,

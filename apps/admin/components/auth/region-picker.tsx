@@ -13,7 +13,16 @@ const LABELS: Record<DeploymentRegion, string> = {
   eu: "EU",
 };
 
+// Temporarily hidden until the EU deployment is live; everyone signs up on US.
+// Set to true to show the picker again.
+export const REGION_PICKER_ENABLED = false;
+
 export function RegionPicker() {
+  if (!REGION_PICKER_ENABLED) return null;
+  return <RegionPickerFieldset />;
+}
+
+function RegionPickerFieldset() {
   const current = useMemo(() => deploymentRegion(), []);
   const [selected, setSelected] = useState<DeploymentRegion>(current);
 
