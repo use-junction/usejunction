@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => {
   const fn = () => vi.fn();
   return {
     prisma: {
-      providerConnection: { update: fn(), findFirst: fn() },
+      providerConnection: { update: fn(), findFirst: fn(), findMany: fn() },
       providerConnectionCapability: { upsert: fn(), findUnique: fn(), update: fn() },
       gitHubRepositoryAccess: { updateMany: fn(), findMany: fn(), update: fn() },
       externalIdentity: { findMany: fn() },
@@ -153,6 +153,7 @@ function arrange(options: { gates?: Map<string, { promise: Promise<void> }>; gra
   });
   mocks.prisma.gitHubRepositoryAccess.updateMany.mockResolvedValue({ count: 0 });
   mocks.prisma.providerConnection.update.mockResolvedValue({});
+  mocks.prisma.providerConnection.findMany.mockResolvedValue([connection]);
   mocks.prisma.providerConnectionCapability.findUnique.mockResolvedValue(null);
   mocks.prisma.providerConnectionCapability.upsert.mockResolvedValue({});
   mocks.prisma.externalIdentity.findMany.mockResolvedValue([]);

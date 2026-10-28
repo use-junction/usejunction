@@ -136,7 +136,8 @@ export async function loadWorkSpendPage(principal: AppPrincipal, search: { days?
     if (row.costKind === "verified_usage") verified += amount;
     if (row.costKind === "estimated_api") estimated += amount;
     if (row.method === "unattributed") unattributed += amount;
-    if (!row.repositoryId) continue;
+    // Repository spend is a share of spend on work, so usage no commit claimed stays out of it.
+    if (!row.repositoryId || row.method === "unattributed") continue;
     const current = costs.get(row.repositoryId) ?? { verified: ZERO, estimated: ZERO };
     if (row.costKind === "verified_usage") current.verified += amount;
     if (row.costKind === "estimated_api") current.estimated += amount;
