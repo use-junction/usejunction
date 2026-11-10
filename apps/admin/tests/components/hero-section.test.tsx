@@ -33,7 +33,7 @@ test("hero leads with per-person seat usage, a free sign-up and the price", () =
 
   const cta = screen.getByRole("link", { name: "Start free" });
   expect(cta.getAttribute("href")).toBe(`/signup?from=${encodeURIComponent("/onboarding?mode=solo")}`);
-  expect(screen.getByText("Free for 5 seats. Then $1 per active developer a month. No card.")).toBeTruthy();
+  expect(screen.getByText("Free for 5 seats, then $1 per active developer a month. No card.")).toBeTruthy();
 });
 
 test("hero video plays muted and loops without controls", () => {

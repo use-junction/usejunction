@@ -68,7 +68,7 @@ export function HeroSection() {
   return (
     <section className="hero-atmosphere relative overflow-x-clip bg-white">
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-0">
-        <div className="grid w-full grid-cols-1 items-center gap-10 pb-20 pt-24 md:gap-12 md:pt-28 lg:min-h-[74svh] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16 lg:pb-28 lg:pt-28">
+        <div className="grid w-full grid-cols-1 items-center gap-10 pb-20 pt-24 md:gap-12 md:pt-28 lg:min-h-[74svh] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-14 lg:pb-28 lg:pt-28">
           <motion.div
             className="relative isolate flex min-w-0 flex-col items-start text-left"
             variants={reduceMotion ? undefined : container}
@@ -81,20 +81,18 @@ export function HeroSection() {
 
             <motion.h1
               variants={item}
-              className="mt-4 text-[2rem] font-bold leading-[1.05] tracking-[-0.03em] text-[var(--public-fg)] sm:text-5xl lg:text-[2.85rem] xl:text-[3.1rem]"
+              className="mt-4 text-[2.25rem] font-bold leading-[1.04] tracking-[-0.035em] text-[var(--public-fg)] [text-wrap:balance] sm:text-5xl lg:text-[3.15rem] xl:text-[3.45rem]"
             >
-              See who actually uses{" "}
-              <span className="block font-semibold text-[#08a8c4] [text-wrap:balance]">
-                the AI coding seats you pay for.
-              </span>
+              See who{" "}
+              <mark className="home-highlight whitespace-nowrap">actually uses</mark> the AI coding seats you pay for.
             </motion.h1>
 
             <motion.p
               variants={item}
-              className="mt-5 max-w-lg text-base leading-relaxed text-[#6b6d66] sm:text-lg sm:leading-8"
+              className="mt-6 max-w-xl text-base leading-relaxed text-[#3a3b37] sm:text-lg sm:leading-8"
             >
-              Per-person usage and plan limits across Claude, Cursor, Codex and Copilot. Find idle seats and
-              wrong plans before you renew.
+              Claude, Cursor, Codex and Copilot each show only their own seats. UseJunction puts every person and
+              every seat on one page, so you can cancel the idle ones and fix the wrong plans before renewal.
             </motion.p>
 
             <motion.div variants={item} className="mt-8 flex w-full flex-col items-start">

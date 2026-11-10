@@ -491,12 +491,35 @@ a {
   --sidebar-ring: #08758a;
 }
 
-/* Homepage product tabs: the bar under the selected tab fills, then the next tab opens. */
-@keyframes home-tab-progress {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
+/* Homepage: marker highlight behind a phrase in the hero headline. */
+.home-highlight {
+  padding: 0 0.07em;
+  margin: 0 -0.07em;
+  color: inherit;
+  background: linear-gradient(transparent 60%, var(--brand-yellow) 60%, var(--brand-yellow) 93%, transparent 93%);
+}
+
+/* Homepage: a hand-placed note on a product screenshot. */
+.home-note {
+  position: absolute;
+  z-index: 2;
+  padding: 9px 13px;
+  background: var(--brand-yellow);
+  border: 2px solid var(--public-fg);
+  box-shadow: 3px 3px 0 var(--public-fg);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--public-fg);
+}
+
+.home-note svg {
+  position: absolute;
+  overflow: visible;
+  fill: none;
+  stroke: var(--public-fg);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }

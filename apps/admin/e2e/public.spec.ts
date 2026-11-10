@@ -52,11 +52,17 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
     }),
   ).toBeVisible();
 
+  // The strip names the paid tools; every supported tool is listed next to the FAQ.
   const toolStrip = page.getByRole("region", { name: "Supported AI coding tools" });
   await expect(toolStrip).toBeVisible();
   await expect(toolStrip.getByRole("img")).toHaveCount(0);
+  for (const tool of ["Claude Code", "Cursor", "Codex", "GitHub Copilot"]) {
+    await expect(toolStrip.getByText(tool, { exact: true })).toBeVisible();
+  }
+  await expect(toolStrip.getByRole("link", { name: `and ${SUPPORTED_TOOLS.length - 4} more` })).toHaveAttribute("href", "#tools");
+  const allTools = page.getByRole("list", { name: "Supported tools" });
   for (const tool of SUPPORTED_TOOLS) {
-    await expect(toolStrip.getByText(tool.name, { exact: true }).first()).toBeVisible();
+    await expect(allTools.getByText(tool.name, { exact: true })).toBeVisible();
   }
 
   // A new visitor can sign up from the header, not only sign in.
@@ -68,7 +74,7 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
   await expect(heroCta).toBeVisible();
   await expect(heroCta).toHaveAttribute("href", /^\/signup\?from=/);
   await expect(
-    page.getByText("Free for 5 seats. Then $1 per active developer a month. No card.").first(),
+    page.getByText("Free for 5 seats, then $1 per active developer a month. No card.").first(),
   ).toBeVisible();
 
   const video = page.getByLabel(/UseJunction product video/i);
@@ -76,68 +82,59 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
   await expect(video).toHaveAttribute("poster", "/video/hero-poster.jpg");
   await expect(video).toHaveJSProperty("muted", true);
 
-  const closing = page.getByRole("region", { name: /Find the seats you’re paying for and not using/i });
+  const closing = page.getByRole("region", { name: /Connect your own laptop first/i });
   await expect(closing.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);
 });
 
-test("homepage product story walks through the three renewal checks", async ({ page }) => {
+test("homepage shows the example team's real screens with notes", async ({ page }) => {
   await page.goto("/");
 
-  const tabs = page.getByRole("tablist", { name: "Product workflows" });
-  const seeTab = tabs.getByRole("tab", { name: /Which seats are idle\?/ });
-  const understandTab = tabs.getByRole("tab", { name: /Who is on the wrong plan\?/ });
-  const actTab = tabs.getByRole("tab", { name: /What needs a look this week\?/ });
+  const weeks = page.getByRole("region", { name: "You’ve probably had one of these weeks." });
+  await expect(weeks.getByRole("img", { name: /Priya is at 97% of her weekly limit/ })).toBeVisible();
+  await expect(weeks.getByText("On Standard, at 97% of her week")).toBeVisible();
+  await expect(weeks.getByText("6% all week. A quiet seat.")).toBeVisible();
 
-  await expect(seeTab).toHaveAttribute("aria-selected", "true");
-  const panel = page.getByRole("tabpanel");
-  await expect(panel.getByRole("heading", { name: "Seats this cycle" })).toBeVisible();
-  await expect(panel.getByText("7 idle seats, $177 a month")).toBeVisible();
-  await expect(panel.getByText("Example data.")).toBeVisible();
-  // The old screenshots showed a real person's name and email; the panels must not.
-  await expect(page.locator("#product img[src*='/elements/']")).toHaveCount(0);
-  await seeTab.focus();
-  await seeTab.press("ArrowRight");
-  await expect(understandTab).toHaveAttribute("aria-selected", "true");
+  const paidTwice = page.getByRole("region", { name: "Paid twice." });
+  await expect(paidTwice.getByRole("img", { name: /9 are paid twice/ })).toBeVisible();
 
-  await expect(panel.getByRole("heading", { name: "Claude Team, weekly limit used" })).toBeVisible();
-  await expect(panel.getByText("Move to Standard")).toHaveCount(3);
-
-  await understandTab.press("End");
-  await expect(actTab).toHaveAttribute("aria-selected", "true");
-  await expect(panel.getByRole("heading", { name: "Needs a look" })).toBeVisible();
-  await expect(panel.getByText("Personal API key")).toBeVisible();
+  const answers = page.getByRole("region", { name: "It also answers these." });
+  for (const term of ["Quiet seats", "Outside company plans", "Active machines", "Usage at API prices"]) {
+    await expect(answers.getByRole("term").filter({ hasText: term })).toBeVisible();
+  }
+  await expect(answers.getByRole("img")).toHaveCount(4);
 });
 
-test("homepage shows the Claude comparison, the rollout steps and a mid-page sign-up", async ({ page }) => {
+test("homepage compares Claude's admin, explains pricing, and shows the rollout and what is collected", async ({ page }) => {
   await page.goto("/");
 
-  const gap = page.getByRole("region", { name: /Every vendor shows its own slice/ });
-  await expect(gap.getByRole("row", { name: /5-hour and weekly limit usage/ })).toContainText("Yes, over time");
-  await expect(gap.getByRole("link", { name: /how to check your team’s usage in Claude/ })).toHaveAttribute(
+  const compare = page.getByRole("region", { name: "What Claude’s own admin shows per person." });
+  const limits = compare.getByRole("row", { name: /Weekly and 5-hour limit use/ });
+  await expect(limits.getByRole("cell")).toHaveText([/No/, /No/, /Yes/]);
+  await expect(compare.getByRole("link", { name: /how to check your team’s usage in Claude/i })).toHaveAttribute(
     "href",
     "/blog/check-claude-team-usage",
   );
 
-  await expect(page.getByRole("region", { name: /Three people who need it/ }).getByRole("article")).toHaveCount(3);
+  const pricing = page.locator("#pricing");
+  await expect(pricing.getByRole("heading", { name: /\$1 per active developer a month\. Your first 5 seats are free\./ })).toBeVisible();
+  await expect(pricing.getByText("UseJunction for 30 developers")).toBeVisible();
+  await expect(pricing.getByText("Hosted by us")).toBeVisible();
+  await expect(pricing.getByText("Self-hosted")).toBeVisible();
+  await expect(pricing.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);
 
-  const start = page.getByRole("region", { name: /Start with one laptop/ });
-  for (const step of ["Connect.", "Look.", "Invite.", "Act."]) {
-    await expect(start.getByRole("heading", { name: new RegExp(`^${step}`) })).toBeVisible();
+  const start = page.getByRole("region", { name: /Try it on your own laptop/ });
+  for (const step of ["Connect your laptop", "Look at your own usage", "Invite the team", "Change seats before renewal"]) {
+    await expect(start.getByRole("heading", { name: step })).toBeVisible();
   }
   await expect(start.getByText("--token")).toHaveCount(0);
-  await expect(start.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);
-});
 
-test("homepage shows current pricing", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByRole("heading", { name: /\$1 per active developer\. Free for your first 5 seats\./i })).toBeVisible();
-  await expect(page.getByText("Free", { exact: true })).toBeVisible();
-  await expect(page.getByText("$1", { exact: true })).toBeVisible();
-  await expect(page.getByText("Custom", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Community" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Managed", exact: true })).toBeVisible();
-  await expect(page.locator("#pricing").getByRole("link", { name: "Start free" })).toHaveCount(2);
-  await expect(page.getByRole("button", { name: "Talk to us" })).toBeVisible();
+  const privacy = page.getByRole("region", { name: "Your developers will ask what it collects." });
+  await expect(privacy.getByRole("list", { name: "Collected", exact: true }).getByRole("listitem")).toHaveCount(5);
+  await expect(privacy.getByRole("list", { name: "Never collected" })).toContainText("Keystrokes or screenshots");
+
+  const faq = page.getByRole("region", { name: "Before you install." });
+  await expect(faq.getByText("Do developers have to change how they work?")).toBeVisible();
+  await expect(faq.getByText("More questions")).toBeVisible();
 });
 
 test("login form rejects bad credentials and links to recovery", async ({ page }) => {
