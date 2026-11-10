@@ -1,5 +1,4 @@
 import { USER_LIMIT_FREE } from "@/lib/saas-billing/entitlements";
-import { getSiteUrl } from "@/lib/public/site-url";
 
 const steps = [
   {
@@ -17,9 +16,6 @@ const steps = [
 ] as const;
 
 export function HomeHowItStarts() {
-  const base = getSiteUrl();
-  const command = `curl -fsSL ${base}/install.sh | sh -s -- --token <your-token> --url ${base}`;
-
   return (
     <section aria-labelledby="home-start-heading" className="bg-white pt-28 sm:pt-32 lg:pt-44">
       <div className="mx-auto grid w-full max-w-6xl gap-14 px-4 sm:px-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-28 lg:px-0 xl:grid-cols-[26rem_minmax(0,1fr)]">
@@ -34,14 +30,6 @@ export function HomeHowItStarts() {
             You don’t need the whole team on day one. Connect your own machine, look at your own numbers, then
             decide.
           </p>
-          <figure className="mt-10 border border-border bg-[var(--public-bg)]">
-            <figcaption className="border-b border-border px-4 py-2 text-xs text-muted-foreground">
-              After sign-up you get a command like this, with your token in it
-            </figcaption>
-            <pre className="overflow-x-auto px-4 py-4 font-mono text-xs leading-6 whitespace-pre-wrap break-all text-foreground">
-              <code>{command}</code>
-            </pre>
-          </figure>
         </div>
 
         <ol className="flex min-w-0 flex-col">
