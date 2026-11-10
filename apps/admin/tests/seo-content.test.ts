@@ -35,8 +35,9 @@ test("seo registry includes priority guides and compare pages", () => {
 });
 
 test("homepage keeps brand messaging while CodexBar for Windows stays in SEO surfaces", () => {
-  assert.equal(siteConfig.seoTitle, "UseJunction — AI Coding Spend Management for Teams");
-  assert.match(siteConfig.description, /AI coding spend management for engineering teams/i);
+  assert.equal(siteConfig.seoTitle, "UseJunction — Team Usage Analytics for Claude, Cursor & Codex");
+  assert.match(siteConfig.description, /Monitor your team's AI coding tools/i);
+  assert.match(siteConfig.description, /not Junction Panel/i);
   assert.doesNotMatch(siteConfig.description, /CodexBar for Windows/);
 
   const keywords = siteConfig.homeSeoKeywords;

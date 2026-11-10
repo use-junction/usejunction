@@ -1,23 +1,22 @@
+import { Check, X } from "lucide-react";
+import { HomeHowItStarts } from "@/components/public/home-how-it-starts";
 import { HomeProductStory } from "@/components/public/home-product-story";
-import { HomeTeamProfiles } from "@/components/public/home-team-profiles";
+import { siteConfig } from "@/lib/public/config";
 
-const privacySteps = [
-  {
-    label: "AI coding tools",
-    detail: "Cursor, Claude Code, Codex, Copilot, and local runtimes",
-  },
-  {
-    label: "Local agent",
-    detail: "Detects tools and reports usage signals you choose to enable",
-  },
-  {
-    label: "You control the detail",
-    detail: "Each login has its own usage switch",
-  },
-  {
-    label: "Your infrastructure",
-    detail: "Run the control plane on infrastructure you trust",
-  },
+/** Mirrors "What UseJunction measures" / "What it does not measure" in llms.txt. */
+const collected = [
+  "Which tools and models are used",
+  "Tokens and estimated cost, by person, tool and model",
+  "Plan cycle and seat usage",
+  "Whether a personal or a company API key was used",
+  "Device and agent health",
+] as const;
+
+const neverCollected = [
+  "Keystrokes or screenshots",
+  "Browser activity",
+  "Network traffic",
+  "Hours spent in the editor",
 ] as const;
 
 export function HomeWorldClass() {
@@ -25,43 +24,59 @@ export function HomeWorldClass() {
     <>
       <HomeProductStory />
 
-      <HomeTeamProfiles />
+      <HomeHowItStarts />
 
-      <section className=" bg-white py-20 sm:py-24 lg:py-32">
-        <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-10 xl:px-12">
-          <div className="mx-auto flex max-w-6xl flex-col gap-12 lg:flex-row lg:items-start lg:justify-center lg:gap-24 xl:gap-28">
-            <div className="w-full max-w-md shrink-0">
-              <h2 className="text-3xl font-semibold leading-[1.1] tracking-[-0.03em] sm:text-4xl lg:text-[2.5rem]">
-                Observe the stack without{" "}
-                <span className="text-[#e09a5a]">watching developers</span>.
-              </h2>
-              <p className="mt-4 text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-                Privacy first. Observability second. No keystroke surveillance, browser capture, or
-                network interception. Usage collection can be turned off per login.
-              </p>
-              <p className="mt-8 text-xs leading-5 text-muted-foreground/80">
-                Open source you can audit. Data stays on infrastructure your team controls.
-              </p>
+      <section aria-labelledby="home-privacy-heading" className="bg-white py-16 sm:py-20 lg:py-24">
+        <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-24 lg:px-0 xl:grid-cols-[26rem_minmax(0,1fr)]">
+          <div className="min-w-0">
+            <h2
+              id="home-privacy-heading"
+              className="text-3xl font-semibold leading-[1.1] tracking-[-0.03em] sm:text-4xl lg:text-[2.5rem]"
+            >
+              Observe the stack without watching developers.
+            </h2>
+            <p className="mt-4 text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+              The agent reads usage from the tools themselves. It doesn’t sit between a developer and their work.
+            </p>
+            <a
+              href={siteConfig.githubUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 inline-block border-b border-current pb-px text-sm font-semibold transition-colors hover:text-primary"
+            >
+              Read the code on GitHub
+            </a>
+          </div>
+
+          <div className="min-w-0">
+            <div className="grid gap-10 sm:grid-cols-2 sm:gap-12">
+              <div>
+                <h3 className="border-b border-foreground pb-3 text-base font-semibold sm:text-lg">Collected</h3>
+                <ul>
+                  {collected.map((entry) => (
+                    <li key={entry} className="flex gap-3 border-b border-border py-3 text-sm leading-6 sm:text-base">
+                      <Check className="mt-1 size-4 shrink-0 text-primary" strokeWidth={2.25} aria-hidden />
+                      {entry}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="border-b border-foreground pb-3 text-base font-semibold sm:text-lg">Never collected</h3>
+                <ul>
+                  {neverCollected.map((entry) => (
+                    <li key={entry} className="flex gap-3 border-b border-border py-3 text-sm leading-6 sm:text-base">
+                      <X className="mt-1 size-4 shrink-0 text-muted-foreground" strokeWidth={2.25} aria-hidden />
+                      {entry}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
-
-            <ol className="flex w-full max-w-md flex-col lg:w-[22rem] lg:shrink-0 xl:w-[26rem]">
-              {privacySteps.map((step, index) => (
-                <li
-                  key={step.label}
-                  className="relative border-b border-border py-5 first:pt-0 last:border-b-0 last:pb-0"
-                >
-                  <div className="flex items-start gap-5">
-                    <span className="min-w-[2.5ch] text-4xl font-semibold tabular-nums tracking-tight text-muted-foreground/35 sm:text-5xl">
-                      0{index + 1}
-                    </span>
-                    <div>
-                      <p className="text-lg font-semibold sm:text-xl">{step.label}</p>
-                      <p className="mt-2 text-sm leading-6 text-muted-foreground">{step.detail}</p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
+            <p className="mt-6 text-sm leading-6 text-[#5c5e56]">
+              <span className="font-semibold text-foreground">Optional:</span> work-session detail, such as asks and
+              change summaries. Each login has its own switch for it.
+            </p>
           </div>
         </div>
       </section>

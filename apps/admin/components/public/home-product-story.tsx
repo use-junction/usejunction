@@ -10,22 +10,22 @@ const AUTO_ADVANCE_MS = 5000;
 const workflows = [
   {
     id: "seats",
-    label: "See it",
-    title: "Identify unused AI-tool seats before renewal.",
+    label: "Which seats are idle?",
+    title: "Every seat you pay for, next to whether anyone used it this cycle.",
     image: "/elements/see-it.png",
     alt: "Seat coverage — team seats with idle seats flagged",
   },
   {
     id: "spend",
-    label: "Understand it",
-    title: "Catch developer overspend and forecast whether a plan will run out.",
+    label: "Who is on the wrong plan?",
+    title: "Each person's plan use and pace, so you can see who needs more and who needs less.",
     image: "/elements/understand-it.png",
     alt: "Spend and plan pace — developer spend watch and plan runway",
   },
   {
     id: "signals",
-    label: "Act on it",
-    title: "Investigate a spike, personal key, stale device, or configuration problem.",
+    label: "What needs a look this week?",
+    title: "Spend spikes, personal API keys, and machines that stopped reporting, each with a name on it.",
     image: "/elements/control-it.png",
     alt: "Action queue — signals with owners and next steps",
   },
@@ -100,10 +100,9 @@ export function HomeProductStory() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.5, ease: EASE }}
-          className="mx-auto max-w-3xl text-center text-3xl font-semibold leading-[1.1] tracking-[-0.03em] sm:text-4xl lg:text-[2.5rem]"
+          className="mx-auto max-w-6xl text-3xl font-semibold leading-[1.1] tracking-[-0.03em] [text-wrap:balance] sm:text-4xl lg:text-[2.5rem]"
         >
-          See every AI coding tool your team uses before you try to{" "}
-          <span className="rounded-md px-1.5 text-[#e09a5a]">control it</span>
+          Three things to check before you renew.
         </motion.h2>
 
         <div className="mx-auto mt-12 flex max-w-6xl flex-col items-center gap-10 lg:mt-16 lg:flex-row lg:items-center lg:justify-center lg:gap-24 xl:gap-28">

@@ -12,8 +12,8 @@ export const siteConfig = {
   promise:
     "See AI coding tool usage, plan utilization, and team insights—before you try to control it.",
   description:
-    "UseJunction is AI coding spend management for engineering teams. Track Cursor, Claude Code, Codex, and Copilot usage, cost, plan utilization, seat waste, and device health. Self-hosted at usejunction.dev — not Junction Panel.",
-  seoTitle: "UseJunction — AI Coding Spend Management for Teams",
+    "Monitor your team's AI coding tools. See each developer's usage, plan limits, and seat type across Claude, Cursor, Codex, and Copilot. Free for 5 seats, self-hosted or managed at usejunction.dev — not Junction Panel.",
+  seoTitle: "UseJunction — Team Usage Analytics for Claude, Cursor & Codex",
   /** Homepage meta keywords only — not shown in visible hero copy. */
   homeSeoKeywords: [
     "CodexBar for teams",
@@ -169,7 +169,7 @@ export const PRICING_PLANS = [
     description: "",
     price: "Free",
     period: `up to ${USER_LIMIT_FREE} seats`,
-    cta: { label: "Get Started", href: siteConfig.signupUrl },
+    cta: { label: "Start free", href: `${siteConfig.signupUrl}?from=${encodeURIComponent("/onboarding?mode=solo")}` },
     featured: false,
     features: [
       "Community License self-host",
@@ -186,7 +186,7 @@ export const PRICING_PLANS = [
     description: "Hosted by us",
     price: `$${TEAM_PRICE_PER_DEV_USD}`,
     period: "per active developer / month",
-    cta: { label: "Get Started", href: siteConfig.signupUrl },
+    cta: { label: "Start free", href: `${siteConfig.signupUrl}?from=${encodeURIComponent("/onboarding?mode=solo")}` },
     featured: true,
     badge: "Popular",
     features: [

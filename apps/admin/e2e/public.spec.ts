@@ -42,12 +42,12 @@ test("unknown routes redirect unauthenticated visitors to sign in", async ({ pag
 
 test("landing page shows brand and primary CTA", async ({ page }) => {
   await page.goto("/");
-  await expect(page).toHaveTitle("UseJunction — AI Coding Spend Management for Teams");
+  await expect(page).toHaveTitle("UseJunction — Team Usage Analytics for Claude, Cursor & Codex");
   await expect(page.locator("title")).toHaveCount(1);
   await expect(page.getByRole("link", { name: "UseJunction home" }).first()).toBeVisible();
   await expect(
     page.getByRole("heading", {
-      name: /Cut wasted AI coding spend before renewal\./i,
+      name: /See who actually uses the AI coding seats you pay for\./i,
       level: 1,
     }),
   ).toBeVisible();
@@ -59,17 +59,34 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
     await expect(toolStrip.getByText(tool.name, { exact: true }).first()).toBeVisible();
   }
 
-  await expect(page.getByRole("link", { name: /Analyze my usage/i }).first()).toBeVisible();
-  await expect(page.getByText(/Start with one developer/i)).toBeVisible();
+  // A new visitor can sign up from the header, not only sign in.
+  const header = page.getByRole("banner");
+  await expect(header.getByRole("link", { name: "Start free" }).first()).toHaveAttribute("href", /^\/signup/);
+  await expect(header.getByRole("link", { name: "Sign in" }).first()).toHaveAttribute("href", "/login");
+
+  const heroCta = page.getByRole("main").getByRole("link", { name: "Start free" }).first();
+  await expect(heroCta).toBeVisible();
+  await expect(heroCta).toHaveAttribute("href", /^\/signup\?from=/);
+  await expect(
+    page.getByText("Free for 5 seats. Then $1 per active developer a month. No card.").first(),
+  ).toBeVisible();
+
+  const video = page.getByLabel(/UseJunction product video/i);
+  await expect(video).toBeVisible();
+  await expect(video).toHaveAttribute("poster", "/video/hero-poster.jpg");
+  await expect(video).toHaveJSProperty("muted", true);
+
+  const closing = page.getByRole("region", { name: /Find the seats you’re paying for and not using/i });
+  await expect(closing.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);
 });
 
-test("homepage product story exposes spend pace and plan runway", async ({ page }) => {
+test("homepage product story walks through the three renewal checks", async ({ page }) => {
   await page.goto("/");
 
   const tabs = page.getByRole("tablist", { name: "Product workflows" });
-  const seeTab = tabs.getByRole("tab", { name: "See it" });
-  const understandTab = tabs.getByRole("tab", { name: "Understand it" });
-  const actTab = tabs.getByRole("tab", { name: "Act on it" });
+  const seeTab = tabs.getByRole("tab", { name: /Which seats are idle\?/ });
+  const understandTab = tabs.getByRole("tab", { name: /Who is on the wrong plan\?/ });
+  const actTab = tabs.getByRole("tab", { name: /What needs a look this week\?/ });
 
   await expect(seeTab).toHaveAttribute("aria-selected", "true");
   await seeTab.focus();
@@ -90,13 +107,13 @@ test("homepage product story exposes spend pace and plan runway", async ({ page 
 
 test("homepage shows current pricing", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /AI spend is data/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /\$1 per active developer\. Free for your first 5 seats\./i })).toBeVisible();
   await expect(page.getByText("Free", { exact: true })).toBeVisible();
   await expect(page.getByText("$1", { exact: true })).toBeVisible();
   await expect(page.getByText("Custom", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Community" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Managed", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Get Started" }).first()).toBeVisible();
+  await expect(page.locator("#pricing").getByRole("link", { name: "Start free" })).toHaveCount(2);
   await expect(page.getByRole("button", { name: "Talk to us" })).toBeVisible();
 });
 
