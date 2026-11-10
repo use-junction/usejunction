@@ -1,7 +1,10 @@
 "use client";
 
+import { useReducedMotion } from "framer-motion";
+import { Check, Eye } from "lucide-react";
 import Image from "next/image";
 import { useRef, useState } from "react";
+import { HOME_H2, HOME_SECTION, Muted, ResultNote } from "@/components/public/home-bits";
 import { cn } from "@/lib/utils";
 
 /** Example data only. Kept in one place so the panels stay consistent with each other. */
@@ -39,7 +42,7 @@ const workflows = [
   {
     id: "signals",
     label: "What needs a look this week?",
-    title: "Spend spikes, personal API keys, and machines that stopped reporting, each with a name on it.",
+    title: "Spend spikes, personal API keys, and machines that stopped reporting.",
   },
 ] as const;
 
@@ -93,17 +96,11 @@ function PanelFrame({
 }
 
 function SeatsPanel() {
-  const idle = SEAT_ROWS.reduce((sum, row) => sum + (row.seats - row.inUse), 0);
   return (
     <PanelFrame
       title="Seats this cycle"
       meta={`${SEAT_ROWS.reduce((s, r) => s + r.seats, 0)} seats, ${SEAT_ROWS.reduce((s, r) => s + r.inUse, 0)} in use`}
-      foot={
-        <>
-          <span className="font-semibold text-foreground">{idle} idle seats cost $177 a month.</span> Both plans renew in
-          the next 23 days.
-        </>
-      }
+      foot="Example data."
     >
       {SEAT_ROWS.map((row) => (
         <li
@@ -147,12 +144,7 @@ function LimitsPanel() {
     <PanelFrame
       title="Claude Team, weekly limit used"
       meta="12 seats"
-      foot={
-        <>
-          <span className="font-semibold text-foreground">Three Premium seats barely use their limit.</span> One Standard
-          seat may need more.
-        </>
-      }
+      foot="Example data."
     >
       {LIMIT_ROWS.map((row) => (
         <li
@@ -181,7 +173,7 @@ function LookPanel() {
     <PanelFrame
       title="Needs a look"
       meta={`${LOOK_ROWS.length} this week`}
-      foot="Each one names a person or a machine, so someone can follow it up."
+      foot="Example data."
     >
       {LOOK_ROWS.map((row) => (
         <li
@@ -201,16 +193,31 @@ function LookPanel() {
   );
 }
 
-const PANELS: Record<WorkflowId, () => React.ReactNode> = {
-  seats: SeatsPanel,
-  spend: LimitsPanel,
-  signals: LookPanel,
+const PANELS: Record<WorkflowId, { Panel: () => React.ReactNode; note: { icon: React.ReactNode; title: string; detail: string } }> = {
+  seats: {
+    Panel: SeatsPanel,
+    note: { icon: <Check />, title: "7 idle seats, $177 a month", detail: "Both plans renew in the next 23 days" },
+  },
+  spend: {
+    Panel: LimitsPanel,
+    note: { icon: <Check />, title: "3 Premium seats barely used", detail: "1 Standard seat is close to its limit" },
+  },
+  signals: {
+    Panel: LookPanel,
+    note: { icon: <Eye />, title: "3 things this week", detail: "Each one has a name on it" },
+  },
 };
+
+/** How long each tab stays up before the next one, unless the reader is hovering or focused inside. */
+const ADVANCE_MS = 7000;
 
 export function HomeProductStory() {
   const [activeId, setActiveId] = useState<WorkflowId>("seats");
+  const [paused, setPaused] = useState(false);
+  const reduceMotion = useReducedMotion() === true;
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const Panel = PANELS[activeId];
+  const activeIndex = workflows.findIndex((workflow) => workflow.id === activeId);
+  const { Panel, note } = PANELS[activeId];
 
   function selectAndFocus(index: number) {
     const nextIndex = (index + workflows.length) % workflows.length;
@@ -234,47 +241,63 @@ export function HomeProductStory() {
   }
 
   return (
-    <section id="product" aria-labelledby="home-product-heading" className="scroll-mt-20 bg-white pt-28 sm:pt-32 lg:pt-44">
+    <section id="product" aria-labelledby="home-product-heading" className={cn("scroll-mt-20", HOME_SECTION)}>
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-0">
-        <h2
-          id="home-product-heading"
-          className="max-w-xl text-3xl font-semibold leading-[1.1] tracking-[-0.03em] [text-wrap:balance] sm:text-4xl lg:text-[2.5rem]"
+        <div
+          className="grid gap-10 border border-border bg-[var(--public-bg)] px-4 py-8 sm:p-10 lg:grid-cols-[19rem_minmax(0,1fr)] lg:gap-16 lg:p-16"
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+          onFocusCapture={() => setPaused(true)}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPaused(false);
+          }}
         >
-          Three things to check before you renew.
-        </h2>
-
-        <div className="mt-14 grid gap-12 lg:mt-20 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-24 xl:grid-cols-[24rem_minmax(0,1fr)]">
-          <div role="tablist" aria-label="Product workflows" aria-orientation="vertical" className="border-t border-border">
-            {workflows.map((workflow, index) => {
-              const selected = workflow.id === activeId;
-              return (
-                <button
-                  key={workflow.id}
-                  ref={(element) => {
-                    tabRefs.current[index] = element;
-                  }}
-                  id={`home-product-tab-${workflow.id}`}
-                  type="button"
-                  role="tab"
-                  aria-selected={selected}
-                  aria-controls="home-product-panel"
-                  tabIndex={selected ? 0 : -1}
-                  onClick={() => setActiveId(workflow.id)}
-                  onKeyDown={(event) => onTabKeyDown(event, index)}
-                  className={cn(
-                    "block w-full border-b py-7 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    selected ? "border-foreground text-foreground" : "border-border text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  <span className={cn("block text-lg tracking-[-0.01em] sm:text-[1.1875rem]", selected ? "font-semibold" : "font-medium")}>
-                    {workflow.label}
-                  </span>
-                  {selected ? (
-                    <span className="mt-3 block max-w-sm text-sm leading-6 text-muted-foreground">{workflow.title}</span>
-                  ) : null}
-                </button>
-              );
-            })}
+          <div className="flex flex-col justify-between gap-10 lg:gap-14">
+            <h2 id="home-product-heading" className={cn(HOME_H2, "lg:text-[2.15rem]")}>
+              Three things to check <Muted>before you renew.</Muted>
+            </h2>
+            <div role="tablist" aria-label="Product workflows" aria-orientation="vertical" className="grid gap-1">
+              {workflows.map((workflow, index) => {
+                const selected = workflow.id === activeId;
+                return (
+                  <button
+                    key={workflow.id}
+                    ref={(element) => {
+                      tabRefs.current[index] = element;
+                    }}
+                    id={`home-product-tab-${workflow.id}`}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    aria-controls="home-product-panel"
+                    tabIndex={selected ? 0 : -1}
+                    onClick={() => setActiveId(workflow.id)}
+                    onKeyDown={(event) => onTabKeyDown(event, index)}
+                    className={cn(
+                      "relative block w-full border p-4 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-5",
+                      selected ? "border-border bg-white text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <span className={cn("block text-base tracking-[-0.01em] sm:text-[1.0625rem]", selected ? "font-semibold" : "font-medium")}>
+                      {workflow.label}
+                    </span>
+                    {selected ? (
+                      <span className="mt-2 block text-sm leading-6 text-muted-foreground">{workflow.title}</span>
+                    ) : null}
+                    {selected && !reduceMotion ? (
+                      <span
+                        key={`${workflow.id}-${activeIndex}`}
+                        aria-hidden
+                        data-testid="home-product-progress"
+                        className="absolute -bottom-px -left-px h-0.5 w-[calc(100%+2px)] origin-left bg-primary animate-[home-tab-progress_linear_both]"
+                        style={{ animationDuration: `${ADVANCE_MS}ms`, animationPlayState: paused ? "paused" : "running" }}
+                        onAnimationEnd={() => setActiveId(workflows[(index + 1) % workflows.length].id)}
+                      />
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div
@@ -282,10 +305,12 @@ export function HomeProductStory() {
             role="tabpanel"
             aria-labelledby={`home-product-tab-${activeId}`}
             tabIndex={0}
-            className="min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="relative min-w-0 self-center pb-8 pr-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:pr-6"
           >
-            <Panel />
-            <p className="mt-4 text-xs text-muted-foreground">Example data.</p>
+            <div className="shadow-[0_30px_60px_-44px_rgba(17,18,16,0.4)]">
+              <Panel />
+            </div>
+            <ResultNote icon={note.icon} title={note.title} detail={note.detail} className="bottom-0 right-2 sm:right-0" />
           </div>
         </div>
       </div>

@@ -490,3 +490,13 @@ a {
   --sidebar-border: #404732;
   --sidebar-ring: #08758a;
 }
+
+/* Homepage product tabs: the bar under the selected tab fills, then the next tab opens. */
+@keyframes home-tab-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}

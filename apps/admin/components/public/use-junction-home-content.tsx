@@ -6,6 +6,7 @@ import { HomeWorldClass } from "@/components/public/home-world-class";
 import { ToolLogosStrip } from "@/components/public/tool-logos-strip";
 import { CalendlyTalkButton } from "@/components/public/calendly-talk-button";
 import { SiteFooter } from "@/components/public/site-footer";
+import { Muted } from "@/components/public/home-bits";
 import { PRICING_PLANS } from "@/lib/public/config";
 import { HOME_PRICE_LINE, HOME_SIGNUP_HREF, HOME_SIGNUP_LABEL } from "@/lib/public/home-cta";
 import { TEAM_PRICE_PER_DEV_USD, USER_LIMIT_FREE } from "@/lib/saas-billing/entitlements";
@@ -32,7 +33,7 @@ export function UseJunctionHomeContent() {
         <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-10 xl:px-12">
           <div className="mx-auto max-w-6xl">
             <h2 className="max-w-2xl text-3xl font-semibold leading-[1.1] tracking-[-0.03em] [text-wrap:balance] sm:text-4xl lg:text-[2.5rem]">
-              ${TEAM_PRICE_PER_DEV_USD} per active developer. Free for your first {USER_LIMIT_FREE} seats.
+              ${TEAM_PRICE_PER_DEV_USD} per active developer. <Muted>Free for your first {USER_LIMIT_FREE} seats.</Muted>
             </h2>
             <p className="mt-6 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
               One idle Cursor seat costs as much as UseJunction for 30 developers.
@@ -129,7 +130,7 @@ export function UseJunctionHomeContent() {
           <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-28 xl:grid-cols-[26rem_minmax(0,1fr)]">
             <div>
               <h2 className="text-3xl font-semibold leading-[1.1] tracking-[-0.03em] sm:text-4xl lg:text-[2.5rem]">
-                Clear answers before you start.
+                Clear answers <Muted block>before you start.</Muted>
               </h2>
             </div>
             <div className="border-t border-border">

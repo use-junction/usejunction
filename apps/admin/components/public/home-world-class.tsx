@@ -1,6 +1,9 @@
 import { Check, X } from "lucide-react";
 import { HomeHowItStarts } from "@/components/public/home-how-it-starts";
+import { Muted } from "@/components/public/home-bits";
 import { HomeProductStory } from "@/components/public/home-product-story";
+import { HomeFounderNote, HomeReaders } from "@/components/public/home-readers";
+import { HomeVendorGap } from "@/components/public/home-vendor-gap";
 import { siteConfig } from "@/lib/public/config";
 
 /** Mirrors "What UseJunction measures" / "What it does not measure" in llms.txt. */
@@ -24,6 +27,12 @@ export function HomeWorldClass() {
     <>
       <HomeProductStory />
 
+      <HomeVendorGap />
+
+      <HomeReaders />
+
+      <HomeFounderNote />
+
       <HomeHowItStarts />
 
       <section aria-labelledby="home-privacy-heading" className="bg-white pt-28 sm:pt-32 lg:pt-44">
@@ -33,7 +42,7 @@ export function HomeWorldClass() {
               id="home-privacy-heading"
               className="text-3xl font-semibold leading-[1.1] tracking-[-0.03em] sm:text-4xl lg:text-[2.5rem]"
             >
-              Observe the stack without watching developers.
+              Observe the stack <Muted block>without watching developers.</Muted>
             </h2>
             <p className="mt-6 text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
               The agent reads usage from the tools themselves. It doesn’t sit between a developer and their work.

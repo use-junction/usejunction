@@ -91,7 +91,7 @@ test("homepage product story walks through the three renewal checks", async ({ p
   await expect(seeTab).toHaveAttribute("aria-selected", "true");
   const panel = page.getByRole("tabpanel");
   await expect(panel.getByRole("heading", { name: "Seats this cycle" })).toBeVisible();
-  await expect(panel.getByText("7 idle seats cost $177 a month.")).toBeVisible();
+  await expect(panel.getByText("7 idle seats, $177 a month")).toBeVisible();
   await expect(panel.getByText("Example data.")).toBeVisible();
   // The old screenshots showed a real person's name and email; the panels must not.
   await expect(page.locator("#product img[src*='/elements/']")).toHaveCount(0);
@@ -106,6 +106,26 @@ test("homepage product story walks through the three renewal checks", async ({ p
   await expect(actTab).toHaveAttribute("aria-selected", "true");
   await expect(panel.getByRole("heading", { name: "Needs a look" })).toBeVisible();
   await expect(panel.getByText("Personal API key")).toBeVisible();
+});
+
+test("homepage shows the Claude comparison, the rollout steps and a mid-page sign-up", async ({ page }) => {
+  await page.goto("/");
+
+  const gap = page.getByRole("region", { name: /Every vendor shows its own slice/ });
+  await expect(gap.getByRole("row", { name: /5-hour and weekly limit usage/ })).toContainText("Yes, over time");
+  await expect(gap.getByRole("link", { name: /how to check your team’s usage in Claude/ })).toHaveAttribute(
+    "href",
+    "/blog/check-claude-team-usage",
+  );
+
+  await expect(page.getByRole("region", { name: /Three people who need it/ }).getByRole("article")).toHaveCount(3);
+
+  const start = page.getByRole("region", { name: /Start with one laptop/ });
+  for (const step of ["Connect.", "Look.", "Invite.", "Act."]) {
+    await expect(start.getByRole("heading", { name: new RegExp(`^${step}`) })).toBeVisible();
+  }
+  await expect(start.getByText("--token")).toHaveCount(0);
+  await expect(start.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);
 });
 
 test("homepage shows current pricing", async ({ page }) => {
