@@ -8,6 +8,8 @@ interface GithubStarBadgeProps {
   /** Optional override for the repo path (owner/repo). If omitted it is parsed from href. */
   repo?: string;
   className?: string;
+  /** Show the star count next to the icon. Off while the count is too small to help. */
+  showCount?: boolean;
 }
 
 function formatCount(value: number): string {
@@ -31,13 +33,13 @@ function parseRepo(href: string): string | null {
   return null;
 }
 
-export function GithubStarBadge({ href, repo, className }: GithubStarBadgeProps) {
+export function GithubStarBadge({ href, repo, className, showCount = true }: GithubStarBadgeProps) {
   const [stars, setStars] = useState<number | null>(null);
 
   const repoPath = repo ?? parseRepo(href);
 
   useEffect(() => {
-    if (!repoPath) return;
+    if (!repoPath || !showCount) return;
     let cancelled = false;
 
     const cacheKey = `uj:github:stars:${repoPath}`;
@@ -68,7 +70,7 @@ export function GithubStarBadge({ href, repo, className }: GithubStarBadgeProps)
     return () => {
       cancelled = true;
     };
-  }, [repoPath]);
+  }, [repoPath, showCount]);
 
   return (
     <a
@@ -81,11 +83,15 @@ export function GithubStarBadge({ href, repo, className }: GithubStarBadgeProps)
       <span className="public-github-star-badge__icon">
         <Github className="h-4 w-4" />
       </span>
-      <span className="public-github-star-badge__divider" aria-hidden="true" />
-      <span className="public-github-star-badge__count">
-        <Star className="h-3.5 w-3.5" aria-hidden="true" />
-        <span>{stars === null ? "—" : formatCount(stars)}</span>
-      </span>
+      {showCount ? (
+        <>
+          <span className="public-github-star-badge__divider" aria-hidden="true" />
+          <span className="public-github-star-badge__count">
+            <Star className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>{stars === null ? "—" : formatCount(stars)}</span>
+          </span>
+        </>
+      ) : null}
     </a>
   );
 }

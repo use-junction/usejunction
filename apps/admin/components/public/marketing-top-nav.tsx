@@ -8,6 +8,7 @@ import { Menu, X } from "lucide-react";
 import usejunctionLogo from "@/public/usejunction.png";
 import { navAnchors, navLinks, siteConfig } from "@/lib/public/config";
 import { GithubStarBadge } from "@/components/public/github-star-badge";
+import { HOME_SIGNUP_HREF, HOME_SIGNUP_LABEL } from "@/lib/public/home-cta";
 
 interface MarketingTopNavProps {
   isAuthenticated: boolean;
@@ -117,21 +118,35 @@ export function MarketingTopNav({ isAuthenticated }: MarketingTopNavProps) {
         </nav>
 
         <div className="hidden h-10 items-center gap-3 md:col-start-3 md:row-start-1 md:flex md:justify-self-end">
-          <GithubStarBadge href={siteConfig.githubUrl} />
+          <GithubStarBadge href={siteConfig.githubUrl} showCount={false} />
           {isAuthenticated ? (
             <Link href="/dashboard" className="public-btn public-btn-yellow rounded-none font-semibold">
               Dashboard
             </Link>
           ) : (
-            <Link href="/login" className="public-btn public-btn-yellow rounded-none font-semibold">
-              Sign in
-            </Link>
+            <>
+              <Link
+                href="/login"
+                className="inline-flex h-10 items-center px-1 text-sm leading-none text-[var(--public-fg)] transition-colors hover:text-[var(--public-accent)]"
+              >
+                Sign in
+              </Link>
+              <Link href={HOME_SIGNUP_HREF} className="public-btn public-btn-yellow rounded-none font-semibold">
+                {HOME_SIGNUP_LABEL}
+              </Link>
+            </>
           )}
         </div>
 
+        <div className="flex items-center gap-2 md:hidden">
+          {isAuthenticated ? null : (
+            <Link href={HOME_SIGNUP_HREF} className="public-btn public-btn-yellow rounded-none px-4 font-semibold">
+              {HOME_SIGNUP_LABEL}
+            </Link>
+          )}
         <button
           type="button"
-          className="inline-flex h-11 w-11 items-center justify-center md:hidden"
+          className="inline-flex h-11 w-11 items-center justify-center"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label={mobileOpen ? "Close menu" : "Open menu"}
           aria-expanded={mobileOpen}
@@ -139,6 +154,7 @@ export function MarketingTopNav({ isAuthenticated }: MarketingTopNavProps) {
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
+        </div>
       </div>
 
       {mobileOpen && (
@@ -169,7 +185,7 @@ export function MarketingTopNav({ isAuthenticated }: MarketingTopNavProps) {
               </button>
             ))}
             <div className="mt-2 flex justify-center">
-              <GithubStarBadge href={siteConfig.githubUrl} />
+              <GithubStarBadge href={siteConfig.githubUrl} showCount={false} />
             </div>
             {isAuthenticated ? (
               <Link href="/dashboard" className="public-btn public-btn-yellow w-full rounded-none text-center text-sm font-semibold">
@@ -178,7 +194,7 @@ export function MarketingTopNav({ isAuthenticated }: MarketingTopNavProps) {
             ) : (
               <Link
                 href="/login"
-                className="public-btn public-btn-yellow mt-1 w-full rounded-none text-center text-sm font-semibold"
+                className="public-btn public-btn-outline mt-1 w-full rounded-none text-center text-sm font-semibold"
                 onClick={() => setMobileOpen(false)}
               >
                 Sign in

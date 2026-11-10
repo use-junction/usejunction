@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { HERO_VIDEO } from "@/lib/public/home-cta";
 import { UseJunctionHomeContent } from "@/components/public/use-junction-home-content";
 import { siteConfig } from "@/lib/public/config";
 import { siteOgImage } from "@/lib/public/seo-metadata";
@@ -37,16 +38,7 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* Same-origin preloads — DotLottie previously fetched WASM from jsDelivr. */}
-      <link
-        rel="preload"
-        href="/animations/dotlottie-player.wasm"
-        as="fetch"
-        type="application/wasm"
-        crossOrigin="anonymous"
-      />
-      <link rel="preload" href="/animations/hero.lottie" as="fetch" crossOrigin="anonymous" />
-      <link rel="preload" href="/animations/hero.gif" as="image" />
+      <link rel="preload" href={HERO_VIDEO.poster} as="image" />
       <UseJunctionHomeContent />
     </>
   );
