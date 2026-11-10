@@ -91,8 +91,8 @@ export function HeroSection() {
               variants={item}
               className="mt-6 max-w-xl text-base leading-relaxed text-[#3a3b37] sm:text-lg sm:leading-8"
             >
-              Claude, Cursor, Codex and Copilot each show only their own seats. UseJunction puts every person and
-              every seat on one page, so you can cancel the idle ones and fix the wrong plans before renewal.
+              Claude, Cursor, Codex and Copilot each show only their own seats. UseJunction shows every person across
+              all of them: who uses AI day by day, who is near a limit, and where the spend landed in GitHub.
             </motion.p>
 
             <motion.div variants={item} className="mt-8 flex w-full flex-col items-start">

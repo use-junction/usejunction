@@ -92,38 +92,53 @@ test("homepage shows the example team's real screens with notes", async ({ page 
   const weeks = page.getByRole("region", { name: "You’ve probably had one of these weeks." });
   await expect(weeks.getByRole("img", { name: /Priya is at 97% of her weekly limit/ })).toBeVisible();
   await expect(weeks.getByText("On Standard, at 97% of her week")).toBeVisible();
-  await expect(weeks.getByText("6% all week. A quiet seat.")).toBeVisible();
+
+  const adoption = page.getByRole("region", { name: "Who has started, and who needs a nudge." });
+  await expect(adoption.getByRole("img", { name: /Regular, Occasional or Not using yet/ })).toBeVisible();
+
+  const work = page.getByRole("region", { name: "Where the AI spend landed." });
+  await expect(work.getByRole("img", { name: /\$693\.48 merged/ })).toBeVisible();
+  await expect(work.getByText("$693 landed on work that merged")).toBeVisible();
+  await expect(work.getByText("$173 on work that isn’t moving")).toBeVisible();
 
   const paidTwice = page.getByRole("region", { name: "Paid twice." });
   await expect(paidTwice.getByRole("img", { name: /9 are paid twice/ })).toBeVisible();
 
-  const answers = page.getByRole("region", { name: "It also answers these." });
-  for (const term of ["Quiet seats", "Outside company plans", "Active machines", "Usage at API prices"]) {
-    await expect(answers.getByRole("term").filter({ hasText: term })).toBeVisible();
+  // Value beyond cost: one row per reader, each answered by a real view.
+  const roles = page.getByRole("region", { name: "Who asks, and what they see." });
+  for (const who of ["Engineering manager", "Project manager", "Leadership", "Finance", "Developer"]) {
+    await expect(roles.getByText(who, { exact: true })).toBeVisible();
   }
-  await expect(answers.getByRole("img")).toHaveCount(4);
+  await expect(roles.getByRole("img", { name: /projected at current daily pace/ })).toBeVisible();
+  await expect(roles.getByRole("img", { name: /^Biggest items/ })).toBeVisible();
+  await expect(roles.getByRole("img", { name: /Spend by week by project/ })).toBeVisible();
+  const sheet = roles.getByRole("figure", { name: /cost\.csv/ });
+  await expect(sheet.getByRole("cell", { name: "People using it (30d)" })).toBeVisible();
+  await expect(sheet.getByRole("cell", { name: "Next renewal" })).toBeVisible();
 });
 
-test("homepage compares Claude's admin, explains pricing, and shows the rollout and what is collected", async ({ page }) => {
+test("homepage compares each vendor's admin, explains pricing, and shows the rollout and what is collected", async ({ page }) => {
   await page.goto("/");
 
-  const compare = page.getByRole("region", { name: "What Claude’s own admin shows per person." });
-  const limits = compare.getByRole("row", { name: /Weekly and 5-hour limit use/ });
-  await expect(limits.getByRole("cell")).toHaveText([/No/, /No/, /Yes/]);
-  await expect(compare.getByRole("link", { name: /how to check your team’s usage in Claude/i })).toHaveAttribute(
-    "href",
-    "/blog/check-claude-team-usage",
-  );
+  const compare = page.getByRole("region", { name: "What each tool’s own admin shows per person." });
+  for (const vendor of ["Claude", "Cursor", "GitHub Copilot", "Codex"]) {
+    await expect(compare.getByRole("columnheader", { name: vendor })).toBeVisible();
+  }
+  await expect(compare.getByRole("columnheader", { name: "UseJunction" }).getByRole("img", { name: "UseJunction" })).toBeVisible();
+  const prRow = compare.getByRole("row", { name: /Spend by pull request and issue/ });
+  await expect(prRow.getByRole("cell")).toHaveText([/Not in their docs/, /Not in their docs/, /Not in their docs/, /Not in their docs/, /Yes/]);
 
   const pricing = page.locator("#pricing");
   await expect(pricing.getByRole("heading", { name: /\$1 per active developer a month\. Your first 5 seats are free\./ })).toBeVisible();
-  await expect(pricing.getByText("UseJunction for 30 developers")).toBeVisible();
-  await expect(pricing.getByText("Hosted by us")).toBeVisible();
-  await expect(pricing.getByText("Self-hosted")).toBeVisible();
-  await expect(pricing.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);
+  const plans = pricing.getByRole("list", { name: "Plans" }).getByRole("listitem");
+  await expect(plans).toHaveCount(2);
+  await expect(plans.nth(0)).toContainText("Hosted");
+  await expect(plans.nth(1)).toContainText("Self-hosted");
+  await expect(pricing.getByText(/pays for/)).toHaveCount(0);
+  await expect(pricing.getByRole("link", { name: "Start free" }).first()).toHaveAttribute("href", /^\/signup/);
 
   const start = page.getByRole("region", { name: /Try it on your own laptop/ });
-  for (const step of ["Connect your laptop", "Look at your own usage", "Invite the team", "Change seats before renewal"]) {
+  for (const step of ["Connect your laptop", "Look at your own usage", "Invite the team", "Connect GitHub"]) {
     await expect(start.getByRole("heading", { name: step })).toBeVisible();
   }
   await expect(start.getByText("--token")).toHaveCount(0);

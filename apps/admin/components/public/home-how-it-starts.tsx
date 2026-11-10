@@ -1,13 +1,11 @@
-import Link from "next/link";
-import { ArrowRight, BarChart3, CalendarDays, Laptop, Users, type LucideIcon } from "lucide-react";
-import { HOME_SIGNUP_HREF, HOME_SIGNUP_LABEL } from "@/lib/public/home-cta";
+import { BarChart3, GitPullRequest, Laptop, Users, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const STEPS: { icon: LucideIcon; title: string; line: string; phase?: string }[] = [
   { icon: Laptop, title: "Connect your laptop", line: "One command. No card.", phase: "Just you" },
   { icon: BarChart3, title: "Look at your own usage", line: "Just yours, at first." },
   { icon: Users, title: "Invite the team", line: "Everyone has their own switch.", phase: "Your team" },
-  { icon: CalendarDays, title: "Change seats before renewal", line: "Cancel the quiet ones." },
+  { icon: GitPullRequest, title: "Connect GitHub", line: "See where the spend landed." },
 ];
 
 export function HomeHowItStarts() {
@@ -42,13 +40,6 @@ export function HomeHowItStarts() {
           ))}
         </ol>
 
-        <Link
-          href={HOME_SIGNUP_HREF}
-          className="public-btn public-btn-teal mt-10 w-full rounded-none px-8 py-3 text-base font-semibold sm:w-auto md:mt-14"
-        >
-          {HOME_SIGNUP_LABEL}
-          <ArrowRight className="h-5 w-5" aria-hidden />
-        </Link>
       </div>
     </section>
   );

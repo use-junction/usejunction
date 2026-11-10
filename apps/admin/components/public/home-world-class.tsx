@@ -93,7 +93,7 @@ export function HomePrivacyFlow() {
               ))}
             </ul>
             <p className="relative mt-2.5 border-[1.5px] border-dashed !border-[var(--public-warning)] bg-white px-3.5 py-2.5 text-sm leading-snug">
-              Work-session detail is optional. Each login has its own switch.
+              Each person can switch off sharing for any of their logins.
             </p>
           </div>
 

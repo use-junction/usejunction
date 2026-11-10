@@ -9,17 +9,19 @@ import { cn } from "@/lib/utils";
  * percentages of the screenshot, so they stay on target as it scales.
  */
 
-function Note({
+export function Note({
   children,
   style,
   arrow,
+  className,
 }: {
   children: ReactNode;
   style: CSSProperties;
   arrow: { box: CSSProperties; viewBox: string; paths: string[] };
+  className?: string;
 }) {
   return (
-    <span className="home-note" style={style}>
+    <span className={cn("home-note", className)} style={style}>
       {children}
       <svg viewBox={arrow.viewBox} style={arrow.box} aria-hidden>
         {arrow.paths.map((d) => (
@@ -31,7 +33,7 @@ function Note({
 }
 
 /** Wide screenshots keep their size on phones and scroll sideways rather than shrinking to unreadable. */
-function ShotScroll({ children, className }: { children: ReactNode; className?: string }) {
+export function ShotScroll({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div className={cn("-mr-4 overflow-x-auto sm:-mr-6 lg:mr-0 lg:overflow-visible", className)}>
       <div className="min-w-[820px] lg:min-w-0">{children}</div>
@@ -52,7 +54,7 @@ export function HomeWeeksChapter() {
           <div>
             <p className="max-w-md text-base leading-7 text-[#3a3b37] sm:text-[1.0625rem]">
               One person is about to run out of Claude. Another has barely opened it. Here is that week for an example
-              team of four.
+              team.
             </p>
             <Link
               href="/guides/claude-team-usage-limits"

@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { ArrowRight, Github } from "lucide-react";
 import { HeroSection } from "@/components/public/hero-section";
-import { HomeAnswers } from "@/components/public/home-answers";
-import { HomeClaudeCompare } from "@/components/public/home-claude-compare";
+import { HomeAdoption, HomeWork } from "@/components/public/home-adoption-work";
 import { HomeFaq } from "@/components/public/home-faq";
 import { HomeHowItStarts } from "@/components/public/home-how-it-starts";
 import { HomePricing } from "@/components/public/home-pricing";
 import { HomePaidTwiceBand, HomeWeeksChapter } from "@/components/public/home-story";
+import { HomeRoles } from "@/components/public/home-roles";
+import { HomeVendorCompare } from "@/components/public/home-vendor-compare";
 import { HomePrivacyFlow } from "@/components/public/home-world-class";
 import { SiteFooter } from "@/components/public/site-footer";
 import { ToolLogosStrip } from "@/components/public/tool-logos-strip";
@@ -29,13 +30,15 @@ export function UseJunctionHomeContent() {
       <HeroSection />
       <ToolLogosStrip />
 
-      {/* Real screens for an example team first, then the smaller answers. */}
+      {/* Real screens for an example team: limits, adoption, where the spend landed, personal logins. */}
       <HomeWeeksChapter />
+      <HomeAdoption />
+      <HomeWork />
       <HomePaidTwiceBand />
-      <HomeAnswers />
 
-      {/* Why the built-in admin isn't enough, then the price, then what happens after sign-up. */}
-      <HomeClaudeCompare />
+      {/* Who asks, what each vendor's own admin shows, then the price and what happens after sign-up. */}
+      <HomeRoles />
+      <HomeVendorCompare />
       <HomePricing />
       <HomeHowItStarts />
 
