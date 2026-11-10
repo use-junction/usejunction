@@ -1,70 +1,45 @@
-import { USER_LIMIT_FREE } from "@/lib/saas-billing/entitlements";
-import { getSiteUrl } from "@/lib/public/site-url";
+import { BarChart3, GitPullRequest, Laptop, Users, type LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-const steps = [
-  {
-    title: "Sign up",
-    detail: `No card and no sales call. The first ${USER_LIMIT_FREE} seats are free.`,
-  },
-  {
-    title: "Run one command on your own machine",
-    detail: "Your own usage shows up first. Nobody else is involved yet.",
-  },
-  {
-    title: "Invite the team when you’ve seen enough",
-    detail: "Idle seats and plan pressure fill in as their machines report.",
-  },
-] as const;
+const STEPS: { icon: LucideIcon; title: string; line: string; phase?: string }[] = [
+  { icon: Laptop, title: "Connect your laptop", line: "One command. No card.", phase: "Just you" },
+  { icon: BarChart3, title: "Look at your own usage", line: "Just yours, at first." },
+  { icon: Users, title: "Invite the team", line: "Everyone has their own switch.", phase: "Your team" },
+  { icon: GitPullRequest, title: "Connect GitHub", line: "See where the spend landed." },
+];
 
 export function HomeHowItStarts() {
-  const base = getSiteUrl();
-  const command = `curl -fsSL ${base}/install.sh | sh -s -- --token <your-token> --url ${base}`;
-
   return (
-    <section aria-labelledby="home-start-heading" className="bg-white py-16 sm:py-20 lg:py-24">
-      <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-24 lg:px-0 xl:grid-cols-[26rem_minmax(0,1fr)]">
-        <div className="min-w-0">
-          <h2
-            id="home-start-heading"
-            className="text-3xl font-semibold leading-[1.1] tracking-[-0.03em] sm:text-4xl lg:text-[2.5rem]"
-          >
-            Start with one laptop.
-          </h2>
-          <p className="mt-4 text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-            You don’t need the whole team on day one. Connect your own machine, look at your own numbers, then
-            decide.
-          </p>
-          <figure className="mt-8 border border-border bg-[var(--public-bg)]">
-            <figcaption className="border-b border-border px-4 py-2 text-xs text-muted-foreground">
-              After sign-up you get a command like this, with your token in it
-            </figcaption>
-            <pre className="overflow-x-auto px-4 py-4 font-mono text-xs leading-6 whitespace-pre-wrap break-all text-foreground">
-              <code>{command}</code>
-            </pre>
-          </figure>
-        </div>
+    <section aria-labelledby="home-start-heading" className="bg-white pt-24 sm:pt-32 lg:pt-44">
+      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-0">
+        <h2
+          id="home-start-heading"
+          className="max-w-md text-[1.6rem] font-semibold leading-tight tracking-[-0.025em] sm:text-[1.95rem]"
+        >
+          Try it on your own laptop before you tell the team.
+        </h2>
 
-        <ol className="flex min-w-0 flex-col">
-          {steps.map((step, index) => (
+        <ol className="mt-8 grid md:mt-14 md:grid-cols-4">
+          {STEPS.map((step, index) => (
             <li
               key={step.title}
-              className="grid grid-cols-[4rem_minmax(0,1fr)] border-b border-border py-6 first:pt-0 last:border-b-0 last:pb-0 sm:grid-cols-[5.5rem_minmax(0,1fr)]"
+              className={cn(
+                "relative px-5 pb-7 pt-5 md:px-7 md:pb-9",
+                index < 2 ? "bg-brand-yellow-pale" : "bg-[#e6f3f5]",
+              )}
             >
-              <span
-                aria-hidden
-                className="text-4xl font-semibold leading-none tabular-nums tracking-tight text-muted-foreground/35 sm:text-5xl"
-              >
-                0{index + 1}
+              <span aria-hidden className="absolute inset-x-0 top-[78px] hidden h-0.5 bg-foreground md:block" />
+              <p className="h-[22px] text-[0.8125rem] font-semibold">{step.phase ?? ""}</p>
+              <span className="relative mt-3.5 flex size-10 items-center justify-center border-2 !border-foreground bg-brand-yellow text-lg font-bold">
+                {index + 1}
               </span>
-              <div>
-                <h3 className="text-lg font-semibold leading-snug tracking-[-0.01em] sm:text-xl">{step.title}</h3>
-                <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
-                  {step.detail}
-                </p>
-              </div>
+              <step.icon className="mt-6 size-[30px] text-primary" strokeWidth={1.7} aria-hidden />
+              <h3 className="mt-3.5 text-[1.2rem] font-semibold leading-snug tracking-[-0.015em]">{step.title}</h3>
+              <p className="mt-2 text-[0.9375rem] text-[#3a3b37]">{step.line}</p>
             </li>
           ))}
         </ol>
+
       </div>
     </section>
   );

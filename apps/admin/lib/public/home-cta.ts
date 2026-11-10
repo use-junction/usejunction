@@ -7,7 +7,7 @@ export const HOME_SIGNUP_LABEL = "Start free";
 export const HOME_SIGNUP_HREF = `${siteConfig.signupUrl}?from=${encodeURIComponent("/onboarding?mode=solo")}`;
 
 /** Price reassurance shown under the hero and closing buttons. */
-export const HOME_PRICE_LINE = `Free for ${USER_LIMIT_FREE} seats. Then $${TEAM_PRICE_PER_DEV_USD} per active developer a month. No card.`;
+export const HOME_PRICE_LINE = `Free for ${USER_LIMIT_FREE} seats, then $${TEAM_PRICE_PER_DEV_USD} per active developer a month. No card.`;
 
 /** First 16s of the launch video (video/renders), muted. The end card is cut because it shows the wrong domain. */
 export const HERO_VIDEO = {

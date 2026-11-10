@@ -1,31 +1,34 @@
 import { TEAM_PRICE_PER_DEV_USD, USER_LIMIT_FREE } from "@/lib/saas-billing/entitlements";
 import type { ContentFaq } from "@/content/types";
 
-/** Homepage FAQs — answer-first for AEO / AI Overviews. Buyer questions first, name-confusion questions last. */
+/**
+ * Homepage FAQs, answer-first for AEO / AI Overviews. The first HOME_FAQ_VISIBLE are shown on the page;
+ * the rest sit under "More questions" (still in the DOM, so the FAQ schema matches the page).
+ */
+export const HOME_FAQ_VISIBLE = 4;
+
 export const HOME_FAQS: ContentFaq[] = [
   {
-    question: "What data does UseJunction collect?",
-    answer:
-      "Privacy first, observability second. The agent reports tool, model, tokens, estimated cost, device, and status. There is no keystroke surveillance, browser capture, or network interception. Usage collection can be turned off per login.",
-  },
-  {
     question: "Do developers have to change how they work?",
-    answer:
-      "No. Developers keep the same tools and editors. A small agent on each machine reads usage from the AI coding tools and reports it; it does not sit in front of their traffic.",
+    answer: "No. Same tools, same editors. A small agent on each machine reads usage in the background.",
   },
   {
-    question: "How long until I see something useful?",
-    answer:
-      "Your own usage appears once your machine reports in after you run the install command. Idle seats and plan pressure fill in as teammates connect their machines.",
-  },
-  {
-    question: "Is Managed available today?",
-    answer: `Yes. Self-host free for up to ${USER_LIMIT_FREE} seats, or use Managed at $${TEAM_PRICE_PER_DEV_USD} per active developer per month—we host and run the control plane for you.`,
+    question: "Is it free?",
+    answer: `Yes, for up to ${USER_LIMIT_FREE} seats, hosted or self-hosted. After that the hosted version is $${TEAM_PRICE_PER_DEV_USD} per active developer a month.`,
   },
   {
     question: "Can we self-host it?",
     answer:
-      "Yes. UseJunction is available under the UseJunction Community License and designed for infrastructure your team controls. Deploy the admin app the same way as local development — Postgres and Next.js; your data stays with you.",
+      "Yes, on infrastructure you control, with Postgres and Next.js, under the UseJunction Community License. Your data stays with you.",
+  },
+  {
+    question: "How long until I see something useful?",
+    answer: "Your own usage appears once your machine reports in. The rest fills in as teammates connect their machines.",
+  },
+  {
+    question: "What data does UseJunction collect?",
+    answer:
+      "The agent reports tool, model, tokens, estimated cost, device, and status. There is no keystroke surveillance, browser capture, or network interception. Usage collection can be turned off per login.",
   },
   {
     question: "Which tools are supported?",

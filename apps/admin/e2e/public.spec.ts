@@ -52,11 +52,17 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
     }),
   ).toBeVisible();
 
+  // The strip names the paid tools; every supported tool is listed next to the FAQ.
   const toolStrip = page.getByRole("region", { name: "Supported AI coding tools" });
   await expect(toolStrip).toBeVisible();
   await expect(toolStrip.getByRole("img")).toHaveCount(0);
+  for (const tool of ["Claude Code", "Cursor", "Codex", "GitHub Copilot"]) {
+    await expect(toolStrip.getByText(tool, { exact: true })).toBeVisible();
+  }
+  await expect(toolStrip.getByRole("link", { name: `and ${SUPPORTED_TOOLS.length - 4} more` })).toHaveAttribute("href", "#tools");
+  const allTools = page.getByRole("list", { name: "Supported tools" });
   for (const tool of SUPPORTED_TOOLS) {
-    await expect(toolStrip.getByText(tool.name, { exact: true }).first()).toBeVisible();
+    await expect(allTools.getByText(tool.name, { exact: true })).toBeVisible();
   }
 
   // A new visitor can sign up from the header, not only sign in.
@@ -68,7 +74,7 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
   await expect(heroCta).toBeVisible();
   await expect(heroCta).toHaveAttribute("href", /^\/signup\?from=/);
   await expect(
-    page.getByText("Free for 5 seats. Then $1 per active developer a month. No card.").first(),
+    page.getByText("Free for 5 seats, then $1 per active developer a month. No card.").first(),
   ).toBeVisible();
 
   const video = page.getByLabel(/UseJunction product video/i);
@@ -76,45 +82,74 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
   await expect(video).toHaveAttribute("poster", "/video/hero-poster.jpg");
   await expect(video).toHaveJSProperty("muted", true);
 
-  const closing = page.getByRole("region", { name: /Find the seats you’re paying for and not using/i });
+  const closing = page.getByRole("region", { name: /Connect your own laptop first/i });
   await expect(closing.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);
 });
 
-test("homepage product story walks through the three renewal checks", async ({ page }) => {
+test("homepage shows the example team's real screens with notes", async ({ page }) => {
   await page.goto("/");
 
-  const tabs = page.getByRole("tablist", { name: "Product workflows" });
-  const seeTab = tabs.getByRole("tab", { name: /Which seats are idle\?/ });
-  const understandTab = tabs.getByRole("tab", { name: /Who is on the wrong plan\?/ });
-  const actTab = tabs.getByRole("tab", { name: /What needs a look this week\?/ });
+  const weeks = page.getByRole("region", { name: "You’ve probably had one of these weeks." });
+  await expect(weeks.getByRole("img", { name: /Priya is at 97% of her weekly limit/ })).toBeVisible();
+  await expect(weeks.getByText("On Standard, at 97% of her week")).toBeVisible();
 
-  await expect(seeTab).toHaveAttribute("aria-selected", "true");
-  await seeTab.focus();
-  await seeTab.press("ArrowRight");
-  await expect(understandTab).toHaveAttribute("aria-selected", "true");
+  const adoption = page.getByRole("region", { name: "Who has started, and who needs a nudge." });
+  await expect(adoption.getByRole("img", { name: /Regular, Occasional or Not using yet/ })).toBeVisible();
 
-  const spendPanel = page.getByRole("tabpanel");
-  await expect(
-    spendPanel.getByRole("img", { name: /developer spend watch and plan runway/i }),
-  ).toBeVisible();
+  const work = page.getByRole("region", { name: "Where the AI spend landed." });
+  await expect(work.getByRole("img", { name: /\$693\.48 merged/ })).toBeVisible();
+  await expect(work.getByText("$693 landed on work that merged")).toBeVisible();
+  await expect(work.getByText("$173 on work that isn’t moving")).toBeVisible();
 
-  await understandTab.press("End");
-  await expect(actTab).toHaveAttribute("aria-selected", "true");
-  await expect(
-    page.getByRole("tabpanel").getByRole("img", { name: /signals with owners and next steps/i }),
-  ).toBeVisible();
+  const paidTwice = page.getByRole("region", { name: "Paid twice." });
+  await expect(paidTwice.getByRole("img", { name: /9 are paid twice/ })).toBeVisible();
+
+  // Value beyond cost: one row per reader, each answered by a real view.
+  const roles = page.getByRole("region", { name: "Who asks, and what they see." });
+  for (const who of ["Engineering manager", "Project manager", "Leadership", "Finance", "Developer"]) {
+    await expect(roles.getByText(who, { exact: true })).toBeVisible();
+  }
+  await expect(roles.getByRole("img", { name: /projected at current daily pace/ })).toBeVisible();
+  await expect(roles.getByRole("img", { name: /^Biggest items/ })).toBeVisible();
+  await expect(roles.getByRole("img", { name: /Spend by week by project/ })).toBeVisible();
+  const sheet = roles.getByRole("figure", { name: /cost\.csv/ });
+  await expect(sheet.getByRole("cell", { name: "People using it (30d)" })).toBeVisible();
+  await expect(sheet.getByRole("cell", { name: "Next renewal" })).toBeVisible();
 });
 
-test("homepage shows current pricing", async ({ page }) => {
+test("homepage compares each vendor's admin, explains pricing, and shows the rollout and what is collected", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /\$1 per active developer\. Free for your first 5 seats\./i })).toBeVisible();
-  await expect(page.getByText("Free", { exact: true })).toBeVisible();
-  await expect(page.getByText("$1", { exact: true })).toBeVisible();
-  await expect(page.getByText("Custom", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Community" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Managed", exact: true })).toBeVisible();
-  await expect(page.locator("#pricing").getByRole("link", { name: "Start free" })).toHaveCount(2);
-  await expect(page.getByRole("button", { name: "Talk to us" })).toBeVisible();
+
+  const compare = page.getByRole("region", { name: "What each tool’s own admin shows per person." });
+  for (const vendor of ["Claude", "Cursor", "GitHub Copilot", "Codex"]) {
+    await expect(compare.getByRole("columnheader", { name: vendor })).toBeVisible();
+  }
+  await expect(compare.getByRole("columnheader", { name: "UseJunction" }).getByRole("img", { name: "UseJunction" })).toBeVisible();
+  const prRow = compare.getByRole("row", { name: /Spend by pull request and issue/ });
+  await expect(prRow.getByRole("cell")).toHaveText([/Not in their docs/, /Not in their docs/, /Not in their docs/, /Not in their docs/, /Yes/]);
+
+  const pricing = page.locator("#pricing");
+  await expect(pricing.getByRole("heading", { name: /\$1 per active developer a month\. Your first 5 seats are free\./ })).toBeVisible();
+  const plans = pricing.getByRole("list", { name: "Plans" }).getByRole("listitem");
+  await expect(plans).toHaveCount(2);
+  await expect(plans.nth(0)).toContainText("Hosted");
+  await expect(plans.nth(1)).toContainText("Self-hosted");
+  await expect(pricing.getByText(/pays for/)).toHaveCount(0);
+  await expect(pricing.getByRole("link", { name: "Start free" }).first()).toHaveAttribute("href", /^\/signup/);
+
+  const start = page.getByRole("region", { name: /Try it on your own laptop/ });
+  for (const step of ["Connect your laptop", "Look at your own usage", "Invite the team", "Connect GitHub"]) {
+    await expect(start.getByRole("heading", { name: step })).toBeVisible();
+  }
+  await expect(start.getByText("--token")).toHaveCount(0);
+
+  const privacy = page.getByRole("region", { name: "Your developers will ask what it collects." });
+  await expect(privacy.getByRole("list", { name: "Collected", exact: true }).getByRole("listitem")).toHaveCount(5);
+  await expect(privacy.getByRole("list", { name: "Never collected" })).toContainText("Keystrokes or screenshots");
+
+  const faq = page.getByRole("region", { name: "Before you install." });
+  await expect(faq.getByText("Do developers have to change how they work?")).toBeVisible();
+  await expect(faq.getByText("More questions")).toBeVisible();
 });
 
 test("login form rejects bad credentials and links to recovery", async ({ page }) => {

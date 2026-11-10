@@ -11,7 +11,7 @@ export function SiteFooter() {
           <div>
             <BrandLogo className="h-9" />
             <p className="mt-3 max-w-xs text-sm leading-6 text-muted-foreground">
-              {siteConfig.tagline}. Self-hosted on your infrastructure—visibility before control.
+              {siteConfig.tagline}. Self-host it, or let us host it.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3">
@@ -23,7 +23,7 @@ export function SiteFooter() {
               ] as const
             ).map(([title, links]) => (
               <div key={title}>
-                <p className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
+                <p className="text-sm font-semibold text-muted-foreground">{title}</p>
                 <div className="mt-4 grid gap-3 text-sm">
                   {links.map((link) => (
                     <Link
@@ -43,9 +43,9 @@ export function SiteFooter() {
             ))}
           </div>
         </div>
-        <div className="mx-auto flex max-w-6xl flex-col items-start gap-3 border-t border-border py-5 font-mono text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="mx-auto flex max-w-6xl flex-col items-start gap-3 border-t border-border py-5 text-[0.8125rem] text-muted-foreground sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <span>
-            © {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
+            © {new Date().getFullYear()} {siteConfig.name}
           </span>
           <Link href="/llms.txt" className="hover:text-primary">
             llms.txt
