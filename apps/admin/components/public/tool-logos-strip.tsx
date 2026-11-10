@@ -65,9 +65,9 @@ function DecorativeToolIcon({ name }: { name: string }) {
 export function ToolLogosStrip() {
   return (
     <section aria-label="Supported AI coding tools" className="border-y border-border bg-white">
-      <div className="mx-auto grid w-full max-w-6xl gap-3 px-4 py-6 sm:px-6 lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-6 lg:px-0 lg:py-7">
+      <div className="mx-auto grid w-full max-w-6xl gap-3 px-4 py-9 sm:px-6 lg:grid-cols-[9rem_minmax(0,1fr)] lg:gap-6 lg:px-0 lg:py-11">
         <p className="text-sm text-muted-foreground lg:pt-0.5">Works with</p>
-        <ul className="flex flex-wrap gap-x-8 gap-y-3.5">
+        <ul className="flex flex-wrap gap-x-10 gap-y-5">
           {SUPPORTED_TOOLS.map((tool) => (
             <li key={tool.name} className="flex items-center gap-2.5">
               <DecorativeToolIcon name={tool.name} />

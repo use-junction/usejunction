@@ -82,12 +82,12 @@ function PanelFrame({
 }) {
   return (
     <div className="border border-border bg-white text-sm leading-snug">
-      <div className="flex items-baseline justify-between gap-4 border-b border-border px-4 py-4 sm:px-5">
+      <div className="flex items-baseline justify-between gap-4 border-b border-border px-5 py-5 sm:px-7">
         <h3 className="text-base font-semibold tracking-[-0.01em]">{title}</h3>
         <span className="text-[0.8125rem] text-muted-foreground">{meta}</span>
       </div>
       <ul>{children}</ul>
-      <p className="bg-[var(--public-bg)] px-4 py-3.5 text-[0.8125rem] text-[#5c5e56] sm:px-5">{foot}</p>
+      <p className="bg-[var(--public-bg)] px-5 py-5 text-[0.8125rem] text-[#5c5e56] sm:px-7">{foot}</p>
     </div>
   );
 }
@@ -108,7 +108,7 @@ function SeatsPanel() {
       {SEAT_ROWS.map((row) => (
         <li
           key={row.tool}
-          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-2.5 border-b border-border px-4 py-3.5 sm:grid-cols-[11rem_minmax(0,1fr)_8rem] sm:px-5"
+          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-2.5 border-b border-border px-5 py-5 sm:grid-cols-[11rem_minmax(0,1fr)_8rem] sm:px-7"
         >
           <div className="flex min-w-0 items-center gap-3">
             <Image src={`/tool-logos/${row.logo}`} alt="" width={22} height={22} className="shrink-0" />
@@ -157,7 +157,7 @@ function LimitsPanel() {
       {LIMIT_ROWS.map((row) => (
         <li
           key={row.person}
-          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-2.5 border-b border-border px-4 py-3.5 sm:grid-cols-[9rem_minmax(0,1fr)_9.5rem] sm:px-5"
+          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-2.5 border-b border-border px-5 py-5 sm:grid-cols-[9rem_minmax(0,1fr)_9.5rem] sm:px-7"
         >
           <div>
             <p className="font-semibold">{row.person}</p>
@@ -186,7 +186,7 @@ function LookPanel() {
       {LOOK_ROWS.map((row) => (
         <li
           key={row.kind}
-          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1.5 border-b border-border px-4 py-3.5 sm:grid-cols-[9.5rem_minmax(0,1fr)_4rem] sm:px-5"
+          className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1.5 border-b border-border px-5 py-5 sm:grid-cols-[9.5rem_minmax(0,1fr)_4rem] sm:px-7"
         >
           <p className="text-[0.8125rem] font-semibold">{row.kind}</p>
           <p className="col-span-2 row-start-2 text-[0.9375rem] text-[#5c5e56] sm:col-span-1 sm:row-start-auto">
@@ -234,7 +234,7 @@ export function HomeProductStory() {
   }
 
   return (
-    <section id="product" aria-labelledby="home-product-heading" className="scroll-mt-20 bg-white pt-20 sm:pt-24 lg:pt-28">
+    <section id="product" aria-labelledby="home-product-heading" className="scroll-mt-20 bg-white pt-28 sm:pt-32 lg:pt-44">
       <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-0">
         <h2
           id="home-product-heading"
@@ -243,7 +243,7 @@ export function HomeProductStory() {
           Three things to check before you renew.
         </h2>
 
-        <div className="mt-10 grid gap-8 lg:mt-12 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-20 xl:grid-cols-[24rem_minmax(0,1fr)]">
+        <div className="mt-14 grid gap-12 lg:mt-20 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-24 xl:grid-cols-[24rem_minmax(0,1fr)]">
           <div role="tablist" aria-label="Product workflows" aria-orientation="vertical" className="border-t border-border">
             {workflows.map((workflow, index) => {
               const selected = workflow.id === activeId;
@@ -262,7 +262,7 @@ export function HomeProductStory() {
                   onClick={() => setActiveId(workflow.id)}
                   onKeyDown={(event) => onTabKeyDown(event, index)}
                   className={cn(
-                    "block w-full border-b py-5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "block w-full border-b py-7 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     selected ? "border-foreground text-foreground" : "border-border text-muted-foreground hover:text-foreground",
                   )}
                 >
@@ -270,7 +270,7 @@ export function HomeProductStory() {
                     {workflow.label}
                   </span>
                   {selected ? (
-                    <span className="mt-2 block max-w-sm text-sm leading-6 text-muted-foreground">{workflow.title}</span>
+                    <span className="mt-3 block max-w-sm text-sm leading-6 text-muted-foreground">{workflow.title}</span>
                   ) : null}
                 </button>
               );
@@ -285,7 +285,7 @@ export function HomeProductStory() {
             className="min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Panel />
-            <p className="mt-3 text-xs text-muted-foreground">Example data.</p>
+            <p className="mt-4 text-xs text-muted-foreground">Example data.</p>
           </div>
         </div>
       </div>

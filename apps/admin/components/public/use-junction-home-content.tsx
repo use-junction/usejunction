@@ -28,18 +28,18 @@ export function UseJunctionHomeContent() {
 
       <HomeWorldClass />
 
-      <section id="pricing" className="scroll-mt-20 bg-white pt-20 sm:pt-24 lg:pt-28">
+      <section id="pricing" className="scroll-mt-20 bg-white pt-28 sm:pt-32 lg:pt-44">
         <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-10 xl:px-12">
           <div className="mx-auto max-w-6xl">
             <h2 className="max-w-2xl text-3xl font-semibold leading-[1.1] tracking-[-0.03em] [text-wrap:balance] sm:text-4xl lg:text-[2.5rem]">
               ${TEAM_PRICE_PER_DEV_USD} per active developer. Free for your first {USER_LIMIT_FREE} seats.
             </h2>
-            <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+            <p className="mt-6 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
               One idle Cursor seat costs as much as UseJunction for 30 developers.
             </p>
           </div>
 
-          <div className="mx-auto mt-10 grid max-w-6xl gap-4 lg:mt-12 lg:grid-cols-3 lg:items-stretch lg:gap-5">
+          <div className="mx-auto mt-14 grid max-w-6xl gap-6 lg:mt-20 lg:grid-cols-3 lg:items-stretch lg:gap-8">
             {PRICING_PLANS.map((plan) => {
               const isCommunity = plan.id === "community";
               const featured = plan.featured;
@@ -47,7 +47,7 @@ export function UseJunctionHomeContent() {
                 <article
                   key={plan.id}
                   className={cn(
-                    "relative flex flex-col bg-white p-6 sm:p-8",
+                    "relative flex flex-col bg-white p-7 sm:p-10",
                     featured
                       ? "border-2 border-[#9fd4df]"
                       : "border border-border",
@@ -91,7 +91,7 @@ export function UseJunctionHomeContent() {
                     </a>
                   )}
 
-                  <ul className="mt-8 space-y-3">
+                  <ul className="mt-10 space-y-4">
                     {plan.features.map((feature) => (
                       <li key={feature} className="flex gap-3 text-sm leading-6 text-[#5c5e56]">
                         <Check className="mt-0.5 size-4 shrink-0 text-[#08a8c4]" strokeWidth={2.25} />
@@ -102,12 +102,12 @@ export function UseJunctionHomeContent() {
 
                   {plan.premiumFeatures.length > 0 ? (
                     <>
-                      <div className="my-6 flex items-center gap-3" aria-hidden>
+                      <div className="my-8 flex items-center gap-3" aria-hidden>
                         <div className="h-px flex-1 bg-border" />
                         <Plus className="size-3.5 text-[#08a8c4]" strokeWidth={2.5} />
                         <div className="h-px flex-1 bg-border" />
                       </div>
-                      <ul className="space-y-3">
+                      <ul className="space-y-4">
                         {plan.premiumFeatures.map((feature) => (
                           <li key={feature} className="flex gap-3 text-sm leading-6">
                             <Check className="mt-0.5 size-4 shrink-0 text-[#08a8c4]" strokeWidth={2.25} />
@@ -124,9 +124,9 @@ export function UseJunctionHomeContent() {
         </div>
       </section>
 
-      <section id="faq" className="scroll-mt-20 bg-white pt-20 sm:pt-24 lg:pt-28 pb-20 sm:pb-24 lg:pb-28">
+      <section id="faq" className="scroll-mt-20 bg-white pt-28 sm:pt-32 lg:pt-44 pb-28 sm:pb-32 lg:pb-44">
         <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-10 xl:px-12">
-          <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-24 xl:grid-cols-[26rem_minmax(0,1fr)]">
+          <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-28 xl:grid-cols-[26rem_minmax(0,1fr)]">
             <div>
               <h2 className="text-3xl font-semibold leading-[1.1] tracking-[-0.03em] sm:text-4xl lg:text-[2.5rem]">
                 Clear answers before you start.
@@ -135,12 +135,12 @@ export function UseJunctionHomeContent() {
             <div className="border-t border-border">
               {HOME_FAQS.map((faq, index) => (
                 <details key={faq.question} className="group border-b border-border" open={index === 0}>
-                  <summary className="flex cursor-pointer list-none items-baseline justify-between gap-6 py-5 text-left text-base font-semibold tracking-[-0.01em] md:text-lg [&::-webkit-details-marker]:hidden">
+                  <summary className="flex cursor-pointer list-none items-baseline justify-between gap-6 py-7 text-left text-base font-semibold tracking-[-0.01em] md:text-lg [&::-webkit-details-marker]:hidden">
                     {faq.question}
                     <span aria-hidden className="shrink-0 text-xl font-normal leading-none text-muted-foreground group-open:hidden">+</span>
                     <span aria-hidden className="hidden shrink-0 text-xl font-normal leading-none text-muted-foreground group-open:inline">−</span>
                   </summary>
-                  <p className="max-w-2xl pb-6 pr-0 text-sm leading-7 text-muted-foreground md:pr-10 md:text-base">{faq.answer}</p>
+                  <p className="max-w-2xl pb-8 pr-0 text-sm leading-7 text-muted-foreground md:pr-10 md:text-base">{faq.answer}</p>
                 </details>
               ))}
             </div>

@@ -68,7 +68,7 @@ export function HeroSection() {
   return (
     <section className="hero-atmosphere relative overflow-x-clip bg-white">
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-0">
-        <div className="grid w-full grid-cols-1 items-center gap-10 pb-16 pt-24 md:gap-12 md:pt-28 lg:min-h-[74svh] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12 lg:pb-20 lg:pt-24">
+        <div className="grid w-full grid-cols-1 items-center gap-10 pb-20 pt-24 md:gap-12 md:pt-28 lg:min-h-[74svh] lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-16 lg:pb-28 lg:pt-28">
           <motion.div
             className="relative isolate flex min-w-0 flex-col items-start text-left"
             variants={reduceMotion ? undefined : container}

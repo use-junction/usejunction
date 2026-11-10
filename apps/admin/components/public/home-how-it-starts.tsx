@@ -21,8 +21,8 @@ export function HomeHowItStarts() {
   const command = `curl -fsSL ${base}/install.sh | sh -s -- --token <your-token> --url ${base}`;
 
   return (
-    <section aria-labelledby="home-start-heading" className="bg-white pt-20 sm:pt-24 lg:pt-28">
-      <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-24 lg:px-0 xl:grid-cols-[26rem_minmax(0,1fr)]">
+    <section aria-labelledby="home-start-heading" className="bg-white pt-28 sm:pt-32 lg:pt-44">
+      <div className="mx-auto grid w-full max-w-6xl gap-14 px-4 sm:px-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-28 lg:px-0 xl:grid-cols-[26rem_minmax(0,1fr)]">
         <div className="min-w-0">
           <h2
             id="home-start-heading"
@@ -30,11 +30,11 @@ export function HomeHowItStarts() {
           >
             Start with one laptop.
           </h2>
-          <p className="mt-4 text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+          <p className="mt-6 text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
             You don’t need the whole team on day one. Connect your own machine, look at your own numbers, then
             decide.
           </p>
-          <figure className="mt-8 border border-border bg-[var(--public-bg)]">
+          <figure className="mt-10 border border-border bg-[var(--public-bg)]">
             <figcaption className="border-b border-border px-4 py-2 text-xs text-muted-foreground">
               After sign-up you get a command like this, with your token in it
             </figcaption>
@@ -48,7 +48,7 @@ export function HomeHowItStarts() {
           {steps.map((step, index) => (
             <li
               key={step.title}
-              className="grid grid-cols-[4rem_minmax(0,1fr)] border-b border-border py-6 first:pt-0 last:border-b-0 last:pb-0 sm:grid-cols-[5.5rem_minmax(0,1fr)]"
+              className="grid grid-cols-[4rem_minmax(0,1fr)] border-b border-border py-9 first:pt-0 last:border-b-0 last:pb-0 sm:grid-cols-[5.5rem_minmax(0,1fr)]"
             >
               <span
                 aria-hidden
@@ -58,7 +58,7 @@ export function HomeHowItStarts() {
               </span>
               <div>
                 <h3 className="text-lg font-semibold leading-snug tracking-[-0.01em] sm:text-xl">{step.title}</h3>
-                <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
+                <p className="mt-3 max-w-md text-sm leading-6 text-muted-foreground sm:text-base sm:leading-7">
                   {step.detail}
                 </p>
               </div>
