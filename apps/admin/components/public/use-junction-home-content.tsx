@@ -1,7 +1,6 @@
 "use client";
 
 import { ArrowRight, Check, Plus } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { HeroSection } from "@/components/public/hero-section";
 import { HomeWorldClass } from "@/components/public/home-world-class";
 import { ToolLogosStrip } from "@/components/public/tool-logos-strip";
@@ -29,7 +28,7 @@ export function UseJunctionHomeContent() {
 
       <HomeWorldClass />
 
-      <section id="pricing" className="scroll-mt-20 bg-white py-16 sm:py-20 lg:py-24">
+      <section id="pricing" className="scroll-mt-20 bg-white pt-20 sm:pt-24 lg:pt-28">
         <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-10 xl:px-12">
           <div className="mx-auto max-w-6xl">
             <h2 className="max-w-2xl text-3xl font-semibold leading-[1.1] tracking-[-0.03em] [text-wrap:balance] sm:text-4xl lg:text-[2.5rem]">
@@ -40,7 +39,7 @@ export function UseJunctionHomeContent() {
             </p>
           </div>
 
-          <div className="mx-auto mt-12 grid max-w-6xl gap-4 sm:mt-16 lg:grid-cols-3 lg:items-center lg:gap-5">
+          <div className="mx-auto mt-10 grid max-w-6xl gap-4 lg:mt-12 lg:grid-cols-3 lg:items-stretch lg:gap-5">
             {PRICING_PLANS.map((plan) => {
               const isCommunity = plan.id === "community";
               const featured = plan.featured;
@@ -50,11 +49,8 @@ export function UseJunctionHomeContent() {
                   className={cn(
                     "relative flex flex-col bg-white p-6 sm:p-8",
                     featured
-                      ? "pricing-card-managed border-2 border-[#9fd4df]"
-                      : cn(
-                          "pricing-card-side",
-                          isCommunity ? "border border-[#08a8c4]/40" : "border order",
-                        ),
+                      ? "border-2 border-[#9fd4df]"
+                      : "border border-border",
                   )}
                 >
                   {"badge" in plan && plan.badge ? (
@@ -128,26 +124,26 @@ export function UseJunctionHomeContent() {
         </div>
       </section>
 
-      <section id="faq" className="scroll-mt-20 bg-white py-16 sm:py-20 lg:py-24">
+      <section id="faq" className="scroll-mt-20 bg-white pt-20 sm:pt-24 lg:pt-28 pb-20 sm:pb-24 lg:pb-28">
         <div className="mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-10 xl:px-12">
-          <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.75fr_1.25fr] lg:gap-16">
+          <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-24 xl:grid-cols-[26rem_minmax(0,1fr)]">
             <div>
               <h2 className="text-3xl font-semibold leading-[1.1] tracking-[-0.03em] sm:text-4xl lg:text-[2.5rem]">
                 Clear answers before you start.
               </h2>
             </div>
-            <Accordion type="single" collapsible className="border-t order">
+            <div className="border-t border-border">
               {HOME_FAQS.map((faq, index) => (
-                <AccordionItem key={faq.question} value={`faq-${index}`}>
-                  <AccordionTrigger className="py-6 text-left text-base font-semibold md:text-lg">
+                <details key={faq.question} className="group border-b border-border" open={index === 0}>
+                  <summary className="flex cursor-pointer list-none items-baseline justify-between gap-6 py-5 text-left text-base font-semibold tracking-[-0.01em] md:text-lg [&::-webkit-details-marker]:hidden">
                     {faq.question}
-                  </AccordionTrigger>
-                  <AccordionContent className="max-w-2xl pb-6 text-sm leading-7 text-muted-foreground md:text-base">
-                    {faq.answer}
-                  </AccordionContent>
-                </AccordionItem>
+                    <span aria-hidden className="shrink-0 text-xl font-normal leading-none text-muted-foreground group-open:hidden">+</span>
+                    <span aria-hidden className="hidden shrink-0 text-xl font-normal leading-none text-muted-foreground group-open:inline">−</span>
+                  </summary>
+                  <p className="max-w-2xl pb-6 pr-0 text-sm leading-7 text-muted-foreground md:pr-10 md:text-base">{faq.answer}</p>
+                </details>
               ))}
-            </Accordion>
+            </div>
           </div>
         </div>
       </section>

@@ -21,7 +21,7 @@ export function HomeHowItStarts() {
   const command = `curl -fsSL ${base}/install.sh | sh -s -- --token <your-token> --url ${base}`;
 
   return (
-    <section aria-labelledby="home-start-heading" className="bg-white py-16 sm:py-20 lg:py-24">
+    <section aria-labelledby="home-start-heading" className="bg-white pt-20 sm:pt-24 lg:pt-28">
       <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-24 lg:px-0 xl:grid-cols-[26rem_minmax(0,1fr)]">
         <div className="min-w-0">
           <h2

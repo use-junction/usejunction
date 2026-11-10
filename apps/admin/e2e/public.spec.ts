@@ -89,20 +89,23 @@ test("homepage product story walks through the three renewal checks", async ({ p
   const actTab = tabs.getByRole("tab", { name: /What needs a look this week\?/ });
 
   await expect(seeTab).toHaveAttribute("aria-selected", "true");
+  const panel = page.getByRole("tabpanel");
+  await expect(panel.getByRole("heading", { name: "Seats this cycle" })).toBeVisible();
+  await expect(panel.getByText("7 idle seats cost $177 a month.")).toBeVisible();
+  await expect(panel.getByText("Example data.")).toBeVisible();
+  // The old screenshots showed a real person's name and email; the panels must not.
+  await expect(page.locator("#product img[src*='/elements/']")).toHaveCount(0);
   await seeTab.focus();
   await seeTab.press("ArrowRight");
   await expect(understandTab).toHaveAttribute("aria-selected", "true");
 
-  const spendPanel = page.getByRole("tabpanel");
-  await expect(
-    spendPanel.getByRole("img", { name: /developer spend watch and plan runway/i }),
-  ).toBeVisible();
+  await expect(panel.getByRole("heading", { name: "Claude Team, weekly limit used" })).toBeVisible();
+  await expect(panel.getByText("Move to Standard")).toHaveCount(3);
 
   await understandTab.press("End");
   await expect(actTab).toHaveAttribute("aria-selected", "true");
-  await expect(
-    page.getByRole("tabpanel").getByRole("img", { name: /signals with owners and next steps/i }),
-  ).toBeVisible();
+  await expect(panel.getByRole("heading", { name: "Needs a look" })).toBeVisible();
+  await expect(panel.getByText("Personal API key")).toBeVisible();
 });
 
 test("homepage shows current pricing", async ({ page }) => {
