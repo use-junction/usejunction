@@ -10,6 +10,7 @@
 #stage{position:absolute;left:0;top:0;width:800px;height:500px;transform-origin:0 0;font-family:"DM Sans",system-ui,sans-serif;background:#fff}
 .sc{position:absolute;inset:0;overflow:hidden;visibility:hidden}
 .light{background:#fff;color:#111210}
+.flash{position:absolute;inset:0;background:#e5ec67;visibility:hidden}
 .cal{font-family:"Cal Sans","DM Sans",sans-serif;letter-spacing:-.01em}
 .m{display:inline-block;overflow:hidden;vertical-align:top;padding:0 .14em .08em;margin:0 -.14em -.08em}
 .r{display:inline-block;will-change:transform}
@@ -23,22 +24,23 @@
 .h1{position:absolute;left:0;right:0;text-align:center;font-size:66px;line-height:1.12;white-space:nowrap}
 .mark{position:absolute;left:400px;top:250px;width:104px;height:104px;margin:-52px 0 0 -52px;opacity:0}
 /* chapter word */
+.chap{position:absolute;left:0;top:0;font-size:150px;line-height:1;white-space:nowrap;transform-origin:0 0;opacity:0}
 /* B */
-.big{position:absolute;left:110px;font-size:76px;line-height:1;white-space:nowrap}
+.big{position:absolute;left:44px;font-size:150px;line-height:1;white-space:nowrap}
 .big small{font-size:.5em;margin-left:.04em}
-.who{position:absolute;left:262px;opacity:0}
-.who .n{font-size:26px;font-weight:700;display:flex;align-items:center;gap:8px;letter-spacing:-.01em}
-.who .n img{width:20px;height:20px}
-.who .c{font-size:16px;color:#666861;margin-top:2px}
-.pill{position:absolute;right:110px;font-size:15px;font-weight:700;color:#d9730a;display:flex;align-items:center;gap:8px;transform-origin:100% 50%}
+.who{position:absolute;left:336px;opacity:0}
+.who .n{font-size:34px;font-weight:700;display:flex;align-items:center;gap:10px;letter-spacing:-.01em}
+.who .n img{width:26px;height:26px}
+.who .c{font-size:20px;color:#666861;margin-top:4px}
+.pill{position:absolute;right:48px;font-size:18px;font-weight:700;color:#d9730a;display:flex;align-items:center;gap:8px;transform-origin:100% 50%}
 .pill i{width:10px;height:10px;background:#d9730a;display:block;transform:rotate(45deg)}
-.track{position:absolute;left:110px;width:580px;height:10px;background:#e9e7df;transform-origin:0 50%}
+.track{position:absolute;left:48px;width:704px;height:14px;background:#e9e7df;transform-origin:0 50%}
 .track i{display:block;height:100%;width:0}
 .seat{position:absolute;top:118px;width:84px;height:84px;border:3px dashed #c4c1b7;border-radius:14px;display:grid;place-items:center;opacity:0}
 .seat .f{position:absolute;inset:-3px;border-radius:14px;background:#08758a;display:grid;place-items:center;transform:scale(0)}
 .fin{position:absolute;left:0;right:0;text-align:center;font-size:62px;line-height:1.1;white-space:nowrap}
 /* C */
-.cap{position:absolute;left:58px;font-size:19px;font-weight:600;white-space:nowrap}
+.cap{position:absolute;left:58px;font-size:22px;font-weight:600;white-space:nowrap}
 .mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
 svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
 /* D */
@@ -50,7 +52,7 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
 .merged{display:inline-flex;align-items:center;gap:6px;margin-left:14px;font-size:17px;font-weight:700;color:#8250df;vertical-align:2px}
 .merged i{width:9px;height:9px;border-radius:50%;background:#8250df;display:block}
 .tot{position:absolute;right:70px;top:186px;white-space:nowrap;text-align:right}
-.tot .v{font-size:44px;line-height:1}
+.tot .v{font-size:58px;line-height:1}
 .tot .ab{font-size:22px;font-weight:600;color:#666861;margin-right:8px}
 .seg{position:absolute;top:254px;height:48px;overflow:hidden;display:flex;align-items:flex-end;white-space:nowrap}
 .seg span{display:block;padding:0 0 12px 11px;font-size:20px;font-weight:700;line-height:1.2}
@@ -92,19 +94,23 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
 .sav{position:absolute;width:30px;height:30px;border-radius:50%;box-shadow:0 0 0 2px #fff;transform:scale(0)}
 #D .jr{height:24px}
 /* E */
-.pw{position:absolute;left:244px;font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1.1;white-space:nowrap}
-.pw .strike{position:absolute;left:-6px;right:-6px;top:54%;height:3px;background:#111210;transform-origin:0 50%;transform:scaleX(0)}
+.pw{position:absolute;left:64px;font-size:62px;line-height:1.1;white-space:nowrap}
+.pw .strike{position:absolute;left:-12px;right:-12px;top:52%;height:5px;background:#111210;transform-origin:0 50%;transform:scaleX(0)}
+/* F */
+.end{position:absolute;left:0;right:0;text-align:center}
 /* controls */
 .ctl{display:flex;gap:12px;align-items:center;margin-top:12px;font-size:13px}
 .ctl button{font:inherit;padding:6px 14px;border:1px solid var(--border);background:var(--card);color:var(--foreground);cursor:pointer;border-radius:var(--radius)}
 .ctl input{flex:1;accent-color:#08758a}
 .ctl .t{font-variant-numeric:tabular-nums;min-width:92px;text-align:right;color:var(--muted-foreground)}
+.hookl{left:0;right:0;text-align:center;font-size:56px;line-height:1.15;white-space:nowrap}
 .tsm{width:36px;height:36px;border-radius:10px;box-shadow:0 4px 12px rgba(20,16,10,.08)}.tsm img{width:20px;height:20px}
 </style></head><body>
 <div class="wrap">
 <div class="frame"><div id="stage">
 
 <section class="sc light" id="D">
+  <div class="abs cal" id="wlab" style="left:48px;top:36px;font-size:30px;line-height:1;opacity:0">Work</div>
   <div id="cam" class="abs" style="inset:0;transform-origin:0 0;opacity:0">
    <div id="board" class="abs" style="inset:0;top:34px">
     <div class="bhead" id="bhead"><svg width="20" height="20" viewBox="0 0 24 24"><path fill="#2684FF" d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z"/></svg>Product roadmap<span>Board</span></div>
@@ -114,6 +120,8 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
     <div class="jc" id="cNext" style="left:56px;top:154px"><p>Add usage alerts</p><div class="cost" id="est" style="color:#08758a"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#08758a" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 6.2c1.8-1.8 3.6-1.8 5.5 0s3.7 1.8 5.5 0M2.5 10.6c1.8-1.8 3.6-1.8 5.5 0s3.7 1.8 5.5 0"/></svg><span class="w">About</span><span class="hlw"><i id="esthl"></i><b class="cal">$5,400</b></span></div><div class="jf"><i class="ti epic"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M5.8.6L2 5.6h2.4L4.2 9.4 8 4.4H5.6z" fill="#fff"/></svg></i><span>NW-238</span><em><u class="av f0"></u><u class="av f1"></u><u class="av f2"></u><u class="av f3"></u></em></div></div><div class="jc" style="left:296px;top:154px"><p>Fix repeated webhook deliveries</p><div class="jf"><i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>NW-231</span><em><u class="av f1"></u></em></div></div><div class="jc" style="left:296px;top:252px"><p>Rewrite billing jobs</p><div class="jf"><i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>NW-224</span><em><u class="av f3"></u></em></div></div><div class="jc" id="cDone" style="left:536px;top:154px"><p>Add team invitations</p><div class="cost" id="amt" style="color:#8250df"><svg width="16" height="16" viewBox="0 0 16 16"><path fill="#8250df" d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z"/></svg><span class="w">Merged</span><span class="hlw"><i id="amthl"></i><b class="cal">$<span id="n6930">0</span></b></span></div><div class="jf"><i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>NW-212</span><em><u class="av f0"></u></em></div></div>
    </div>
   </div>
+  <div class="abs cal hookl" style="top:334px"><span class="m"><span class="r" id="hk1">One feature. $6,930 in AI.</span></span></div>
+  <div class="abs cal hookl" style="top:398px;font-size:48px"><span class="m"><span class="r" id="hk2">What will the <span class="hlw"><i id="hk2hl"></i><b>next one</b></span> cost?</span></span></div>
   <div class="abs" id="pbg"></div>
   <div class="abs" id="detail" style="inset:0;visibility:hidden">
     <div class="abs jf" id="dbc" style="left:68px;top:92px;margin:0;opacity:0"><i class="ti epic"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M5.8.6L2 5.6h2.4L4.2 9.4 8 4.4H5.6z" fill="#fff"/></svg></i><span>NW-238</span><span class="loz2" style="margin-left:8px;padding:3px 8px;font-size:11px;vertical-align:0"><i></i>To do · not started</span></div>
@@ -132,6 +140,7 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
 </section>
 
 <section class="sc light" id="C">
+  <div class="chap cal" id="chC">Forecast</div>
   <svg class="full" viewBox="0 0 800 500">
     <defs><clipPath id="cArea"><rect id="cAreaR" x="0" y="0" width="0" height="500"/></clipPath><clipPath id="cProj"><rect id="cProjR" x="286" y="0" width="0" height="500"/></clipPath>
     <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e5ec67" stop-opacity=".55"/><stop offset="1" stop-color="#e5ec67" stop-opacity="0"/></linearGradient></defs>
@@ -146,60 +155,74 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
   </svg>
   <div class="abs mono" id="lt" style="left:262px;top:432px;opacity:0;color:rgba(17,18,16,.5)">day 10</div>
   <div class="abs mono" id="le" style="left:706px;top:432px;opacity:0;color:rgba(17,18,16,.5)">day 30</div>
-  <div class="abs cal" style="left:56px;top:92px;font-size:60px;line-height:1;white-space:nowrap"><span class="m"><span class="r" id="cnr">$<span id="cn">0</span></span></span></div>
-  <div class="cap" style="top:162px"><span class="m"><span class="r" id="cc1" style="color:#666861">spent so far</span></span></div>
-  <div class="cap" style="top:162px"><span class="m"><span class="r" id="cc2">by month end <span style="color:#8a8c84;font-weight:500">· 38 people</span></span></span></div>
-  <div class="cap" style="top:188px;font-weight:500"><span class="m"><span class="r" id="cc3" style="color:#8a8c84">at the same daily pace</span></span></div>
+  <div class="abs cal" style="left:54px;top:88px;font-size:108px;line-height:1;white-space:nowrap"><span class="m"><span class="r" id="cnr">$<span id="cn">0</span></span></span></div>
+  <div class="cap" style="top:216px"><span class="m"><span class="r" id="cc1" style="color:#666861">spent so far</span></span></div>
+  <div class="cap" style="top:216px"><span class="m"><span class="r" id="cc2">by month end <span style="color:#8a8c84;font-weight:500">· 38 people</span></span></span></div>
+  <div class="cap" style="top:246px;font-weight:500"><span class="m"><span class="r" id="cc3" style="color:#8a8c84">at the same daily pace</span></span></div>
 </section>
 
+<i class="flash" id="fB"></i>
 <section class="sc light" id="B">
-  <div class="tile tsm" style="left:528px;top:88px"><img src="{{claude}}"></div><div class="tile tsm" style="left:570px;top:88px"><img src="{{cursor}}"></div><div class="tile tsm" style="left:612px;top:88px"><img src="{{codex}}"></div><div class="tile tsm" style="left:654px;top:88px"><img src="{{copilot}}"></div>
+  <div class="chap cal" id="chB">See</div>
+  <div class="tile tsm" style="left:592px;top:30px"><img src="{{claude}}"></div><div class="tile tsm" style="left:634px;top:30px"><img src="{{cursor}}"></div><div class="tile tsm" style="left:676px;top:30px"><img src="{{codex}}"></div><div class="tile tsm" style="left:718px;top:30px"><img src="{{copilot}}"></div>
   <div id="rows">
     <div id="row1" class="abs" style="inset:0">
-      <div class="big cal" style="top:150px"><span class="m"><span class="r" id="n1r"><span id="n1">0</span><small>%</small></span></span></div>
-      <div class="who" id="who1" style="top:157px"><div class="n"><img src="{{claude}}">Priya</div><div class="c">of her weekly Claude limit</div></div>
-      <div class="pill" id="pill" style="top:174px"><i></i>Near limit</div>
-      <div class="track" id="t1" style="top:244px"><i id="f1" style="background:#d9730a"></i></div>
+      <div class="big cal" style="top:82px"><span class="m"><span class="r" id="n1r"><span id="n1">0</span><small>%</small></span></span></div>
+      <div class="who" id="who1" style="top:112px"><div class="n"><img src="{{claude}}">Priya</div><div class="c">of her weekly Claude limit</div></div>
+      <div class="pill" id="pill" style="top:128px"><i></i>Near limit</div>
+      <div class="track" id="t1" style="top:240px"><i id="f1" style="background:#d9730a"></i></div>
     </div>
     <div id="row2" class="abs" style="inset:0">
-      <div class="big cal" style="top:308px;color:#a2a8b5"><span class="m"><span class="r" id="n2r"><span id="n2">0</span><small>%</small></span></span></div>
-      <div class="who" id="who2" style="top:315px"><div class="n"><img src="{{claude}}">Elena</div><div class="c">A quiet seat.</div></div>
-      <div class="track" id="t2" style="top:402px"><i id="f2" style="background:#a2a8b5"></i></div>
+      <div class="big cal" style="top:268px;color:#a2a8b5"><span class="m"><span class="r" id="n2r"><span id="n2">0</span><small>%</small></span></span></div>
+      <div class="who" id="who2" style="top:298px"><div class="n"><img src="{{claude}}">Elena</div><div class="c">A quiet seat.</div></div>
+      <div class="track" id="t2" style="top:426px"><i id="f2" style="background:#a2a8b5"></i></div>
     </div>
   </div>
 </section>
 
 <section class="sc light" id="E">
-  <div class="abs" id="ecard" style="left:212px;top:98px;width:376px;height:304px;background:#fff;border:1px solid #e5e1de;border-radius:10px;box-shadow:0 14px 40px rgba(20,16,10,.08);opacity:0"></div>
-  <div class="abs" style="left:244px;top:126px;display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;white-space:nowrap">
-    <svg id="shield" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#08758a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="transform-origin:50% 50%;flex:none"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path id="shchk" d="m9 12 2 2 4-4" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg>
+  <div class="abs" style="left:64px;top:46px;display:flex;align-items:center;gap:12px;font-size:23px;font-weight:600;white-space:nowrap">
+    <svg id="shield" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#08758a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="transform-origin:50% 50%;flex:none"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path id="shchk" d="m9 12 2 2 4-4" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg>
     <span class="m"><span class="r" id="secl">The agent reads usage locally.</span></span>
   </div>
-  <div class="pw" style="top:186px"><span class="m"><span class="r e">keystrokes</span></span><i class="strike"></i></div>
-  <div class="pw" style="top:230px"><span class="m"><span class="r e">browser activity</span></span><i class="strike"></i></div>
-  <div class="pw" style="top:274px"><span class="m"><span class="r e">network traffic</span></span><i class="strike"></i></div>
-  <div class="pw" style="top:338px"><span class="m"><span class="r" id="never"><span class="hlw"><i id="nvhl"></i><b>Never collected.</b></span></span></span></div>
+  <div class="pw cal" style="top:118px"><span class="m"><span class="r e">keystrokes</span></span><i class="strike"></i></div>
+  <div class="pw cal" style="top:192px"><span class="m"><span class="r e">browser activity</span></span><i class="strike"></i></div>
+  <div class="pw cal" style="top:266px"><span class="m"><span class="r e">network traffic</span></span><i class="strike"></i></div>
+  <div class="pw cal" style="top:372px"><span class="m"><span class="r" id="never"><span class="hlw"><i id="nvhl"></i><b>Never collected.</b></span></span></span></div>
+</section>
+
+<i class="flash" id="fF"></i>
+<section class="sc light" id="F">
+  <div class="end" style="top:160px"><span class="m"><span class="r" id="wm"><img src="{{wordmark}}" style="height:84px;display:block"></span></span></div>
+  <div class="end" style="top:276px;font-size:26px;font-weight:600"><span class="m"><span class="r" id="tl">Free for 5 seats. No card.</span></span></div>
 </section>
 
 </div></div>
-<div class="ctl"><button id="play">Pause</button><input id="scrub" type="range" min="0" max="18.4" step="0.01" value="0"><span class="t" id="time"></span></div>
+<div class="ctl"><button id="play">Pause</button><input id="scrub" type="range" min="0" max="19.9" step="0.01" value="0"><span class="t" id="time"></span></div>
 </div>
 <script>
 const $=id=>document.getElementById(id), all=s=>[...document.querySelectorAll(s)];
 const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)), p=(t,a,b)=>cl((t-a)/(b-a)), lerp=(a,b,k)=>a+(b-a)*k;
 const outExpo=x=>x>=1?1:1-Math.pow(2,-10*x), outCubic=x=>1-Math.pow(1-x,3), inCubic=x=>x*x*x, inOut=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
 const outBack=x=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)};
-// Order: Work -> Forecast -> See -> Never collected, then straight back to Work. There are no captions, chapter
-// titles or end card: on the homepage the film sits beside the headline, which is the only headline-sized type.
-const S={W:0,C:11.1,B:13.6,E:15.8,END:18.4};
+// Order: Work (with the hook) -> Forecast -> See -> Never collected -> End card
+const S={W:0,C:11.1,B:13.9,E:16.4,F:18.4,END:19.9};
 const stage=$('stage'), frame=stage.parentElement;
 function fit(){stage.style.transform='scale('+(frame.clientWidth/800)+')'}new ResizeObserver(fit).observe(frame);fit();
 const rise=(el,kin,kout=0)=>{el.style.transform=`translateY(${(1-kin)*108-kout*108}%)`};
 const vis=(el,on)=>{el.style.visibility=on?'visible':'hidden'};
+const dia=(el,cx,cy,r)=>{el.style.clipPath=`polygon(${cx}px ${cy-r}px,${cx+r}px ${cy}px,${cx}px ${cy+r}px,${cx-r}px ${cy}px)`};
 const num=(el,v)=>{el.textContent=Math.round(v).toLocaleString('en-US')};
 const dash=(el,k)=>{el.style.strokeDashoffset=1-k};
 const mix=(a,b,k)=>a.map((v,i)=>Math.round(lerp(v,b[i],k))), rgb=c=>`rgb(${c[0]},${c[1]},${c[2]})`;
-// Every scene is on white, so scenes crossfade.
+let dims={};function measure(){for(const id of['chB','chC']){const e=$(id);dims[id]=[e.offsetWidth,e.offsetHeight]}}measure();document.fonts.ready.then(measure);
+function chapter(id,u,a){const e=$(id),[w,h]=dims[id];const k=inOut(p(u,a+.32,a+.62));const pop=lerp(1.22,1,outExpo(p(u,a,a+.4)));
+  const s=lerp(1,.2,k)*pop,cx=lerp(400,48+w*.1,k),cy=lerp(250,36+h*.1,k);
+  e.style.opacity=p(u,a,a+.1);e.style.transform=`translate(${cx-w*s/2}px,${cy-h*s/2}px) scale(${s})`}
+function iris(t,t0,cx,cy,flash,scene,r0){const R=1150;const a=inOut(p(t,t0,t0+.34)),b=inOut(p(t,t0+.13,t0+.5));
+  vis(flash,t>=t0&&t<t0+.5);dia(flash,cx,cy,lerp(r0,R,a));
+  if(t>=t0+.5)scene.style.clipPath='none';else dia(scene,cx,cy,lerp(0,R,b));return t>=t0+.13}
+// Every scene is on white, so a wipe would just cut the last one in half; crossfade instead.
 function fade(t,t0,scene){scene.style.opacity=inOut(p(t,t0,t0+.34));return t>=t0}
 
 const eU=all('#E .e'), strikes=all('#E .strike'), segs=all('#D .seg'), jcards=all('#D .jc'), savs=all('#D .sav'), tsm=all('#B .tsm');
@@ -219,10 +242,10 @@ function draw(t){
   let u=t;vis($('D'),t<S.C+.4);
   // camera: close on the finished ticket, then pull back to the board
   const zb=inOut(p(u,2.0,2.6)),land=1-outCubic(p(u,0,.32));
-  const cs=lerp(1.6,1,zb)*(1+.06*land),ctx=lerp(400,640,zb)-640*cs,cty=lerp(250,244,zb)-244*cs;
+  const cs=lerp(2.1,1,zb)*(1+.1*land),ctx=lerp(400,640,zb)-640*cs,cty=lerp(185,244,zb)-244*cs;
   $('cam').style.transform=`translate(${ctx}px,${cty}px) scale(${cs})`;$('cam').style.opacity=p(u,0,.16);
   $('board').style.opacity=Math.min(1,(1-p(u,3.85,4.07))+p(u,8.2,8.5));
-  $('bhead').style.opacity=1;
+  $('wlab').style.opacity=p(u,2.3,2.6);$('bhead').style.opacity=1;
   const spot=1-p(u,2.0,2.45),grow=outCubic(p(u,.6,.92)),grow2=outCubic(p(u,8.25,8.6)),dk=inOut(p(u,9.6,10.5)),settle=outCubic(p(u,10.15,10.55));
   $('colTodo').style.opacity=1-.45*spot;$('colProg').style.opacity=1-.45*spot;$('colDone').style.opacity=1;
   $('colDone').style.height=(114+36*grow)+'px';$('colTodo').style.height=lerp(114+36*grow2,46,settle)+'px';$('colProg').style.height=(212+114*settle)+'px';
@@ -239,6 +262,9 @@ function draw(t){
   // the highlighter marks whichever amount the scene is about: the finished ticket in the hook, the estimate at the end
   $('amthl').style.transform=`scaleX(${outExpo(p(u,1.0,1.3))})`;$('amthl').style.opacity=1-p(u,2.0,2.5);
   $('est').style.height=(36*grow2)+'px';$('esthl').style.transform=`scaleX(${outExpo(p(u,8.75,9.05))})`;
+  // hook lines
+  rise($('hk1'),outExpo(p(u,.75,1.15)),inCubic(p(u,1.95,2.2)));
+  rise($('hk2'),outExpo(p(u,2.45,2.85)),inCubic(p(u,3.6,3.82)));$('hk2hl').style.transform=`scaleX(${outExpo(p(u,2.85,3.12))})`;
   // jump into the unstarted feature, and later back out to the board
   const ex=inOut(p(u,3.65,4.07)),ex2=inOut(p(u,8.2,8.62)),R0=[56,188,208,70],R0b=[56,188,208,106],R1=[48,80,704,396];
   const rc=ex2>0?R1.map((v,i)=>lerp(v,R0b[i],ex2)):R0.map((v,i)=>lerp(v,R1[i],ex)),pb=$('pbg'),inD=u>=3.65&&u<8.62;
@@ -268,14 +294,15 @@ function draw(t){
   $('about').style.opacity=p(u,6.28,6.46);
   rise($('brk'),outExpo(p(u,7.3,7.66)));
   // the cursor lives in board space and follows the camera
-  let cx=960,cy=330;CW.forEach(([a,b,x,y,arc])=>{if(u>=a){const k=inOut(p(u,a,b)),sx=cx,sy=cy;cx=lerp(sx,x,k);cy=lerp(sy,y,k)-(arc?20*Math.sin(Math.PI*k):0)}});
+  let cx=880,cy=330;CW.forEach(([a,b,x,y,arc])=>{if(u>=a){const k=inOut(p(u,a,b)),sx=cx,sy=cy;cx=lerp(sx,x,k);cy=lerp(sy,y,k)-(arc?20*Math.sin(Math.PI*k):0)}});
   const px=cx*cs+ctx,py=cy*cs+cty;
   let dip=1,rg=0;PRESS.forEach(a=>{dip*=1-.16*Math.sin(Math.PI*p(u,a,a+.18));const k=p(u,a+.03,a+.3);if(k>0&&k<1)rg=k});
   $('cur').style.opacity=u>=.05?1:0;$('cur').style.transform=`translate(${px-5}px,${py-3}px) scale(${dip})`;
   $('ringc').style.opacity=rg>0?1-rg:0;$('ringc').style.transform=`translate(${px}px,${py}px) scale(${.3+.9*outCubic(rg)})`;
 
   // ================= FORECAST
-  u=t-S.C+.4;vis($('C'),fade(t,S.C,$('C'))&&t<S.B+.4);
+  u=t-S.C;vis($('C'),fade(t,S.C,$('C'))&&t<S.B+.55);
+  chapter('chC',u,.2);
   const sk=inOut(p(u,.78,1.38));dash($('solid'),sk);$('cAreaR').setAttribute('width',58+228*sk);
   const sp=$('solid'),sl=sp.getTotalLength(),pt=sp.getPointAtLength(sl*sk);
   const pk=inOut(p(u,1.55,2.2));$('cProjR').setAttribute('width',pk>0?452*pk+6:0);
@@ -288,7 +315,8 @@ function draw(t){
   rise($('cc1'),outExpo(p(u,.8,1.1)),inCubic(p(u,1.45,1.62)));rise($('cc2'),outExpo(p(u,1.6,1.95)));rise($('cc3'),outExpo(p(u,1.7,2.05)));
 
   // ================= SEE
-  u=t-S.B+.5;vis($('B'),fade(t,S.B,$('B'))&&t<S.E+.4);
+  u=t-S.B;const bOn=iris(t,S.B,738,128,$('fB'),$('B'),8);vis($('B'),bOn&&t<S.E+.4);
+  chapter('chB',u,.28);
   tsm.forEach((el,i)=>{const a=.5+i*.06,k=p(u,a,a+.4);el.style.opacity=p(u,a,a+.1);el.style.transform=`scale(${Math.max(0,outBack(k))})`});
   rise($('n1r'),outExpo(p(u,.82,1.2)));const c1=97*outCubic(p(u,.86,1.45));num($('n1'),c1);
   $('t1').style.transform=`scaleX(${outExpo(p(u,.82,1.2))})`;$('f1').style.width=c1+'%';
@@ -299,22 +327,22 @@ function draw(t){
   $('who2').style.opacity=p(u,1.58,1.78);$('who2').style.transform=`translateX(${(1-outCubic(p(u,1.58,1.93)))*26}px)`;
 
   // ================= NEVER COLLECTED
-  u=t-S.E;vis($('E'),fade(t,S.E,$('E')));
-  // fade to white at the end so the loop restarts cleanly on the board
-  $('E').style.opacity=Math.min(+$('E').style.opacity,1-inOut(p(t,S.END-.32,S.END-.02)));
-  $('ecard').style.opacity=p(u,0,.25);$('ecard').style.transform=`scale(${lerp(.96,1,outCubic(p(u,0,.4)))})`;
+  u=t-S.E;vis($('E'),fade(t,S.E,$('E'))&&t<S.F+.55);
   $('shield').style.transform=`scale(${Math.max(0,outBack(p(u,.14,.5)))})`;dash($('shchk'),inOut(p(u,.42,.7)));
   rise($('secl'),outExpo(p(u,.24,.62)));
   eU.forEach((el,i)=>{rise(el,outExpo(p(u,.42+i*.07,.78+i*.07)));el.style.opacity=lerp(1,.38,p(u,.82+i*.09,1.0+i*.09))});
   strikes.forEach((el,i)=>{el.style.transform=`scaleX(${outExpo(p(u,.78+i*.09,1.02+i*.09))})`});
   rise($('never'),outExpo(p(u,1.12,1.48)));$('nvhl').style.transform=`scaleX(${outExpo(p(u,1.42,1.72))})`;
 
+  // ================= END CARD
+  u=t-S.F;const fOn=iris(t,S.F,400,250,$('fF'),$('F'),0);vis($('F'),fOn);
+  rise($('wm'),outExpo(p(u,.36,.74)),inCubic(p(u,1.22,1.46)));rise($('tl'),outExpo(p(u,.48,.86)),inCubic(p(u,1.18,1.42)));
   $('time').textContent=t.toFixed(1)+' / '+S.END+'s';scrub.value=t;
 }
 const btn=$('play'),scrub=$('scrub');let T=0,paused=false,last=0;
 btn.onclick=()=>{paused=!paused;btn.textContent=paused?'Play':'Pause'};
 scrub.oninput=()=>{T=+scrub.value;paused=true;btn.textContent='Play';draw(T)};
-window.__setT=t=>{T=t;paused=true;draw(t)};
+window.__setT=t=>{T=t;paused=true;measure();draw(t)};
 function loop(n){const d=Math.min(.1,(n-last)/1000);last=n;if(!paused)T=(T+d)%S.END;draw(T);requestAnimationFrame(loop)}
 requestAnimationFrame(n=>{last=n;loop(n)});
 

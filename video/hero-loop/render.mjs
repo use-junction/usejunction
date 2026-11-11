@@ -23,8 +23,8 @@ const outDir = path.join(publicDir, "video");
 
 const FPS = 30;
 /** Must match S.END in hero-loop.html. */
-const DURATION = 18.4;
-/** The opening close-up: the merged ticket showing what it cost. */
+const DURATION = 19.9;
+/** The hook frame: "One feature. $6,930 in AI." on the merged ticket. */
 const POSTER_AT = 1.5;
 
 const ASSETS = {
@@ -33,6 +33,7 @@ const ASSETS = {
   cursor: [path.join(publicDir, "tool-logos/cursor.svg"), "image/svg+xml"],
   codex: [path.join(publicDir, "tool-logos/chatgpt.svg"), "image/svg+xml"],
   copilot: [path.join(publicDir, "tool-logos/copilot.svg"), "image/svg+xml"],
+  wordmark: [path.join(publicDir, "usejunction.png"), "image/png"],
   f0: [path.join(here, "assets/people/marcus.jpg"), "image/jpeg"],
   f1: [path.join(here, "assets/people/priya.jpg"), "image/jpeg"],
   f2: [path.join(here, "assets/people/tom.jpg"), "image/jpeg"],
