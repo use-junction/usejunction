@@ -10,7 +10,7 @@ export const HOME_SIGNUP_HREF = `${siteConfig.signupUrl}?from=${encodeURICompone
 export const HOME_PRICE_LINE = `Free for ${USER_LIMIT_FREE} seats, then $${TEAM_PRICE_PER_DEV_USD} per active developer a month. No card.`;
 
 /**
- * The 19.9s hero loop, rendered from video/hero-loop/hero-loop.html by video/hero-loop/render.mjs.
+ * The 21.2s hero loop, rendered from video/hero-loop/hero-loop.html by video/hero-loop/render.mjs.
  * Phones get a smaller encode; the poster is the hook frame ("One feature. $6,930 in AI.").
  * Sources are listed phone first, H.264 before VP9: the browser plays the first one whose media and codec it
  * supports, so most get the smaller MP4 and browsers without H.264 still get the loop as WebM.

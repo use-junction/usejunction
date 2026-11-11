@@ -23,3 +23,15 @@ test("every hero film scene is drawn on white, the Forecast included", () => {
   expect(film).not.toContain(".dark{");
   expect(film).toMatch(/#stage\{[^}]*background:#fff\}/);
 });
+
+// The See chapter names what it shows and goes past its two examples to the rest of the team.
+test("hero film's See chapter reads \"See every seat\" and scrolls a list of people that matches the homepage", () => {
+  expect(film).toContain('id="chB">See<span id="chBx"');
+  expect(film).toContain("> every seat</span>");
+  // The people the homepage also shows keep the homepage's numbers (home-roles.tsx and home-story.tsx).
+  expect(film).toContain("['Marcus',58,'claude'");
+  expect(film).toContain("['Tom',2,'cursor'");
+  expect(film).toContain("['Amara',1,'cursor'");
+  const people = film.match(/const PEOPLE=\[([\s\S]*?)\];\n/)?.[1] ?? "";
+  expect(people.match(/\['[A-Z]/g)?.length).toBeGreaterThanOrEqual(8);
+});

@@ -163,9 +163,10 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
 
 <i class="flash" id="fB"></i>
 <section class="sc light" id="B">
-  <div class="chap cal" id="chB">See</div>
+  <div class="chap cal" id="chB">See<span id="chBx" style="position:absolute;left:100%;top:0;white-space:pre;opacity:0"> every seat</span></div>
   <div class="tile tsm" style="left:592px;top:30px"><img src="{{claude}}"></div><div class="tile tsm" style="left:634px;top:30px"><img src="{{cursor}}"></div><div class="tile tsm" style="left:676px;top:30px"><img src="{{codex}}"></div><div class="tile tsm" style="left:718px;top:30px"><img src="{{copilot}}"></div>
-  <div id="rows">
+  <div id="rclip" style="position:absolute;left:0;right:0;top:76px;bottom:0;overflow:hidden">
+  <div id="rows" style="position:absolute;left:0;top:-76px;width:800px;height:500px;transform-origin:0 0">
     <div id="row1" class="abs" style="inset:0">
       <div class="big cal" style="top:82px"><span class="m"><span class="r" id="n1r"><span id="n1">0</span><small>%</small></span></span></div>
       <div class="who" id="who1" style="top:112px"><div class="n"><img src="{{claude}}">Priya</div><div class="c">of her weekly Claude limit</div></div>
@@ -177,6 +178,8 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
       <div class="who" id="who2" style="top:298px"><div class="n"><img src="{{claude}}">Elena</div><div class="c">A quiet seat.</div></div>
       <div class="track" id="t2" style="top:426px"><i id="f2" style="background:#a2a8b5"></i></div>
     </div>
+  </div>
+  <div id="rfade" style="position:absolute;left:0;right:0;top:0;height:34px;background:linear-gradient(#fff,rgba(255,255,255,0));opacity:0"></div>
   </div>
 </section>
 
@@ -198,7 +201,7 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
 </section>
 
 </div></div>
-<div class="ctl"><button id="play">Pause</button><input id="scrub" type="range" min="0" max="19.9" step="0.01" value="0"><span class="t" id="time"></span></div>
+<div class="ctl"><button id="play">Pause</button><input id="scrub" type="range" min="0" max="21.2" step="0.01" value="0"><span class="t" id="time"></span></div>
 </div>
 <script>
 const $=id=>document.getElementById(id), all=s=>[...document.querySelectorAll(s)];
@@ -206,7 +209,7 @@ const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)), p=(t,a,b)=>cl((t-a)/(b-a)), ler
 const outExpo=x=>x>=1?1:1-Math.pow(2,-10*x), outCubic=x=>1-Math.pow(1-x,3), inCubic=x=>x*x*x, inOut=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
 const outBack=x=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)};
 // Order: Work (with the hook) -> Forecast -> See -> Never collected -> End card
-const S={W:0,C:11.1,B:13.9,E:16.4,F:18.4,END:19.9};
+const S={W:0,C:11.1,B:13.9,E:17.7,F:19.7,END:21.2};
 const stage=$('stage'), frame=stage.parentElement;
 function fit(){stage.style.transform='scale('+(frame.clientWidth/800)+')'}new ResizeObserver(fit).observe(frame);fit();
 const rise=(el,kin,kout=0)=>{el.style.transform=`translateY(${(1-kin)*108-kout*108}%)`};
@@ -236,6 +239,16 @@ const LEGS=[[5.1,5.36],[5.38,5.62],[5.64,5.84],[5.86,6.06]], STOPS=[68,249,401,5
 // cursor waypoints in board space: [start, end, x, y, arc]
 const CW=[[.1,.42,714,206,1],[2.5,3.0,150,226,1],[3.8,4.2,708,452,1],[6.7,7.1,330,402,1],[8.2,8.62,236,200,1],[9.6,10.5,476,376,0]], PRESS=[.55,3.55,7.1,9.5,10.52];
 const BASESH='0 1px 1px rgba(9,30,66,.25),0 0 1px rgba(9,30,66,.31)';
+// See: Priya and Elena are the top of a longer list. The rest of it is built here, one row every 186px, and the
+// scene pulls back and scrolls through it. Marcus, Tom and Amara carry the homepage's figures for them.
+const ICON={claude:tsm[0].firstElementChild.src,cursor:tsm[1].firstElementChild.src};
+const BARC={warn:'#d9730a',ok:'#08758a',idle:'#a2a8b5'}, NUMC={warn:'#111210',ok:'#111210',idle:'#a2a8b5'};
+const PEOPLE=[['Marcus',58,'claude','of the weekly Claude limit','ok'],['Tom',2,'cursor','Cursor seat, barely used','idle'],['Amara',1,'cursor','Cursor seat, barely used','idle'],
+  ['Kenji',84,'claude','of the weekly Claude limit','ok'],['Sofia',0,'cursor','Cursor seat, not used','idle'],['Leila',93,'claude','of the weekly Claude limit','warn'],
+  ['Diego',45,'claude','of the weekly Claude limit','ok'],['Jonas',4,'claude','A quiet seat.','idle'],['Hannah',67,'claude','of the weekly Claude limit','ok']];
+const more=PEOPLE.map(([n,pc,tool,cap,tone],i)=>{const row=document.createElement('div');row.className='abs';row.style.cssText=`inset:0;transform:translateY(${186*(i+2)}px);opacity:0`;
+  row.innerHTML=`<div class="big cal" style="top:82px;color:${NUMC[tone]}">${pc}<small>%</small></div><div class="who" style="top:112px;opacity:1"><div class="n"><img src="${ICON[tool]}">${n}</div><div class="c">${cap}</div></div>${tone==='warn'?'<div class="pill" style="top:128px"><i></i>Near limit</div>':''}<div class="track" style="top:240px"><i style="background:${BARC[tone]};width:${pc}%"></i></div>`;
+  $('rows').appendChild(row);return row});
 
 function draw(t){
   // ================= WORK, opening on the hook
@@ -325,6 +338,12 @@ function draw(t){
   rise($('n2r'),outExpo(p(u,1.45,1.83)));const c2=6*outCubic(p(u,1.5,1.85));num($('n2'),c2);
   $('t2').style.transform=`scaleX(${outExpo(p(u,1.45,1.83))})`;$('f2').style.width=c2+'%';
   $('who2').style.opacity=p(u,1.58,1.78);$('who2').style.transform=`translateX(${(1-outCubic(p(u,1.58,1.93)))*26}px)`;
+  // the chapter word docks in the corner and becomes "See every seat"
+  $('chBx').style.opacity=p(u,.88,1.12);
+  // pull back and scroll: the two people are the top of the whole team's list
+  const pull=inOut(p(u,2.2,2.8)),scroll=inOut(p(u,2.3,3.55)),listS=lerp(1,.55,pull);
+  $('rows').style.transform=`translate(${181*pull}px,${46.9*pull-scroll*6*186*listS}px) scale(${listS})`;
+  more.forEach(row=>{row.style.opacity=p(u,2.2,2.45)});$('rfade').style.opacity=pull;
 
   // ================= NEVER COLLECTED
   u=t-S.E;vis($('E'),fade(t,S.E,$('E'))&&t<S.F+.55);
