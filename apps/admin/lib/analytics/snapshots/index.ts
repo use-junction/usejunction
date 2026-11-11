@@ -30,6 +30,12 @@ export type {
   SnapshotDeveloperActivity,
   SnapshotReadResult,
 } from "./read";
+export {
+  DEVICE_OBSERVED_SOURCES,
+  SYNC_TRAIL_REQUIRED_SINCE,
+  syncTrailBackedSql,
+  countUnbackedDeviceRows,
+} from "./sync-trail";
 export { getDashboardReadiness, getWorkspaceSyncReadiness, countOrgDirtyDays } from "./readiness";
 export type { DashboardReadiness } from "./readiness";
 export {

@@ -43,9 +43,11 @@ export async function eraseDeveloperData(input: {
       await tx.device.deleteMany({ where: { id: { in: deviceIds } } });
     }
 
+    // Keep the spend in org totals. Deleting the devices above also deletes their
+    // sync runs, so mark the rows: snapshots accept erased device rows without one.
     await tx.usageDaily.updateMany({
       where: { orgId: input.orgId, developerId: developer.id },
-      data: { developerId: null, deviceId: null, metadata: {} },
+      data: { developerId: null, deviceId: null, metadata: { erasedAt: now.toISOString() } },
     });
 
     await tx.externalIdentity.deleteMany({ where: { developerId: developer.id } });
