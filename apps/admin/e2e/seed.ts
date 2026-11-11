@@ -268,6 +268,11 @@ async function main() {
   const usageFrom = new Date("2026-07-01T00:00:00.000Z");
   const usageTo = new Date("2026-07-16T00:00:00.000Z");
 
+  // Device rows only count when a sync run from that device covers their date.
+  await prisma.syncRun.create({
+    data: { orgId: org.id, deviceId: device.id, status: "committed", windowFrom: usageFrom, windowTo: usageTo, committedAt: deviceSeenAt },
+  });
+
   await prisma.usageDaily.createMany({
     data: [
       {
