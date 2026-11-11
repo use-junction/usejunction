@@ -139,7 +139,11 @@ export function MarketingTopNav({ isAuthenticated }: MarketingTopNavProps) {
         </div>
 
         <div className="flex items-center gap-2 md:hidden">
-          {isAuthenticated ? null : (
+          {isAuthenticated ? (
+            <Link href="/dashboard" className="public-btn public-btn-yellow rounded-none px-4 font-semibold">
+              Dashboard
+            </Link>
+          ) : (
             <Link href={HOME_SIGNUP_HREF} className="public-btn public-btn-yellow rounded-none px-4 font-semibold">
               {HOME_SIGNUP_LABEL}
             </Link>
