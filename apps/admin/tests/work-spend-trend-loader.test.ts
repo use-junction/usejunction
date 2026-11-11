@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { beforeEach, test, vi } from "vitest";
+import { afterEach, beforeEach, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ raw: vi.fn() }));
 vi.mock("@usejunction/db", async () => {
@@ -7,7 +7,12 @@ vi.mock("@usejunction/db", async () => {
   return { Prisma, prisma: { $queryRaw: mocks.raw } };
 });
 
-beforeEach(() => { mocks.raw.mockReset(); });
+// The fixtures are dated August and September 2026. Pin "today" so the 90-day window always covers them.
+beforeEach(() => {
+  mocks.raw.mockReset();
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-09-25T12:00:00Z") });
+});
+afterEach(() => { vi.useRealTimers(); });
 
 test("classifies shipped, in-flight, and stalled work and cleans a weak title", async () => {
   mocks.raw.mockResolvedValue([{
