@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Cloud, Server, type LucideIcon } from "lucide-react";
+import { ArrowRight, Cloud, Github, Server, type LucideIcon } from "lucide-react";
 import { siteConfig } from "@/lib/public/config";
 import { HOME_SIGNUP_HREF, HOME_SIGNUP_LABEL } from "@/lib/public/home-cta";
 import { TEAM_PRICE_PER_DEV_USD, USER_LIMIT_FREE } from "@/lib/saas-billing/entitlements";
@@ -34,7 +34,7 @@ const OPTIONS: Option[] = [
 
 export function HomePricing() {
   return (
-    <section id="pricing" aria-labelledby="home-pricing-heading" className="scroll-mt-20 mt-24 bg-brand-yellow-pale sm:mt-32 lg:mt-[9.5rem]">
+    <section id="pricing" aria-labelledby="home-pricing-heading" className="scroll-mt-20 bg-brand-yellow-pale">
       <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 pb-[4.5rem] pt-16 sm:px-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-[5.5rem] lg:px-0 lg:pb-[7.5rem] lg:pt-28">
         <div>
           <p aria-hidden className="text-[7.5rem] font-bold leading-[0.85] tracking-[-0.06em] sm:text-[11.5rem]">
@@ -46,7 +46,7 @@ export function HomePricing() {
           </h2>
           <Link
             href={HOME_SIGNUP_HREF}
-            className="public-btn public-btn-teal mt-8 w-full rounded-none px-8 py-3 text-base font-semibold sm:w-auto"
+            className="public-btn public-btn-cta mt-8 w-full rounded-none sm:w-auto"
           >
             {HOME_SIGNUP_LABEL}
             <ArrowRight className="h-5 w-5" aria-hidden />
@@ -72,8 +72,9 @@ export function HomePricing() {
                 <Link
                   href={option.link.href}
                   {...(option.link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                  className="col-start-2 justify-self-start border-b !border-current pb-px text-[0.9375rem] font-semibold transition-colors hover:text-primary sm:col-start-auto"
+                  className="col-start-2 inline-flex items-center gap-2 justify-self-start border-b !border-current pb-px text-[0.9375rem] font-semibold transition-colors hover:text-primary sm:col-start-auto"
                 >
+                  {option.link.external ? <Github className="size-4" aria-hidden /> : null}
                   {option.link.label}
                 </Link>
               </li>

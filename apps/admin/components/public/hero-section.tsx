@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Github } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { siteConfig } from "@/lib/public/config";
@@ -99,7 +99,7 @@ export function HeroSection() {
               <div className="flex w-full flex-col items-stretch gap-4 sm:w-auto sm:flex-row sm:items-center sm:gap-6">
                 <Link
                   href={HOME_SIGNUP_HREF}
-                  className="public-btn public-btn-teal rounded-none px-8 py-3 text-base font-semibold"
+                  className="public-btn public-btn-cta rounded-none"
                 >
                   {HOME_SIGNUP_LABEL}
                   <ArrowRight className="h-5 w-5" aria-hidden />
@@ -108,8 +108,9 @@ export function HeroSection() {
                   href={siteConfig.githubUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="self-start border-b border-current pb-px text-[0.9375rem] font-semibold text-[var(--public-fg)] transition-colors hover:text-[var(--public-accent)] sm:self-auto"
+                  className="inline-flex items-center gap-2 self-start border-b border-current pb-px text-[0.9375rem] font-semibold text-[var(--public-fg)] transition-colors hover:text-[var(--public-accent)] sm:self-auto"
                 >
+                  <Github className="size-4" aria-hidden />
                   Self-host from GitHub
                 </a>
               </div>
