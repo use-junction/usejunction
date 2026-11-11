@@ -39,7 +39,7 @@ flowchart LR
 | Quota cards | `quota_snapshot` via `readQuotas` | Always live |
 | `/api/insights/query` | Live `usage_daily` CTE | Debug / ad-hoc escape hatch only |
 
-Snapshot grains (`org-day-snap-v2`):
+Snapshot grains (`org-day-snap-v3`):
 
 | Grain | `developerId` | `toolName` | `modelName` |
 |-------|---------------|------------|-------------|
@@ -57,6 +57,20 @@ Key read-path contract (`apps/admin/lib/analytics/snapshots/read.ts`):
 > Dirty days are reported as importing/partial — never recomputed via live CTEs. Default `ensure: false` on page readers.
 
 `ORG_DAY_SNAPSHOT_VERSION` embeds `CALCULATION_VERSION` and `PRICING_VERSION`, so bumping either makes every sealed row invisible to readers until it is resealed. The first drain after such a deploy (sync commit, Sync now, or the daily cron) runs `ensureOrgSnapshotCoverage`, which marks every usage day without a current-version seal dirty and then drains them newest-first; dashboards show `partialData` until that finishes.
+
+### Which device rows count: the sync trail
+
+Since the legacy `/api/ingest/local-usage` route was removed (2026-07-25), every device row reaches `usage_daily` inside a sync run, and the run records the window of dates the device declared (`sync_runs.window_from`..`window_to`). A device-sourced row (`device_observed` and its aliases) only counts toward snapshots when one of these holds:
+
+- a sync run from the same device covers the row's date;
+- it was observed before 2026-07-26 (legacy uploads, which have no run);
+- privacy erasure removed its device and runs (`device_id` null, `metadata.erasedAt` set).
+
+Anything else was written outside the sync pipeline (a script, a leaked test seed, a direct database write) and is left out. Vendor, gateway, otel and invoice rows are unaffected.
+
+The rule is one SQL fragment, `syncTrailBackedSql()` in `apps/admin/lib/analytics/snapshots/sync-trail.ts`, used by every snapshot reader of `usage_daily`: the materialize aggregation, the corrupt-day detector, the zero-seal guard, the live overlay and readiness's stub-conflict count. They must agree; if materialize skipped a row the other checks still counted, that day would be marked dirty forever. Each materialized range logs `[snapshots/unbacked-device-rows]` with the row count and cost it left out.
+
+This only catches rows that bypassed the pipeline. Rows uploaded through a real sync, even by an agent the user controls, have a sync trail and count.
 
 ---
 

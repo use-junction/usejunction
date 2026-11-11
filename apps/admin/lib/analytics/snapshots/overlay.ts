@@ -4,6 +4,7 @@
  */
 import { Prisma, prisma } from "@usejunction/db";
 import { ORG_DAY_SNAPSHOT_VERSION } from "./materialize";
+import { syncTrailBackedSql } from "./sync-trail";
 
 export type LiveDayTotalRow = {
   date: Date;
@@ -113,6 +114,7 @@ export async function liveOrgDayTotalsForDates(
       FROM usage_daily
       WHERE org_id = ${orgId}
         AND date IN (${dateList})
+        AND ${syncTrailBackedSql()}
         ${developerFilter}
     ), ranked AS (
       SELECT classified.*,

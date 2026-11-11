@@ -184,11 +184,12 @@ test("erasure anonymises the developer and scrubs usage plus audit email", async
   assert.equal(update.name, "Erased member");
   assert.match(update.email, /erased-dev_1@erased\.invalid/);
   assert.equal(update.authUserId, null);
-  assert.deepEqual(mocks.usageUpdate.mock.calls[0][0].data, {
-    developerId: null,
-    deviceId: null,
-    metadata: {},
-  });
+  const usageData = mocks.usageUpdate.mock.calls[0][0].data;
+  assert.equal(usageData.developerId, null);
+  assert.equal(usageData.deviceId, null);
+  // Only the erasure time survives, so snapshots keep the spend without its sync run.
+  assert.deepEqual(Object.keys(usageData.metadata), ["erasedAt"]);
+  assert.match(usageData.metadata.erasedAt, /^\d{4}-\d{2}-\d{2}T/);
   assert.equal(mocks.userDelete.mock.calls.length, 1);
   const redacted = mocks.auditUpdate.mock.calls[0][0].data.metadata;
   assert.equal(redacted.email, "[redacted-email]");

@@ -1,5 +1,6 @@
-import { prisma } from "@usejunction/db";
+import { Prisma, prisma } from "@usejunction/db";
 import { ORG_DAY_SNAPSHOT_VERSION } from "./materialize";
+import { syncTrailBackedSql } from "./sync-trail";
 
 const DEFAULT_METRIC_VERSION = ORG_DAY_SNAPSHOT_VERSION;
 
@@ -58,22 +59,17 @@ async function countStubConflicts(
   });
   if (!stubs.length) return 0;
 
-  const days = stubs.map((row) => row.date);
-  const usage = await prisma.usageDaily.findMany({
-    where: {
-      orgId,
-      date: { in: days },
-      OR: [
-        { requests: { gt: 0 } },
-        { inputTokens: { gt: 0 } },
-        { outputTokens: { gt: 0 } },
-        { costMicros: { gt: 0 } },
-        { sessions: { gt: 0 } },
-      ],
-    },
-    distinct: ["date"],
-    select: { date: true },
-  });
+  const days = stubs.map((row) => isoDay(row.date));
+  // Same sync-trail rule as materialize, or a day with only unbacked rows would
+  // read as a stub conflict forever.
+  const usage = await prisma.$queryRaw<Array<{ date: Date }>>`
+    SELECT DISTINCT date
+    FROM usage_daily
+    WHERE org_id = ${orgId}
+      AND date IN (${Prisma.join(days.map((d) => Prisma.sql`${d}::date`))})
+      AND ${syncTrailBackedSql()}
+      AND (requests > 0 OR input_tokens > 0 OR output_tokens > 0 OR cost_micros > 0 OR sessions > 0)
+  `;
   return usage.length;
 }
 
