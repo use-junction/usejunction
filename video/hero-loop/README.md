@@ -1,14 +1,14 @@
 # Homepage hero loop
 
-The 18.7-second silent loop in the homepage hero. It is drawn in HTML and rendered to video, so it plays the same everywhere.
+The 19.9-second silent loop in the homepage hero. It is drawn in HTML and rendered to video, so it plays the same everywhere.
 
 | Time | Scene |
 |---|---|
-| 0–9.9s | Work: a merged ticket shows what it cost ("One feature. $6,930 in AI."), then the next feature is estimated from the people assigned to it (about $5,400) and moves to In progress |
-| 9.9–12.7s | Forecast: $14,180 spent in ten days, $42,540 by month end |
-| 12.7–15.2s | See: Priya at 97% of her weekly Claude limit, Elena at 6% |
-| 15.2–17.2s | Never collected: the agent reads usage locally |
-| 17.2–18.7s | End card: "Free for 5 seats. No card." |
+| 0–11.1s | Work: a merged ticket shows what it cost ("One feature. $6,930 in AI."), then the next feature is estimated from the people assigned to it (about $5,400), the estimate sits on its card and the card moves to In progress |
+| 11.1–13.9s | Forecast: $14,180 spent in ten days, $42,540 by month end |
+| 13.9–16.4s | See: Priya at 97% of her weekly Claude limit, Elena at 6% |
+| 16.4–18.4s | Never collected: the agent reads usage locally |
+| 18.4–19.9s | End card: "Free for 5 seats. No card." |
 
 The figures are the homepage's example team (Northwind Labs, 38 people). Keep them in step with the homepage sections.
 

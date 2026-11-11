@@ -81,8 +81,11 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
 #D .seg span{padding-bottom:10px;font-size:19px}
 .av{background-size:cover;background-position:center;background-color:#dfe1e6}
 .f0{background-image:url({{f0}})}.f1{background-image:url({{f1}})}.f2{background-image:url({{f2}})}.f3{background-image:url({{f3}})}
-#amt{height:0;overflow:hidden;display:flex;align-items:flex-end;gap:2px;white-space:nowrap}
-#amt .v{font-size:31px;line-height:1.1}
+/* The cost row is the same on every card: an icon, a word, the amount. */
+.cost{height:0;overflow:hidden;display:flex;align-items:flex-end;gap:6px;white-space:nowrap;font-size:13.5px}
+.cost svg{flex:none;margin-bottom:6px}
+.cost .w{font-weight:700;margin-bottom:5px}
+.cost b{font-size:25px;line-height:1.15;color:#172b4d;font-weight:400}
 .loz2{display:inline-flex;align-items:center;gap:6px;margin-left:14px;padding:5px 10px;border-radius:3px;background:#dfe1e6;color:#172b4d;font-size:12.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;vertical-align:5px}
 .loz2 i{width:8px;height:8px;border-radius:50%;background:#7a869a;display:block}
 #D .seg{align-items:center}
@@ -102,8 +105,6 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
 .ctl .t{font-variant-numeric:tabular-nums;min-width:92px;text-align:right;color:var(--muted-foreground)}
 .hookl{left:0;right:0;text-align:center;font-size:56px;line-height:1.15;white-space:nowrap}
 .tsm{width:36px;height:36px;border-radius:10px;box-shadow:0 4px 12px rgba(20,16,10,.08)}.tsm img{width:20px;height:20px}
-#est{height:0;overflow:hidden;display:flex;align-items:flex-end;gap:6px;font-size:13px;font-weight:600;color:#5e6c84;white-space:nowrap}
-#est b{font-size:23px;line-height:1.15;color:#172b4d;font-weight:400}
 </style></head><body>
 <div class="wrap">
 <div class="frame"><div id="stage">
@@ -116,7 +117,7 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
     <div class="jcol" id="colTodo" style="left:48px;height:114px"><h5>To do<b id="cTodo">1</b></h5></div>
     <div class="jcol" id="colProg" style="left:288px;height:212px"><h5>In progress<b id="cProg">2</b></h5></div>
     <div class="jcol" id="colDone" style="left:528px;height:114px"><h5>Done<b>1</b></h5></div>
-    <div class="jc" id="cNext" style="left:56px;top:154px"><p>Add usage alerts</p><div id="est"><span>about</span><b class="cal">$5,400</b></div><div class="jf"><i class="ti epic"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M5.8.6L2 5.6h2.4L4.2 9.4 8 4.4H5.6z" fill="#fff"/></svg></i><span>NW-238</span><em><u class="av f0"></u><u class="av f1"></u><u class="av f2"></u><u class="av f3"></u></em></div></div><div class="jc" style="left:296px;top:154px"><p>Fix repeated webhook deliveries</p><div class="jf"><i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>NW-231</span><em><u class="av f1"></u></em></div></div><div class="jc" style="left:296px;top:252px"><p>Rewrite billing jobs</p><div class="jf"><i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>NW-224</span><em><u class="av f3"></u></em></div></div><div class="jc" id="cDone" style="left:536px;top:154px"><p>Add team invitations</p><div id="amt"><span class="hlw"><i id="amthl"></i><b class="v cal">$<span id="n6930">0</span></b></span><span class="merged" style="margin-left:9px;vertical-align:0;margin-bottom:6px;gap:5px"><svg width="17" height="17" viewBox="0 0 16 16" style="flex:none"><path fill="#8250df" d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z"/></svg>Merged</span></div><div class="jf"><i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>NW-212</span><em><u class="av f0"></u></em></div></div>
+    <div class="jc" id="cNext" style="left:56px;top:154px"><p>Add usage alerts</p><div class="cost" id="est" style="color:#08758a"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#08758a" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 6.2c1.8-1.8 3.6-1.8 5.5 0s3.7 1.8 5.5 0M2.5 10.6c1.8-1.8 3.6-1.8 5.5 0s3.7 1.8 5.5 0"/></svg><span class="w">About</span><span class="hlw"><i id="esthl"></i><b class="cal">$5,400</b></span></div><div class="jf"><i class="ti epic"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M5.8.6L2 5.6h2.4L4.2 9.4 8 4.4H5.6z" fill="#fff"/></svg></i><span>NW-238</span><em><u class="av f0"></u><u class="av f1"></u><u class="av f2"></u><u class="av f3"></u></em></div></div><div class="jc" style="left:296px;top:154px"><p>Fix repeated webhook deliveries</p><div class="jf"><i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>NW-231</span><em><u class="av f1"></u></em></div></div><div class="jc" style="left:296px;top:252px"><p>Rewrite billing jobs</p><div class="jf"><i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>NW-224</span><em><u class="av f3"></u></em></div></div><div class="jc" id="cDone" style="left:536px;top:154px"><p>Add team invitations</p><div class="cost" id="amt" style="color:#8250df"><svg width="16" height="16" viewBox="0 0 16 16"><path fill="#8250df" d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z"/></svg><span class="w">Merged</span><span class="hlw"><i id="amthl"></i><b class="cal">$<span id="n6930">0</span></b></span></div><div class="jf"><i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>NW-212</span><em><u class="av f0"></u></em></div></div>
    </div>
   </div>
   <div class="abs cal hookl" style="top:334px"><span class="m"><span class="r" id="hk1">One feature. $6,930 in AI.</span></span></div>
@@ -197,7 +198,7 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
 </section>
 
 </div></div>
-<div class="ctl"><button id="play">Pause</button><input id="scrub" type="range" min="0" max="18.7" step="0.01" value="0"><span class="t" id="time"></span></div>
+<div class="ctl"><button id="play">Pause</button><input id="scrub" type="range" min="0" max="19.9" step="0.01" value="0"><span class="t" id="time"></span></div>
 </div>
 <script>
 const $=id=>document.getElementById(id), all=s=>[...document.querySelectorAll(s)];
@@ -205,7 +206,7 @@ const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)), p=(t,a,b)=>cl((t-a)/(b-a)), ler
 const outExpo=x=>x>=1?1:1-Math.pow(2,-10*x), outCubic=x=>1-Math.pow(1-x,3), inCubic=x=>x*x*x, inOut=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
 const outBack=x=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)};
 // Order: Work (with the hook) -> Forecast -> See -> Never collected -> End card
-const S={W:0,C:9.9,B:12.7,E:15.2,F:17.2,END:18.7};
+const S={W:0,C:11.1,B:13.9,E:16.4,F:18.4,END:19.9};
 const stage=$('stage'), frame=stage.parentElement;
 function fit(){stage.style.transform='scale('+(frame.clientWidth/800)+')'}new ResizeObserver(fit).observe(frame);fit();
 const rise=(el,kin,kout=0)=>{el.style.transform=`translateY(${(1-kin)*108-kout*108}%)`};
@@ -233,7 +234,7 @@ const rows=ISS.map(([k,ti,o],i)=>{const r=document.createElement('div');r.classN
   r.innerHTML=`<i class="tint"></i>${TASKI}<span class="k">${k}</span><span>${ti}</span><span class="nm">${NAMES[o]}</span><u class="av f${o}"></u>`;$('drows').appendChild(r);return r});
 const LEGS=[[5.1,5.36],[5.38,5.62],[5.64,5.84],[5.86,6.06]], STOPS=[68,249,401,506,582], SUMS=[0,1900,3500,4600,5400], PICK=1;
 // cursor waypoints in board space: [start, end, x, y, arc]
-const CW=[[.1,.42,714,206,1],[2.5,3.0,150,226,1],[3.8,4.2,708,452,1],[6.7,7.1,330,402,1],[8.2,8.62,150,236,1],[8.85,9.45,390,412,0]], PRESS=[.55,3.55,7.1,8.78,9.47];
+const CW=[[.1,.42,714,206,1],[2.5,3.0,150,226,1],[3.8,4.2,708,452,1],[6.7,7.1,330,402,1],[8.2,8.62,236,200,1],[9.6,10.5,476,376,0]], PRESS=[.55,3.55,7.1,9.5,10.52];
 const BASESH='0 1px 1px rgba(9,30,66,.25),0 0 1px rgba(9,30,66,.31)';
 
 function draw(t){
@@ -245,25 +246,27 @@ function draw(t){
   $('cam').style.transform=`translate(${ctx}px,${cty}px) scale(${cs})`;$('cam').style.opacity=p(u,0,.16);
   $('board').style.opacity=Math.min(1,(1-p(u,3.85,4.07))+p(u,8.2,8.5));
   $('wlab').style.opacity=p(u,2.3,2.6);$('bhead').style.opacity=1;
-  const spot=1-p(u,2.0,2.45),grow=outCubic(p(u,.6,.92)),grow2=outCubic(p(u,8.25,8.6)),dk=inOut(p(u,8.85,9.45)),settle=outCubic(p(u,9.15,9.5));
+  const spot=1-p(u,2.0,2.45),grow=outCubic(p(u,.6,.92)),grow2=outCubic(p(u,8.25,8.6)),dk=inOut(p(u,9.6,10.5)),settle=outCubic(p(u,10.15,10.55));
   $('colTodo').style.opacity=1-.45*spot;$('colProg').style.opacity=1-.45*spot;$('colDone').style.opacity=1;
-  $('colDone').style.height=(114+42*grow)+'px';$('colTodo').style.height=lerp(114+30*grow2,46,settle)+'px';$('colProg').style.height=(212+108*settle)+'px';
-  $('cTodo').textContent=u<9.3?'1':'0';$('cProg').textContent=u<9.3?'2':'3';
+  $('colDone').style.height=(114+36*grow)+'px';$('colTodo').style.height=lerp(114+36*grow2,46,settle)+'px';$('colProg').style.height=(212+114*settle)+'px';
+  $('cTodo').textContent=u<10.3?'1':'0';$('cProg').textContent=u<10.3?'2':'3';
   jcards.forEach(c=>{let s=1,x=0,y=0,rot=0,sh=BASESH,bg=WHITE,o=1,z='';
     if(c.id==='cDone'){const l=outCubic(p(u,.58,.82))*(1-p(u,2.0,2.4)),g=p(u,.58,.78);s=1+.04*l;
-      bg=mix(mix(WHITE,HOVER,p(u,.25,.45)),GREEN,g);sh=`0 ${1+7*l}px ${1+20*l}px rgba(9,30,66,${.25-.07*l}),0 0 1px rgba(9,30,66,.4),inset 4px 0 0 rgba(46,158,91,${g})`}
-    else{o=1-.8*spot;if(c.id==='cNext'){const hv=Math.min(1,p(u,2.9,3.08)*(1-p(u,3.9,4.0))+p(u,8.66,8.78)*(1-p(u,9.47,9.62)));
-      const grab=p(u,8.78,8.9)*(1-p(u,9.45,9.58));bg=mix(WHITE,HOVER,hv);s=(1-.04*Math.sin(Math.PI*p(u,3.55,3.75)))*(1+.03*grab);
+      bg=mix(mix(WHITE,HOVER,p(u,.25,.45)),GREEN,g);sh=`0 ${1+7*l}px ${1+20*l}px rgba(9,30,66,${.25-.07*l}),0 0 1px rgba(9,30,66,.4)`}
+    else{o=1-.8*spot;if(c.id==='cNext'){const hv=Math.min(1,p(u,2.9,3.08)*(1-p(u,3.9,4.0))+p(u,8.66,8.78)*(1-p(u,10.52,10.67)));
+      const grab=p(u,9.5,9.62)*(1-p(u,10.5,10.63));bg=mix(WHITE,HOVER,hv);s=(1-.04*Math.sin(Math.PI*p(u,3.55,3.75)))*(1+.03*grab);
       x=240*dk;y=176*dk;rot=3*Math.sin(Math.PI*dk);if(grab>0){sh=`0 ${12*grab}px ${26*grab}px rgba(9,30,66,${.22*grab}),0 0 1px rgba(9,30,66,.4)`;z=5}}}
     c.style.opacity=o;c.style.zIndex=z;c.style.background=rgb(bg);c.style.boxShadow=sh;c.style.transform=`translate(${x}px,${y}px) rotate(${rot}deg) scale(${s})`});
   // the finished ticket shows what it cost, on the card
-  $('amt').style.height=(42*grow)+'px';num($('n6930'),Math.round(6930*outCubic(p(u,.65,1.15))/10)*10);
-  $('amthl').style.transform=`scaleX(${outExpo(p(u,1.0,1.3))})`;$('est').style.height=(30*grow2)+'px';
+  $('amt').style.height=(36*grow)+'px';num($('n6930'),Math.round(6930*outCubic(p(u,.65,1.15))/10)*10);
+  // the highlighter marks whichever amount the scene is about: the finished ticket in the hook, the estimate at the end
+  $('amthl').style.transform=`scaleX(${outExpo(p(u,1.0,1.3))})`;$('amthl').style.opacity=1-p(u,2.0,2.5);
+  $('est').style.height=(36*grow2)+'px';$('esthl').style.transform=`scaleX(${outExpo(p(u,8.75,9.05))})`;
   // hook lines
   rise($('hk1'),outExpo(p(u,.75,1.15)),inCubic(p(u,1.95,2.2)));
   rise($('hk2'),outExpo(p(u,2.45,2.85)),inCubic(p(u,3.6,3.82)));$('hk2hl').style.transform=`scaleX(${outExpo(p(u,2.85,3.12))})`;
   // jump into the unstarted feature, and later back out to the board
-  const ex=inOut(p(u,3.65,4.07)),ex2=inOut(p(u,8.2,8.62)),R0=[56,188,208,70],R0b=[56,188,208,100],R1=[48,80,704,396];
+  const ex=inOut(p(u,3.65,4.07)),ex2=inOut(p(u,8.2,8.62)),R0=[56,188,208,70],R0b=[56,188,208,106],R1=[48,80,704,396];
   const rc=ex2>0?R1.map((v,i)=>lerp(v,R0b[i],ex2)):R0.map((v,i)=>lerp(v,R1[i],ex)),pb=$('pbg'),inD=u>=3.65&&u<8.62;
   pb.style.opacity=inD?1:0;pb.style.left=rc[0]+'px';pb.style.top=rc[1]+'px';pb.style.width=rc[2]+'px';pb.style.height=rc[3]+'px';
   vis($('detail'),inD&&t<S.C+.4);$('detail').style.opacity=1-p(u,8.2,8.36);

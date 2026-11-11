@@ -23,7 +23,7 @@ const outDir = path.join(publicDir, "video");
 
 const FPS = 30;
 /** Must match S.END in hero-loop.html. */
-const DURATION = 18.7;
+const DURATION = 19.9;
 /** The hook frame: "One feature. $6,930 in AI." on the merged ticket. */
 const POSTER_AT = 1.5;
 

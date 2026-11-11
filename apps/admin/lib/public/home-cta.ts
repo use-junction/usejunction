@@ -10,7 +10,7 @@ export const HOME_SIGNUP_HREF = `${siteConfig.signupUrl}?from=${encodeURICompone
 export const HOME_PRICE_LINE = `Free for ${USER_LIMIT_FREE} seats, then $${TEAM_PRICE_PER_DEV_USD} per active developer a month. No card.`;
 
 /**
- * The 18.7s hero loop, rendered from video/hero-loop/hero-loop.html by video/hero-loop/render.mjs.
+ * The 19.9s hero loop, rendered from video/hero-loop/hero-loop.html by video/hero-loop/render.mjs.
  * Phones get a smaller encode; the poster is the hook frame ("One feature. $6,930 in AI.").
  * Sources are listed phone first, H.264 before VP9: the browser plays the first one whose media and codec it
  * supports, so most get the smaller MP4 and browsers without H.264 still get the loop as WebM.
@@ -19,7 +19,7 @@ export const HERO_VIDEO = {
   poster: "/video/hero-loop-poster.jpg",
   width: 1280,
   height: 800,
-  duration: 18.7,
+  duration: 19.9,
   sources: [
     { src: "/video/hero-loop-mobile.mp4", type: 'video/mp4; codecs="avc1.64001F"', media: "(max-width: 767px)" },
     { src: "/video/hero-loop.mp4", type: 'video/mp4; codecs="avc1.640020"' },
@@ -34,8 +34,8 @@ export const HERO_VIDEO = {
  * `still` is a settled frame from the chapter, shown instead of playing for visitors who ask for reduced motion.
  */
 export const HERO_CHAPTERS = [
-  { label: "Work", detail: "What a feature costs", start: 0, still: 9.6 },
-  { label: "Forecast", detail: "Where the month lands", start: 9.9, still: 12.5 },
-  { label: "See", detail: "Who is near a limit", start: 12.7, still: 15 },
-  { label: "Privacy", detail: "What is never collected", start: 15.2, still: 17 },
+  { label: "Work", detail: "What a feature costs", start: 0, still: 10.9 },
+  { label: "Forecast", detail: "Where the month lands", start: 11.1, still: 13.7 },
+  { label: "See", detail: "Who is near a limit", start: 13.9, still: 16.2 },
+  { label: "Privacy", detail: "What is never collected", start: 16.4, still: 18.2 },
 ] as const;

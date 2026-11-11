@@ -95,7 +95,7 @@ test("hero film names its four chapters and jumps to the one a visitor picks", (
 
   vi.mocked(HTMLMediaElement.prototype.play).mockClear();
   fireEvent.click(chapters.getByRole("button", { name: /^Forecast/ }));
-  expect(video.currentTime).toBe(9.9);
+  expect(video.currentTime).toBe(11.1);
   expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
   expect(chapters.getByRole("button", { name: /^Forecast/ }).getAttribute("aria-current")).toBe("true");
   expect(chapters.getByRole("button", { name: /^Work/ }).getAttribute("aria-current")).toBeNull();
@@ -119,6 +119,6 @@ test("with reduced motion a chapter shows as a still frame instead of playing", 
 
   const video = screen.getByLabelText(/UseJunction product video/) as HTMLVideoElement;
   fireEvent.click(screen.getByRole("button", { name: /^See/ }));
-  expect(video.currentTime).toBe(15);
+  expect(video.currentTime).toBe(16.2);
   expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
 });

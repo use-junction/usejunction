@@ -89,7 +89,7 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
   // The chapter strip jumps the film to a chapter and marks it; the pause button stops the clock.
   const chapters = page.getByRole("group", { name: "Video chapters" });
   await chapters.getByRole("button", { name: /^Forecast/ }).click();
-  await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime)).toBeGreaterThanOrEqual(9.9);
+  await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime)).toBeGreaterThanOrEqual(11.1);
   await expect(chapters.getByRole("button", { name: /^Forecast/ })).toHaveAttribute("aria-current", "true");
   await chapters.getByRole("button", { name: "Pause video" }).click();
   await expect(video).toHaveJSProperty("paused", true);
