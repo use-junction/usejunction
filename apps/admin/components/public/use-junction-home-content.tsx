@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { ArrowRight, Github } from "lucide-react";
 import { HeroSection } from "@/components/public/hero-section";
-import { HomeAdoption, HomeWork } from "@/components/public/home-adoption-work";
 import { HomeFaq } from "@/components/public/home-faq";
 import { HomeHowItStarts } from "@/components/public/home-how-it-starts";
 import { HomePricing } from "@/components/public/home-pricing";
 import { HomePaidTwiceBand, HomeWeeksChapter } from "@/components/public/home-story";
 import { HomeRoles } from "@/components/public/home-roles";
 import { HomeVendorCompare } from "@/components/public/home-vendor-compare";
+import { HomeWork } from "@/components/public/home-work";
 import { HomePrivacyFlow } from "@/components/public/home-world-class";
 import { SiteFooter } from "@/components/public/site-footer";
 import { ToolLogosStrip } from "@/components/public/tool-logos-strip";
@@ -30,15 +30,14 @@ export function UseJunctionHomeContent() {
       <HeroSection />
       <ToolLogosStrip />
 
-      {/* Real screens for an example team: limits, adoption, where the spend landed, personal logins. */}
+      {/* Three problems for an example team, one picture each: limits, duplicate seats, where the spend landed. */}
       <HomeWeeksChapter />
-      <HomeAdoption />
-      <HomeWork />
       <HomePaidTwiceBand />
+      <HomeWork />
 
-      {/* Who asks, what each vendor's own admin shows, then the price and what happens after sign-up. */}
-      <HomeRoles />
+      {/* Why the tools' own admin pages don't answer it, who asks, then the price and what happens after sign-up. */}
       <HomeVendorCompare />
+      <HomeRoles />
       <HomePricing />
       <HomeHowItStarts />
 
@@ -56,7 +55,7 @@ export function UseJunctionHomeContent() {
           <div className="flex w-full shrink-0 flex-col items-stretch sm:w-auto sm:items-start">
             <Link
               href={HOME_SIGNUP_HREF}
-              className="public-btn public-btn-yellow min-h-[58px] rounded-none px-9 text-[1.0625rem] font-semibold"
+              className="public-btn public-btn-cta rounded-none"
             >
               {HOME_SIGNUP_LABEL}
               <ArrowRight className="h-5 w-5" aria-hidden />

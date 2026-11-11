@@ -164,10 +164,10 @@ export function HeroSection() {
             >
               <Link
                 href={HOME_SIGNUP_HREF}
-                className="public-btn public-btn-teal rounded-none px-7 py-3 text-base font-semibold"
+                className="public-btn public-btn-cta rounded-none"
               >
                 {HOME_SIGNUP_LABEL}
-                <ArrowRight className="h-4 w-4" aria-hidden />
+                <ArrowRight className="h-5 w-5" aria-hidden />
               </Link>
               <a
                 href={siteConfig.githubUrl}

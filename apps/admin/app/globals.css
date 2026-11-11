@@ -510,27 +510,89 @@ a {
   background: linear-gradient(transparent 60%, var(--brand-yellow) 60%, var(--brand-yellow) 93%, transparent 93%);
 }
 
-/* Homepage: a hand-placed note on a product screenshot. */
+/* The page's main call to action: brand yellow with an ink edge. Notes are violet so nothing else looks like it. */
+.public-btn-cta {
+  min-height: 52px;
+  padding: 0 1.75rem;
+  gap: 0.625rem;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  background: var(--brand-yellow);
+  color: var(--public-fg);
+  border: 2px solid var(--public-fg);
+  transition: background 0.15s;
+}
+
+.public-btn-cta:hover {
+  background: #d6de4a;
+  opacity: 1;
+}
+
+.public-btn-cta:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
+}
+
+/* Homepage: a hand-placed note on a picture, in the violet of a reviewer's pen: a pale card with a hard violet shadow, and a violet arrow. */
 .home-note {
   position: absolute;
   z-index: 2;
-  padding: 9px 13px;
-  background: var(--brand-yellow);
-  border: 2px solid var(--public-fg);
-  box-shadow: 3px 3px 0 var(--public-fg);
+  padding: 8px 13px 9px;
+  background: #ece6ff;
+  box-shadow: 3px 3px 0 #2e1f78;
   font-size: 16px;
   font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;
-  color: var(--public-fg);
+  color: #2e1f78;
 }
 
 .home-note svg {
   position: absolute;
   overflow: visible;
   fill: none;
-  stroke: var(--public-fg);
+  stroke: #6747d6;
   stroke-width: 2.6;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* Below the desktop layout a note sits in the flow under its picture, without its arrow. */
+@media (max-width: 1023px) {
+  .home-note {
+    position: static;
+    display: inline-block;
+    transform: rotate(-1deg) !important;
+    white-space: normal;
+    font-size: 14.5px;
+  }
+
+  .home-note svg {
+    display: none;
+  }
+
+  /* A pinned note's arrow rises from its top edge to the thing above it. */
+  .home-note.home-note-pin {
+    position: relative;
+    max-width: calc(100% - 8px);
+  }
+
+  .home-note.home-note-pin svg {
+    display: block;
+    left: 14px;
+    top: -31px;
+    width: 26px;
+    height: 30px;
+  }
+
+  .home-note.home-note-pin-end {
+    transform: rotate(1deg) !important;
+  }
+
+  .home-note.home-note-pin-end svg {
+    left: auto;
+    right: 14px;
+    transform: scaleX(-1);
+  }
 }

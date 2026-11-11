@@ -97,47 +97,161 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
   await expect(closing.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);
 });
 
-test("homepage shows the example team's real screens with notes", async ({ page }) => {
+test("homepage shows one picture per problem for the example team", async ({ page }) => {
   await page.goto("/");
 
+  // Limits: two people, two bars, and what to do about each.
   const weeks = page.getByRole("region", { name: "You’ve probably had one of these weeks." });
-  await expect(weeks.getByRole("img", { name: /Priya is at 97% of her weekly limit/ })).toBeVisible();
-  await expect(weeks.getByText("On Standard, at 97% of her week")).toBeVisible();
+  const limits = weeks.getByRole("figure", { name: /Priya at 97% of her weekly limit, Elena at 6%/ });
+  await expect(limits.getByText("97%")).toBeVisible();
+  await expect(limits.getByText("6%", { exact: true })).toBeVisible();
+  await expect(limits.getByText("Move her to Premium").filter({ visible: true })).toBeVisible();
+  await expect(limits.getByText("Does Elena still need hers?").filter({ visible: true })).toBeVisible();
 
-  const adoption = page.getByRole("region", { name: "Who has started, and who needs a nudge." });
-  await expect(adoption.getByRole("img", { name: /Regular, Occasional or Not using yet/ })).toBeVisible();
-
-  const work = page.getByRole("region", { name: "Where the AI spend landed." });
-  await expect(work.getByRole("img", { name: /\$693\.48 merged/ })).toBeVisible();
-  await expect(work.getByText("$693 landed on work that merged")).toBeVisible();
-  await expect(work.getByText("$173 on work that isn’t moving")).toBeVisible();
-
+  // Paid twice: two tools' seats for one person, one of them unopened.
   const paidTwice = page.getByRole("region", { name: "Paid twice." });
-  await expect(paidTwice.getByRole("img", { name: /9 are paid twice/ })).toBeVisible();
+  for (const use of ["No usage", "on Claude models", "on Grok models", "Under 3% each"]) {
+    await expect(paidTwice.getByText(use)).toBeVisible();
+  }
+  await expect(paidTwice.getByText("$360")).toHaveCSS("color", "rgb(200, 50, 30)");
+  await expect(paidTwice.getByText("Cancel nine Cursor seats by 14 Dec").filter({ visible: true })).toBeVisible();
 
-  // Value beyond cost: one row per reader, each answered by a real view.
-  const roles = page.getByRole("region", { name: "Who asks, and what they see." });
-  for (const who of ["Engineering manager", "Project manager", "Leadership", "Finance", "Developer"]) {
+  // Work: one bar, split by where the spend landed. The three parts add up to the total.
+  const work = page.getByRole("region", { name: "Where the AI spend landed." });
+  const landed = work.getByRole("figure", { name: /\$61,480 of AI spend matched to work/ });
+  for (const part of ["$35,120", "$17,140", "$9,220"]) {
+    await expect(landed.getByText(part, { exact: true })).toBeVisible();
+  }
+  expect(35120 + 17140 + 9220).toBe(61480);
+  await expect(landed.getByText("57% landed on work that merged").filter({ visible: true })).toBeVisible();
+
+  // The sections this replaced are gone.
+  await expect(page.getByRole("region", { name: "Who has started, and who needs a nudge." })).toHaveCount(0);
+  await expect(page.locator('img[src*="/home/"]')).toHaveCount(0);
+});
+
+test("homepage answers each person who asks, with the example team's numbers", async ({ page }) => {
+  await page.goto("/");
+
+  const roles = page.getByRole("region", { name: "Someone is going to ask you." });
+  for (const who of ["Engineering manager", "Developer", "Project manager", "Leadership", "Finance"]) {
     await expect(roles.getByText(who, { exact: true })).toBeVisible();
   }
-  await expect(roles.getByRole("img", { name: /projected at current daily pace/ })).toBeVisible();
-  await expect(roles.getByRole("img", { name: /^Biggest items/ })).toBeVisible();
-  await expect(roles.getByRole("img", { name: /Spend by week by project/ })).toBeVisible();
+
+  const people = roles.getByRole("figure", { name: /each person’s Claude and Cursor use/ });
+  await expect(people.getByText("Near limit")).toBeVisible();
+  await expect(people.getByText("$948")).toBeVisible();
+
+  const myData = roles.getByRole("figure", { name: /each login with a sharing switch/ });
+  await expect(myData.getByRole("img", { name: "Sharing on" })).toBeVisible();
+  await expect(myData.getByRole("list", { name: "Never collected" }).getByRole("listitem")).toHaveCount(4);
+
+  // Spend per Jira ticket, grouped the way the board is.
+  const board = roles.getByRole("figure", { name: /Jira board/ });
+  const inProgress = board.getByRole("region", { name: "In progress" });
+  await expect(inProgress.getByRole("listitem").filter({ hasText: "NW-224" })).toContainText("AI spend $1,819");
+  await expect(inProgress.getByText("Not moving")).toBeVisible();
+  // The same ticket as the comparison's last row, estimated before anyone starts it.
+  await expect(board.getByRole("region", { name: "To do" }).getByRole("listitem").filter({ hasText: "NW-238" })).toContainText("Estimated AI spend est. $2,100");
+
+  await expect(roles.getByRole("heading", { name: "Which teams are using it?" })).toBeVisible();
+  await expect(roles.getByRole("figure", { name: /\$42,540 projected at the same daily pace/ })).toBeVisible();
+  // Return is a counted share and a cost per merged pull request, not a multiple.
+  const returned = roles.getByRole("figure", { name: /Return on the spend/ });
+  await expect(returned.getByText("57%")).toBeVisible();
+  await expect(returned.getByText("$1,527")).toBeVisible();
+  expect(Math.round(35120 / 23)).toBe(1527);
+  await expect(roles.getByText(/\dx\b|ROI/)).toHaveCount(0);
+
   const sheet = roles.getByRole("figure", { name: /cost\.csv/ });
   await expect(sheet.getByRole("cell", { name: "People using it (30d)" })).toBeVisible();
   await expect(sheet.getByRole("cell", { name: "Next renewal" })).toBeVisible();
+  await expect(sheet.getByRole("cell", { name: "1750.00" })).toBeVisible();
+
+  // Each row is a label, one sentence and a picture: the lines that described the pictures are gone.
+  await expect(roles.getByText(/One row per person|sharing switch for each login|Each Jira ticket|Export one row|Three answers/)).toHaveCount(0);
+
+  // Rows alternate sides, with Leadership full width between them.
+  const left = async (locator: import("@playwright/test").Locator) => (await locator.boundingBox())!.x;
+  const top = async (locator: import("@playwright/test").Locator) => (await locator.boundingBox())!.y;
+  const emText = roles.getByRole("heading", { name: "Priya needs Premium. Elena barely uses hers." });
+  const pmText = roles.getByRole("heading", { name: "The billing rewrite has $1,819 in it and isn’t moving." });
+  const devText = roles.getByRole("heading", { name: "I can see what it holds about me." });
+  expect(await left(emText)).toBeLessThan(await left(people));
+  expect(await left(board)).toBeLessThan(await left(pmText));
+  expect(await left(sheet)).toBeGreaterThan(await left(roles.getByRole("heading", { name: /Two renewals in December/ })));
+  expect(await left(myData)).toBeLessThan(await left(devText));
+  const leadership = roles.getByRole("heading", { name: "We’re on pace for $42,540 this month." });
+  expect(await top(leadership)).toBeGreaterThan(await top(board));
+  expect(await top(leadership)).toBeLessThan(await top(sheet));
+  expect(await top(devText)).toBeGreaterThan(await top(sheet));
+  // Each role's tag starts level with the top of its picture.
+  const tagTop = async (who: string) => (await roles.locator(`[data-role="${who}"] > div`).first().boundingBox())!.y;
+  for (const [who, picture] of [["Engineering manager", people], ["Project manager", board], ["Finance", sheet], ["Developer", myData]] as const) {
+    expect(Math.abs((await tagTop(who)) - (await top(picture)))).toBeLessThanOrEqual(2);
+  }
+  // Each leadership question sits above the card that answers it.
+  expect(await top(roles.getByRole("heading", { name: "What are we getting for it?" }))).toBeLessThan(await top(returned));
+});
+
+test("homepage Start free buttons stand out from the page", async ({ page }) => {
+  await page.goto("/");
+  // Every link that names GitHub carries the GitHub mark: hero, pricing, privacy, close and the footer.
+  const githubLinks = page.locator('main a[href*="github.com"]').filter({ hasText: "GitHub" });
+  await expect(githubLinks).toHaveCount(5);
+  for (const link of await githubLinks.all()) {
+    await expect(link.locator("svg")).toBeVisible();
+  }
+  const buttons = page.locator("main").getByRole("link", { name: "Start free" });
+  await expect(buttons).toHaveCount(5);
+  // The four large ones (hero, comparison, pricing, close) are yellow with an ink edge.
+  const loud = page.locator("main a.public-btn-cta");
+  await expect(loud).toHaveCount(4);
+  for (const button of await loud.all()) {
+    await expect(button).toHaveCSS("background-color", "rgb(229, 236, 103)");
+    await expect(button).toHaveCSS("border-top-width", "2px");
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(52);
+  }
+  // Notes on the pictures are violet, so none of them can be mistaken for the button.
+  for (const note of await page.locator(".home-note").all()) {
+    await expect(note).not.toHaveCSS("background-color", "rgb(229, 236, 103)");
+  }
 });
 
 test("homepage compares each vendor's admin, explains pricing, and shows the rollout and what is collected", async ({ page }) => {
   await page.goto("/");
 
-  const compare = page.getByRole("region", { name: "What each tool’s own admin shows per person." });
+  const compare = page.getByRole("region", { name: "Four tabs open, and you’re still guessing." });
   for (const vendor of ["Claude", "Cursor", "GitHub Copilot", "Codex"]) {
     await expect(compare.getByRole("columnheader", { name: vendor })).toBeVisible();
   }
   await expect(compare.getByRole("columnheader", { name: "UseJunction" }).getByRole("img", { name: "UseJunction" })).toBeVisible();
-  const prRow = compare.getByRole("row", { name: /Spend by pull request and issue/ });
-  await expect(prRow.getByRole("cell")).toHaveText([/Not in their docs/, /Not in their docs/, /Not in their docs/, /Not in their docs/, /Yes/]);
+  // Four rows. Each is a question; our column holds the answer and the vendors' cells stay honest.
+  await expect(compare.getByRole("rowheader")).toHaveText([
+    "Who is about to hit a limit?",
+    "What did each person spend?",
+    "Where will this month’s bill land?",
+    "What will the next feature cost?",
+  ]);
+  const limitRow = compare.getByRole("row", { name: /Who is about to hit a limit\?/ });
+  await expect(limitRow.getByRole("cell")).toHaveText([/Priya, 97%/, /Not shown/, /Spend limit/, /Budgets/, /Credit limit/]);
+  const billRow = compare.getByRole("row", { name: /Where will this month’s bill land\?/ });
+  await expect(billRow.getByRole("cell")).toHaveText([/\$42,540 by month end.*\$14,180 spent in the first ten days/, /Own bill/, /Own bill/, /Own bill/, /Own bill/]);
+  expect((14180 / 10) * 30).toBe(42540);
+
+  // The next-feature row reads without clicking: who the spend comes from, and the merged feature it is based on.
+  const sprintRow = compare.getByRole("row", { name: /What will the next feature cost\?/ });
+  await expect(sprintRow.getByRole("cell").first()).toHaveText(/SSO login, about \$5,400.*not started, 6 tickets/);
+  await expect(sprintRow.getByRole("button")).toHaveText([/Marcus.*\$1,900/, /Priya.*\$1,600/, /Tom.*\$1,100/, /Amara.*\$800/]);
+  expect(1900 + 1600 + 1100 + 800).toBe(5400);
+  await expect(sprintRow.getByText("Based on Team invitations, which merged at $6,930")).toBeVisible();
+  await sprintRow.getByRole("button", { name: /Marcus/ }).click();
+  await expect(sprintRow.getByRole("cell").first()).toHaveText(/Marcus, about \$1,900.*2 of the 6 tickets/);
+  await sprintRow.getByRole("button", { name: /Marcus/ }).click();
+  await expect(sprintRow.getByRole("cell").first()).toHaveText(/SSO login, about \$5,400/);
+  // Every vendor cell says something; nothing is left blank or unconfirmed.
+  await expect(compare.getByText("Unconfirmed")).toHaveCount(0);
+  await expect(compare.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);
 
   const pricing = page.locator("#pricing");
   await expect(pricing.getByRole("heading", { name: /\$1 per active developer a month\. Your first 5 seats are free\./ })).toBeVisible();
