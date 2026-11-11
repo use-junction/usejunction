@@ -12,6 +12,8 @@ The 18.7-second silent loop in the homepage hero. It is drawn in HTML and render
 
 The figures are the homepage's example team (Northwind Labs, 38 people). Keep them in step with the homepage sections.
 
+The homepage shows a chapter strip under the film (Work, Forecast, See, Privacy). Its timings are `HERO_CHAPTERS` in `apps/admin/lib/public/home-cta.ts`; if you re-time a scene, update them too. A test fails if they drift.
+
 ## Files
 
 - `hero-loop.html` is the source. Asset placeholders such as `{{f0}}` are filled at render time. The scene timings are in `S` at the top of the script.

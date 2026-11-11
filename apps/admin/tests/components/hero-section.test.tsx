@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const motion = vi.hoisted(() => ({ reduce: false }));
@@ -24,12 +24,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test("hero leads with per-person seat usage, a free sign-up and the price", () => {
+test("hero says one thing above the film: the headline, a free sign-up, self-hosting and the price", () => {
   render(<HeroSection />);
 
-  expect(
-    screen.getByRole("heading", { level: 1, name: /See who actually uses the AI coding seats you pay for\./ }),
-  ).toBeTruthy();
+  expect(screen.getByRole("heading", { level: 1, name: /See where your AI coding spend goes\./ })).toBeTruthy();
+  // The film carries the detail, so the static copy has no eyebrow and no paragraph competing with it.
+  expect(screen.queryByText("For engineering and platform teams")).toBeNull();
+  expect(screen.queryByText(/each show only their own seats/)).toBeNull();
+  expect(screen.getByRole("link", { name: "Self-host from GitHub" })).toBeTruthy();
 
   const cta = screen.getByRole("link", { name: "Start free" });
   expect(cta.getAttribute("href")).toBe(`/signup?from=${encodeURIComponent("/onboarding?mode=solo")}`);
@@ -76,4 +78,47 @@ test("hero video stays still with controls when reduced motion is on", () => {
   expect(video.autoplay).toBe(false);
   expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
   expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+});
+
+test("hero film names its four chapters and jumps to the one a visitor picks", () => {
+  render(<HeroSection />);
+
+  const video = screen.getByLabelText(/UseJunction product video/) as HTMLVideoElement;
+  const chapters = within(screen.getByRole("group", { name: "Video chapters" }));
+  expect(chapters.getAllByRole("button").map((button) => button.textContent)).toEqual([
+    "WorkWhat a feature costs",
+    "ForecastWhere the month lands",
+    "SeeWho is near a limit",
+    "PrivacyWhat is never collected",
+    "",
+  ]);
+
+  vi.mocked(HTMLMediaElement.prototype.play).mockClear();
+  fireEvent.click(chapters.getByRole("button", { name: /^Forecast/ }));
+  expect(video.currentTime).toBe(9.9);
+  expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
+  expect(chapters.getByRole("button", { name: /^Forecast/ }).getAttribute("aria-current")).toBe("true");
+  expect(chapters.getByRole("button", { name: /^Work/ }).getAttribute("aria-current")).toBeNull();
+});
+
+test("hero film can be paused and started again, as autoplaying motion must allow", () => {
+  render(<HeroSection />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Pause video" }));
+  expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+
+  vi.mocked(HTMLMediaElement.prototype.play).mockClear();
+  fireEvent.click(screen.getByRole("button", { name: "Play video" }));
+  expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Pause video" })).toBeTruthy();
+});
+
+test("with reduced motion a chapter shows as a still frame instead of playing", () => {
+  motion.reduce = true;
+  render(<HeroSection />);
+
+  const video = screen.getByLabelText(/UseJunction product video/) as HTMLVideoElement;
+  fireEvent.click(screen.getByRole("button", { name: /^See/ }));
+  expect(video.currentTime).toBe(15);
+  expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
 });

@@ -294,6 +294,21 @@ a {
   background: #ffffff;
 }
 
+/* The hero film sits under the headline as a centered stage. Its width is capped by the viewport's height so the
+   whole film, whose captions sit low in the frame, stays on the first screen of a laptop; 21.5rem is the room the
+   header, headline, button and chapter strip need. Phones get it edge to edge. */
+.hero-film {
+  width: min(100%, 60rem, max(28rem, calc((100svh - 21.5rem) * 1.6)));
+  margin-inline: auto;
+}
+
+@media (max-width: 639px) {
+  .hero-film {
+    width: auto;
+    margin-inline: -1rem;
+  }
+}
+
 /* The hero film has no frame, so fade its outer edges: the zoomed-in board dissolves into the page instead of
    ending in a hard line. Scene content keeps a 6% margin, clear of the fade. */
 .hero-video-edge {

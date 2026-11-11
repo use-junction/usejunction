@@ -47,7 +47,7 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
   await expect(page.getByRole("link", { name: "UseJunction home" }).first()).toBeVisible();
   await expect(
     page.getByRole("heading", {
-      name: /See who actually uses the AI coding seats you pay for\./i,
+      name: /See where your AI coding spend goes\./i,
       level: 1,
     }),
   ).toBeVisible();
@@ -85,6 +85,15 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
   // The loop actually loads and plays: the browser picked a source and the clock moves.
   await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentSrc)).toMatch(/\/video\/hero-loop(-mobile)?\.(mp4|webm)$/);
   await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime), { timeout: 10_000 }).toBeGreaterThan(0.5);
+
+  // The chapter strip jumps the film to a chapter and marks it; the pause button stops the clock.
+  const chapters = page.getByRole("group", { name: "Video chapters" });
+  await chapters.getByRole("button", { name: /^Forecast/ }).click();
+  await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime)).toBeGreaterThanOrEqual(9.9);
+  await expect(chapters.getByRole("button", { name: /^Forecast/ })).toHaveAttribute("aria-current", "true");
+  await chapters.getByRole("button", { name: "Pause video" }).click();
+  await expect(video).toHaveJSProperty("paused", true);
+  await expect(chapters.getByRole("button", { name: "Play video" })).toBeVisible();
 
   const closing = page.getByRole("region", { name: /Connect your own laptop first/i });
   await expect(closing.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);
