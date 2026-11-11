@@ -47,7 +47,7 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
   await expect(page.getByRole("link", { name: "UseJunction home" }).first()).toBeVisible();
   await expect(
     page.getByRole("heading", {
-      name: /See who actually uses the AI coding seats you pay for\./i,
+      name: /See where your AI coding spend goes\./i,
       level: 1,
     }),
   ).toBeVisible();
@@ -79,8 +79,19 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
 
   const video = page.getByLabel(/UseJunction product video/i);
   await expect(video).toBeVisible();
-  await expect(video).toHaveAttribute("poster", "/video/hero-poster.jpg");
+  await expect(video).toHaveAttribute("poster", "/video/hero-loop-poster.jpg");
   await expect(video).toHaveJSProperty("muted", true);
+  await expect(video).toHaveJSProperty("loop", true);
+  // The loop actually loads and plays: the browser picked a source and the clock moves.
+  await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentSrc)).toMatch(/\/video\/hero-loop(-mobile)?\.(mp4|webm)$/);
+  await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime), { timeout: 10_000 }).toBeGreaterThan(0.5);
+
+  // It does not present as a video player: no chapter strip, and the pause button appears only on hover.
+  await expect(page.getByRole("group", { name: "Video chapters" })).toHaveCount(0);
+  await video.hover();
+  await page.getByRole("button", { name: "Pause video" }).click();
+  await expect(video).toHaveJSProperty("paused", true);
+  await expect(page.getByRole("button", { name: "Play video" })).toBeVisible();
 
   const closing = page.getByRole("region", { name: /Connect your own laptop first/i });
   await expect(closing.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);

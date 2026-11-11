@@ -9,9 +9,21 @@ export const HOME_SIGNUP_HREF = `${siteConfig.signupUrl}?from=${encodeURICompone
 /** Price reassurance shown under the hero and closing buttons. */
 export const HOME_PRICE_LINE = `Free for ${USER_LIMIT_FREE} seats, then $${TEAM_PRICE_PER_DEV_USD} per active developer a month. No card.`;
 
-/** First 16s of the launch video (video/renders), muted. The end card is cut because it shows the wrong domain. */
+/**
+ * The 18.4s hero loop, rendered from video/hero-loop/hero-loop.html by video/hero-loop/render.mjs.
+ * It has no captions or end card, because it plays beside the headline. Phones get a smaller encode; the poster
+ * is the opening close-up of the merged ticket and what it cost.
+ * Sources are listed phone first, H.264 before VP9: the browser plays the first one whose media and codec it
+ * supports, so most get the smaller MP4 and browsers without H.264 still get the loop as WebM.
+ */
 export const HERO_VIDEO = {
-  poster: "/video/hero-poster.jpg",
-  webm: "/video/hero.webm",
-  mp4: "/video/hero.mp4",
+  poster: "/video/hero-loop-poster.jpg",
+  width: 1280,
+  height: 800,
+  sources: [
+    { src: "/video/hero-loop-mobile.mp4", type: 'video/mp4; codecs="avc1.64001F"', media: "(max-width: 767px)" },
+    { src: "/video/hero-loop.mp4", type: 'video/mp4; codecs="avc1.640020"' },
+    { src: "/video/hero-loop-mobile.webm", type: 'video/webm; codecs="vp9"', media: "(max-width: 767px)" },
+    { src: "/video/hero-loop.webm", type: 'video/webm; codecs="vp9"' },
+  ],
 } as const;

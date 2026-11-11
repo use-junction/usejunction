@@ -294,6 +294,17 @@ a {
   background: #ffffff;
 }
 
+/* The hero film has no frame, so fade its outer edges: the zoomed-in board dissolves into the page instead of
+   ending in a hard line. Scene content keeps a 6% margin, clear of the fade. */
+.hero-video-edge {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent),
+    linear-gradient(to bottom, transparent, #000 4%, #000 96%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent),
+    linear-gradient(to bottom, transparent, #000 4%, #000 96%, transparent);
+  mask-composite: intersect;
+}
+
 .hero-mock-frame {
   overflow: hidden;
   border-radius: 0.75rem;

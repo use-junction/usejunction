@@ -1,0 +1,321 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+@font-face{font-family:"Cal Sans";src:url({{calsans}}) format("truetype");font-display:block}
+*{box-sizing:border-box}
+.wrap{max-width:720px;margin:0 auto;font-family:var(--font-sans,system-ui)}
+.frame{position:relative;width:100%;aspect-ratio:800/500;overflow:hidden;border:1px solid var(--border)}
+#stage{position:absolute;left:0;top:0;width:800px;height:500px;transform-origin:0 0;font-family:"DM Sans",system-ui,sans-serif;background:#fff}
+.sc{position:absolute;inset:0;overflow:hidden;visibility:hidden}
+.light{background:#fff;color:#111210}
+.cal{font-family:"Cal Sans","DM Sans",sans-serif;letter-spacing:-.01em}
+.m{display:inline-block;overflow:hidden;vertical-align:top;padding:0 .14em .08em;margin:0 -.14em -.08em}
+.r{display:inline-block;will-change:transform}
+.abs{position:absolute}
+.hlw{position:relative;display:inline-block}
+.hlw>i{position:absolute;left:-.1em;right:-.1em;top:16%;bottom:4%;background:#e5ec67;transform-origin:0 50%;transform:scaleX(0);z-index:0}
+.hlw>b{position:relative;font-weight:inherit;z-index:1}
+/* A */
+.tile{position:absolute;width:64px;height:64px;background:#fff;border:1px solid #e5e1de;border-radius:16px;box-shadow:0 10px 26px rgba(20,16,10,.09);display:grid;place-items:center;opacity:0}
+.tile img{width:34px;height:34px}
+.h1{position:absolute;left:0;right:0;text-align:center;font-size:66px;line-height:1.12;white-space:nowrap}
+.mark{position:absolute;left:400px;top:250px;width:104px;height:104px;margin:-52px 0 0 -52px;opacity:0}
+/* chapter word */
+/* B */
+.big{position:absolute;left:110px;font-size:76px;line-height:1;white-space:nowrap}
+.big small{font-size:.5em;margin-left:.04em}
+.who{position:absolute;left:262px;opacity:0}
+.who .n{font-size:26px;font-weight:700;display:flex;align-items:center;gap:8px;letter-spacing:-.01em}
+.who .n img{width:20px;height:20px}
+.who .c{font-size:16px;color:#666861;margin-top:2px}
+.pill{position:absolute;right:110px;font-size:15px;font-weight:700;color:#d9730a;display:flex;align-items:center;gap:8px;transform-origin:100% 50%}
+.pill i{width:10px;height:10px;background:#d9730a;display:block;transform:rotate(45deg)}
+.track{position:absolute;left:110px;width:580px;height:10px;background:#e9e7df;transform-origin:0 50%}
+.track i{display:block;height:100%;width:0}
+.seat{position:absolute;top:118px;width:84px;height:84px;border:3px dashed #c4c1b7;border-radius:14px;display:grid;place-items:center;opacity:0}
+.seat .f{position:absolute;inset:-3px;border-radius:14px;background:#08758a;display:grid;place-items:center;transform:scale(0)}
+.fin{position:absolute;left:0;right:0;text-align:center;font-size:62px;line-height:1.1;white-space:nowrap}
+/* C */
+.cap{position:absolute;left:58px;font-size:19px;font-weight:600;white-space:nowrap}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
+/* D */
+.lab{position:absolute;white-space:nowrap;opacity:0}
+.lab .v{font-size:50px;line-height:1}
+.lab .k{font-size:22px;font-weight:700;margin-left:10px}
+.tag{position:absolute;left:48px;top:306px;border:1px solid #c4c1b7;padding:4px 8px;color:#666861;opacity:0}
+.frow{position:absolute;left:70px;top:202px;font-size:25px;font-weight:700;white-space:nowrap;letter-spacing:-.01em}
+.merged{display:inline-flex;align-items:center;gap:6px;margin-left:14px;font-size:17px;font-weight:700;color:#8250df;vertical-align:2px}
+.merged i{width:9px;height:9px;border-radius:50%;background:#8250df;display:block}
+.tot{position:absolute;right:70px;top:186px;white-space:nowrap;text-align:right}
+.tot .v{font-size:44px;line-height:1}
+.tot .ab{font-size:22px;font-weight:600;color:#666861;margin-right:8px}
+.seg{position:absolute;top:254px;height:48px;overflow:hidden;display:flex;align-items:flex-end;white-space:nowrap}
+.seg span{display:block;padding:0 0 12px 11px;font-size:20px;font-weight:700;line-height:1.2}
+.chipk{position:absolute;top:211px;width:20px;height:14px;border:2px solid #111210;background:#fff}
+.slot{position:absolute;top:334px;font-size:20px;white-space:nowrap;color:#3f5d63}
+.bhead{position:absolute;left:48px;top:84px;display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700;color:#172b4d;opacity:0}
+.bhead span{color:#5e6c84;font-size:14px;font-weight:500}
+.jcol{position:absolute;top:120px;width:224px;background:#f1f2f4;border-radius:6px;opacity:0}
+.jcol h5{margin:0;padding:11px 12px;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:#5e6c84;font-weight:700}
+.jcol h5 b{font-weight:500;margin-left:5px}
+.jc{position:absolute;width:208px;background:#fff;border-radius:4px;box-shadow:0 1px 1px rgba(9,30,66,.25),0 0 1px rgba(9,30,66,.31);padding:10px 10px 9px;color:#172b4d;opacity:0}
+.jc p{margin:0;font-size:15px;line-height:1.27;font-weight:500}
+.jf{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:#5e6c84;font-weight:600}
+.jf em{margin-left:auto;display:flex}
+.jf .dn{text-decoration:line-through}
+.av{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:9.5px;font-weight:700;text-decoration:none;font-style:normal;flex:none}
+.jf .av{margin-left:-5px;box-shadow:0 0 0 2px #fff}
+.ti{width:16px;height:16px;border-radius:3px;display:grid;place-items:center;flex:none}.ti.task{background:#4bade8}.ti.epic{background:#904ee2}
+#call{left:536px;top:272px;display:flex;align-items:center;gap:8px;white-space:nowrap;transform-origin:20px 0;opacity:0}
+#call img{width:26px;height:26px}#call .v{font-size:40px;line-height:1}
+#pbg{background:#fff;border-radius:5px;box-shadow:0 18px 50px rgba(9,30,66,.18),0 0 1px rgba(9,30,66,.4);opacity:0}
+.loz{display:inline-block;margin-left:12px;padding:3px 7px;border-radius:3px;background:#dfe1e6;color:#42526e;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;vertical-align:6px}
+.jr{position:absolute;left:68px;width:664px;height:26px;display:flex;align-items:center;gap:8px;padding:0 8px;border-bottom:1px solid #ebecf0;font-size:14px;color:#172b4d;opacity:0}
+.jr .tint{position:absolute;inset:0;opacity:0}.jr>*:not(.tint){position:relative}
+.jr .k{width:56px;font-size:12px;color:#5e6c84;font-weight:600}.jr .nm{margin-left:auto;font-size:13px;color:#5e6c84;font-weight:500}
+#D .seg span{padding-bottom:10px;font-size:19px}
+.av{background-size:cover;background-position:center;background-color:#dfe1e6}
+.f0{background-image:url({{f0}})}.f1{background-image:url({{f1}})}.f2{background-image:url({{f2}})}.f3{background-image:url({{f3}})}
+/* The cost row is the same on every card: an icon, a word, the amount. */
+.cost{height:0;overflow:hidden;display:flex;align-items:flex-end;gap:6px;white-space:nowrap;font-size:13.5px}
+.cost svg{flex:none;margin-bottom:6px}
+.cost .w{font-weight:700;margin-bottom:5px}
+.cost b{font-size:25px;line-height:1.15;color:#172b4d;font-weight:400}
+.loz2{display:inline-flex;align-items:center;gap:6px;margin-left:14px;padding:5px 10px;border-radius:3px;background:#dfe1e6;color:#172b4d;font-size:12.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;vertical-align:5px}
+.loz2 i{width:8px;height:8px;border-radius:50%;background:#7a869a;display:block}
+#D .seg{align-items:center}
+#D .seg span{padding:0 0 0 10px;font-size:17px;line-height:1.2}
+#D .seg em{display:block;font-style:normal;font-weight:500;font-size:15px;font-variant-numeric:tabular-nums;opacity:0}
+.sav{position:absolute;width:30px;height:30px;border-radius:50%;box-shadow:0 0 0 2px #fff;transform:scale(0)}
+#D .jr{height:24px}
+/* E */
+.pw{position:absolute;left:244px;font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1.1;white-space:nowrap}
+.pw .strike{position:absolute;left:-6px;right:-6px;top:54%;height:3px;background:#111210;transform-origin:0 50%;transform:scaleX(0)}
+/* controls */
+.ctl{display:flex;gap:12px;align-items:center;margin-top:12px;font-size:13px}
+.ctl button{font:inherit;padding:6px 14px;border:1px solid var(--border);background:var(--card);color:var(--foreground);cursor:pointer;border-radius:var(--radius)}
+.ctl input{flex:1;accent-color:#08758a}
+.ctl .t{font-variant-numeric:tabular-nums;min-width:92px;text-align:right;color:var(--muted-foreground)}
+.tsm{width:36px;height:36px;border-radius:10px;box-shadow:0 4px 12px rgba(20,16,10,.08)}.tsm img{width:20px;height:20px}
+</style></head><body>
+<div class="wrap">
+<div class="frame"><div id="stage">
+
+<section class="sc light" id="D">
+  <div id="cam" class="abs" style="inset:0;transform-origin:0 0;opacity:0">
+   <div id="board" class="abs" style="inset:0;top:34px">
+    <div class="bhead" id="bhead"><svg width="20" height="20" viewBox="0 0 24 24"><path fill="#2684FF" d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.001 1.001 0 0 0 23.013 0Z"/></svg>Product roadmap<span>Board</span></div>
+    <div class="jcol" id="colTodo" style="left:48px;height:114px"><h5>To do<b id="cTodo">1</b></h5></div>
+    <div class="jcol" id="colProg" style="left:288px;height:212px"><h5>In progress<b id="cProg">2</b></h5></div>
+    <div class="jcol" id="colDone" style="left:528px;height:114px"><h5>Done<b>1</b></h5></div>
+    <div class="jc" id="cNext" style="left:56px;top:154px"><p>Add usage alerts</p><div class="cost" id="est" style="color:#08758a"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#08758a" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 6.2c1.8-1.8 3.6-1.8 5.5 0s3.7 1.8 5.5 0M2.5 10.6c1.8-1.8 3.6-1.8 5.5 0s3.7 1.8 5.5 0"/></svg><span class="w">About</span><span class="hlw"><i id="esthl"></i><b class="cal">$5,400</b></span></div><div class="jf"><i class="ti epic"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M5.8.6L2 5.6h2.4L4.2 9.4 8 4.4H5.6z" fill="#fff"/></svg></i><span>NW-238</span><em><u class="av f0"></u><u class="av f1"></u><u class="av f2"></u><u class="av f3"></u></em></div></div><div class="jc" style="left:296px;top:154px"><p>Fix repeated webhook deliveries</p><div class="jf"><i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>NW-231</span><em><u class="av f1"></u></em></div></div><div class="jc" style="left:296px;top:252px"><p>Rewrite billing jobs</p><div class="jf"><i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>NW-224</span><em><u class="av f3"></u></em></div></div><div class="jc" id="cDone" style="left:536px;top:154px"><p>Add team invitations</p><div class="cost" id="amt" style="color:#8250df"><svg width="16" height="16" viewBox="0 0 16 16"><path fill="#8250df" d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z"/></svg><span class="w">Merged</span><span class="hlw"><i id="amthl"></i><b class="cal">$<span id="n6930">0</span></b></span></div><div class="jf"><i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i><span>NW-212</span><em><u class="av f0"></u></em></div></div>
+   </div>
+  </div>
+  <div class="abs" id="pbg"></div>
+  <div class="abs" id="detail" style="inset:0;visibility:hidden">
+    <div class="abs jf" id="dbc" style="left:68px;top:92px;margin:0;opacity:0"><i class="ti epic"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M5.8.6L2 5.6h2.4L4.2 9.4 8 4.4H5.6z" fill="#fff"/></svg></i><span>NW-238</span><span class="loz2" style="margin-left:8px;padding:3px 8px;font-size:11px;vertical-align:0"><i></i>To do · not started</span></div>
+    <div class="abs" style="left:68px;top:117px;font-size:30px;font-weight:700;color:#172b4d;white-space:nowrap;letter-spacing:-.015em"><span class="m"><span class="r" id="dt">Add usage alerts</span></span></div>
+    <div class="tot" style="right:68px;top:96px"><span class="m"><span class="r" id="qm"><span class="v cal" style="color:#c1c7d0">?</span></span></span></div>
+    <div class="tot" style="right:68px;top:96px"><span class="m"><span class="r" id="tot2"><span class="ab" id="about">about</span><span class="v cal" id="totv" style="display:inline-block;transform-origin:100% 80%">$<span id="tot">0</span></span></span></span></div>
+    <div class="abs" id="chl" style="left:68px;top:162px;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;color:#5e6c84;font-weight:700;opacity:0">Child issues<span style="font-weight:500;margin-left:5px">6</span></div>
+    <div id="drows"></div>
+    <div class="seg"><span><b>Marcus</b><em>$1,900</em></span></div><div class="seg"><span><b>Priya</b><em>$1,600</em></span></div><div class="seg"><span><b>Tom</b><em>$1,100</em></span></div><div class="seg"><span><b>Amara</b><em>$800</em></span></div><u class="sav av f0"></u><u class="sav av f1"></u><u class="sav av f2"></u><u class="sav av f3"></u>
+    <div class="abs" id="refbar" style="left:68px;top:424px;height:5px;width:660px;background:#b4c3c6;transform-origin:0 50%"></div>
+    <div class="slot" style="left:68px;top:434px;font-size:17px"><span class="m"><span class="r" id="capt">Based on Team invitations, which merged at $6,930</span></span></div>
+    <div class="slot" style="left:249px;top:432px;color:#111210;font-weight:600;font-size:19px"><span class="m"><span class="r" id="brk">Priya · 2 tickets · about <span class="cal" style="font-size:28px;margin-left:4px">$1,600</span></span></span></div>
+  </div>
+  <div class="abs" id="ringc" style="width:40px;height:40px;margin:-20px 0 0 -20px;border:2px solid #111210;border-radius:50%;left:0;top:0;opacity:0"></div>
+  <svg class="abs" id="cur" width="30" height="30" viewBox="0 0 24 24" style="left:0;top:0;transform-origin:5px 3px;opacity:0"><path d="M5 3l14 8.2-6.6 1.4L10 19.4z" fill="#111210" stroke="#fafaf7" stroke-width="1.6" stroke-linejoin="round"/></svg>
+</section>
+
+<section class="sc light" id="C">
+  <svg class="full" viewBox="0 0 800 500">
+    <defs><clipPath id="cArea"><rect id="cAreaR" x="0" y="0" width="0" height="500"/></clipPath><clipPath id="cProj"><rect id="cProjR" x="286" y="0" width="0" height="500"/></clipPath>
+    <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e5ec67" stop-opacity=".55"/><stop offset="1" stop-color="#e5ec67" stop-opacity="0"/></linearGradient></defs>
+    <g id="grid" stroke="#111210" stroke-opacity=".12" stroke-dasharray="2 8"><path d="M58 128H742M58 220H742M58 312H742"/></g>
+    <path id="base" d="M58 420H742" stroke="#111210" stroke-opacity=".16" stroke-width="2"/>
+    <path d="M58 414 C 100 410, 120 396, 150 388 S 200 384, 226 364 S 262 334, 286 323 L286 420 L58 420Z" fill="url(#gA)" clip-path="url(#cArea)"/>
+    <path id="solid" d="M58 414 C 100 410, 120 396, 150 388 S 200 384, 226 364 S 262 334, 286 323" fill="none" stroke="#08758a" stroke-width="5" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+    <path id="todayL" d="M286 323V420" stroke="#111210" stroke-opacity=".3" stroke-width="2" stroke-dasharray="3 6" opacity="0"/>
+    <path d="M286 323 L738 128" fill="none" stroke="#08758a" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 14" clip-path="url(#cProj)"/>
+    <circle id="ring" cx="286" cy="323" r="8" fill="none" stroke="#08758a" stroke-width="2" opacity="0"/>
+    <circle id="tip" cx="58" cy="414" r="8" fill="#08758a" opacity="0"/>
+  </svg>
+  <div class="abs mono" id="lt" style="left:262px;top:432px;opacity:0;color:rgba(17,18,16,.5)">day 10</div>
+  <div class="abs mono" id="le" style="left:706px;top:432px;opacity:0;color:rgba(17,18,16,.5)">day 30</div>
+  <div class="abs cal" style="left:56px;top:92px;font-size:60px;line-height:1;white-space:nowrap"><span class="m"><span class="r" id="cnr">$<span id="cn">0</span></span></span></div>
+  <div class="cap" style="top:162px"><span class="m"><span class="r" id="cc1" style="color:#666861">spent so far</span></span></div>
+  <div class="cap" style="top:162px"><span class="m"><span class="r" id="cc2">by month end <span style="color:#8a8c84;font-weight:500">· 38 people</span></span></span></div>
+  <div class="cap" style="top:188px;font-weight:500"><span class="m"><span class="r" id="cc3" style="color:#8a8c84">at the same daily pace</span></span></div>
+</section>
+
+<section class="sc light" id="B">
+  <div class="tile tsm" style="left:528px;top:88px"><img src="{{claude}}"></div><div class="tile tsm" style="left:570px;top:88px"><img src="{{cursor}}"></div><div class="tile tsm" style="left:612px;top:88px"><img src="{{codex}}"></div><div class="tile tsm" style="left:654px;top:88px"><img src="{{copilot}}"></div>
+  <div id="rows">
+    <div id="row1" class="abs" style="inset:0">
+      <div class="big cal" style="top:150px"><span class="m"><span class="r" id="n1r"><span id="n1">0</span><small>%</small></span></span></div>
+      <div class="who" id="who1" style="top:157px"><div class="n"><img src="{{claude}}">Priya</div><div class="c">of her weekly Claude limit</div></div>
+      <div class="pill" id="pill" style="top:174px"><i></i>Near limit</div>
+      <div class="track" id="t1" style="top:244px"><i id="f1" style="background:#d9730a"></i></div>
+    </div>
+    <div id="row2" class="abs" style="inset:0">
+      <div class="big cal" style="top:308px;color:#a2a8b5"><span class="m"><span class="r" id="n2r"><span id="n2">0</span><small>%</small></span></span></div>
+      <div class="who" id="who2" style="top:315px"><div class="n"><img src="{{claude}}">Elena</div><div class="c">A quiet seat.</div></div>
+      <div class="track" id="t2" style="top:402px"><i id="f2" style="background:#a2a8b5"></i></div>
+    </div>
+  </div>
+</section>
+
+<section class="sc light" id="E">
+  <div class="abs" id="ecard" style="left:212px;top:98px;width:376px;height:304px;background:#fff;border:1px solid #e5e1de;border-radius:10px;box-shadow:0 14px 40px rgba(20,16,10,.08);opacity:0"></div>
+  <div class="abs" style="left:244px;top:126px;display:flex;align-items:center;gap:10px;font-size:18px;font-weight:600;white-space:nowrap">
+    <svg id="shield" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#08758a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="transform-origin:50% 50%;flex:none"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path id="shchk" d="m9 12 2 2 4-4" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg>
+    <span class="m"><span class="r" id="secl">The agent reads usage locally.</span></span>
+  </div>
+  <div class="pw" style="top:186px"><span class="m"><span class="r e">keystrokes</span></span><i class="strike"></i></div>
+  <div class="pw" style="top:230px"><span class="m"><span class="r e">browser activity</span></span><i class="strike"></i></div>
+  <div class="pw" style="top:274px"><span class="m"><span class="r e">network traffic</span></span><i class="strike"></i></div>
+  <div class="pw" style="top:338px"><span class="m"><span class="r" id="never"><span class="hlw"><i id="nvhl"></i><b>Never collected.</b></span></span></span></div>
+</section>
+
+</div></div>
+<div class="ctl"><button id="play">Pause</button><input id="scrub" type="range" min="0" max="18.4" step="0.01" value="0"><span class="t" id="time"></span></div>
+</div>
+<script>
+const $=id=>document.getElementById(id), all=s=>[...document.querySelectorAll(s)];
+const cl=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)), p=(t,a,b)=>cl((t-a)/(b-a)), lerp=(a,b,k)=>a+(b-a)*k;
+const outExpo=x=>x>=1?1:1-Math.pow(2,-10*x), outCubic=x=>1-Math.pow(1-x,3), inCubic=x=>x*x*x, inOut=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const outBack=x=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(x-1,3)+c1*Math.pow(x-1,2)};
+// Order: Work -> Forecast -> See -> Never collected, then straight back to Work. There are no captions, chapter
+// titles or end card: on the homepage the film sits beside the headline, which is the only headline-sized type.
+const S={W:0,C:11.1,B:13.6,E:15.8,END:18.4};
+const stage=$('stage'), frame=stage.parentElement;
+function fit(){stage.style.transform='scale('+(frame.clientWidth/800)+')'}new ResizeObserver(fit).observe(frame);fit();
+const rise=(el,kin,kout=0)=>{el.style.transform=`translateY(${(1-kin)*108-kout*108}%)`};
+const vis=(el,on)=>{el.style.visibility=on?'visible':'hidden'};
+const num=(el,v)=>{el.textContent=Math.round(v).toLocaleString('en-US')};
+const dash=(el,k)=>{el.style.strokeDashoffset=1-k};
+const mix=(a,b,k)=>a.map((v,i)=>Math.round(lerp(v,b[i],k))), rgb=c=>`rgb(${c[0]},${c[1]},${c[2]})`;
+// Every scene is on white, so scenes crossfade.
+function fade(t,t0,scene){scene.style.opacity=inOut(p(t,t0,t0+.34));return t>=t0}
+
+const eU=all('#E .e'), strikes=all('#E .strike'), segs=all('#D .seg'), jcards=all('#D .jc'), savs=all('#D .sav'), tsm=all('#B .tsm');
+const TASKI='<i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i>';
+const WHITE=[255,255,255], HOVER=[251,252,214], GREEN=[220,245,227], YEL=[229,236,103], INK=[17,18,16];
+const SEGC=[[8,117,138],[61,148,165],[127,188,198],[185,220,226]], SEGT=[WHITE,WHITE,INK,INK], NAMES=['Marcus','Priya','Tom','Amara'];
+const ISS=[['NW-241','Alert rules',0],['NW-242','Spend thresholds',0],['NW-243','Email template',1],['NW-244','Weekly digest',1],['NW-245','Slack message',2],['NW-246','Mute settings',3]];
+const rows=ISS.map(([k,ti,o],i)=>{const r=document.createElement('div');r.className='jr';r.style.top=(182+i*25)+'px';
+  r.innerHTML=`<i class="tint"></i>${TASKI}<span class="k">${k}</span><span>${ti}</span><span class="nm">${NAMES[o]}</span><u class="av f${o}"></u>`;$('drows').appendChild(r);return r});
+const LEGS=[[5.1,5.36],[5.38,5.62],[5.64,5.84],[5.86,6.06]], STOPS=[68,249,401,506,582], SUMS=[0,1900,3500,4600,5400], PICK=1;
+// cursor waypoints in board space: [start, end, x, y, arc]
+const CW=[[.1,.42,714,206,1],[2.5,3.0,150,226,1],[3.8,4.2,708,452,1],[6.7,7.1,330,402,1],[8.2,8.62,236,200,1],[9.6,10.5,476,376,0]], PRESS=[.55,3.55,7.1,9.5,10.52];
+const BASESH='0 1px 1px rgba(9,30,66,.25),0 0 1px rgba(9,30,66,.31)';
+
+function draw(t){
+  // ================= WORK, opening on the hook
+  let u=t;vis($('D'),t<S.C+.4);
+  // camera: close on the finished ticket, then pull back to the board
+  const zb=inOut(p(u,2.0,2.6)),land=1-outCubic(p(u,0,.32));
+  const cs=lerp(1.6,1,zb)*(1+.06*land),ctx=lerp(400,640,zb)-640*cs,cty=lerp(250,244,zb)-244*cs;
+  $('cam').style.transform=`translate(${ctx}px,${cty}px) scale(${cs})`;$('cam').style.opacity=p(u,0,.16);
+  $('board').style.opacity=Math.min(1,(1-p(u,3.85,4.07))+p(u,8.2,8.5));
+  $('bhead').style.opacity=1;
+  const spot=1-p(u,2.0,2.45),grow=outCubic(p(u,.6,.92)),grow2=outCubic(p(u,8.25,8.6)),dk=inOut(p(u,9.6,10.5)),settle=outCubic(p(u,10.15,10.55));
+  $('colTodo').style.opacity=1-.45*spot;$('colProg').style.opacity=1-.45*spot;$('colDone').style.opacity=1;
+  $('colDone').style.height=(114+36*grow)+'px';$('colTodo').style.height=lerp(114+36*grow2,46,settle)+'px';$('colProg').style.height=(212+114*settle)+'px';
+  $('cTodo').textContent=u<10.3?'1':'0';$('cProg').textContent=u<10.3?'2':'3';
+  jcards.forEach(c=>{let s=1,x=0,y=0,rot=0,sh=BASESH,bg=WHITE,o=1,z='';
+    if(c.id==='cDone'){const l=outCubic(p(u,.58,.82))*(1-p(u,2.0,2.4)),g=p(u,.58,.78);s=1+.04*l;
+      bg=mix(mix(WHITE,HOVER,p(u,.25,.45)),GREEN,g);sh=`0 ${1+7*l}px ${1+20*l}px rgba(9,30,66,${.25-.07*l}),0 0 1px rgba(9,30,66,.4)`}
+    else{o=1-.8*spot;if(c.id==='cNext'){const hv=Math.min(1,p(u,2.9,3.08)*(1-p(u,3.9,4.0))+p(u,8.66,8.78)*(1-p(u,10.52,10.67)));
+      const grab=p(u,9.5,9.62)*(1-p(u,10.5,10.63));bg=mix(WHITE,HOVER,hv);s=(1-.04*Math.sin(Math.PI*p(u,3.55,3.75)))*(1+.03*grab);
+      x=240*dk;y=176*dk;rot=3*Math.sin(Math.PI*dk);if(grab>0){sh=`0 ${12*grab}px ${26*grab}px rgba(9,30,66,${.22*grab}),0 0 1px rgba(9,30,66,.4)`;z=5}}}
+    c.style.opacity=o;c.style.zIndex=z;c.style.background=rgb(bg);c.style.boxShadow=sh;c.style.transform=`translate(${x}px,${y}px) rotate(${rot}deg) scale(${s})`});
+  // the finished ticket shows what it cost, on the card
+  $('amt').style.height=(36*grow)+'px';num($('n6930'),Math.round(6930*outCubic(p(u,.65,1.15))/10)*10);
+  // the highlighter marks whichever amount the scene is about: the finished ticket in the hook, the estimate at the end
+  $('amthl').style.transform=`scaleX(${outExpo(p(u,1.0,1.3))})`;$('amthl').style.opacity=1-p(u,2.0,2.5);
+  $('est').style.height=(36*grow2)+'px';$('esthl').style.transform=`scaleX(${outExpo(p(u,8.75,9.05))})`;
+  // jump into the unstarted feature, and later back out to the board
+  const ex=inOut(p(u,3.65,4.07)),ex2=inOut(p(u,8.2,8.62)),R0=[56,188,208,70],R0b=[56,188,208,106],R1=[48,80,704,396];
+  const rc=ex2>0?R1.map((v,i)=>lerp(v,R0b[i],ex2)):R0.map((v,i)=>lerp(v,R1[i],ex)),pb=$('pbg'),inD=u>=3.65&&u<8.62;
+  pb.style.opacity=inD?1:0;pb.style.left=rc[0]+'px';pb.style.top=rc[1]+'px';pb.style.width=rc[2]+'px';pb.style.height=rc[3]+'px';
+  vis($('detail'),inD&&t<S.C+.4);$('detail').style.opacity=1-p(u,8.2,8.36);
+  $('detail').style.clipPath=`inset(${rc[1]}px ${800-rc[0]-rc[2]}px ${500-rc[1]-rc[3]}px ${rc[0]}px)`;
+  $('dbc').style.opacity=p(u,3.9,4.1);rise($('dt'),outExpo(p(u,3.9,4.26)));
+  rise($('qm'),outExpo(p(u,4.0,4.34)),inCubic(p(u,LEGS[0][1]-.2,LEGS[0][1]-.04)));
+  $('chl').style.opacity=p(u,4.07,4.25);
+  const pick=outCubic(p(u,7.18,7.4)),lift=Math.max(0,outBack(p(u,7.18,7.48)));
+  // the assigned people first
+  rows.forEach((r,i)=>{const o=ISS[i][2],a=4.13+i*.06,k=outCubic(p(u,a,a+.3)),on=p(u,LEGS[o][0],LEGS[o][0]+.2),ti=r.firstElementChild;
+    r.style.opacity=k;r.style.transform=`translateX(${(1-k)*-18}px)`;
+    r.lastElementChild.style.transform=`scale(${Math.max(0,outBack(p(u,a+.14,a+.44)))})`;r.children[4].style.opacity=p(u,a+.14,a+.34);
+    ti.style.background=rgb(o===PICK?mix(SEGC[o],YEL,pick):SEGC[o]);ti.style.opacity=on*(o===PICK?lerp(.3,.85,pick):.3*(1-.7*pick))});
+  // then the sum: each person's tickets become their share of one bar
+  $('refbar').style.transform=`scaleX(${inOut(p(u,4.86,5.18))})`;
+  rise($('capt'),outExpo(p(u,4.96,5.32)),inCubic(p(u,7.16,7.34)));
+  let done=0;LEGS.forEach(([a,b],i)=>{const k=inOut(p(u,a,b));if(k>=1)done=i+1;const sg=segs[i],me=i===PICK,up=me?8*lift:0;sg.style.left=STOPS[i]+'px';
+    sg.style.width=Math.max(0,(STOPS[i+1]-STOPS[i])*k-(i<3?2:0))+'px';sg.firstElementChild.style.opacity=p(u,b-.05,b+.15);
+    sg.style.top=(370-up)+'px';sg.style.height=(48+up)+'px';sg.style.opacity=me?1:lerp(1,.4,pick);
+    sg.style.background=rgb(me?mix(SEGC[i],YEL,pick):SEGC[i]);sg.style.color=rgb(me?mix(SEGT[i],INK,pick):SEGT[i]);
+    const am=sg.querySelector('em'),ak=p(u,6.3+i*.09,6.58+i*.09);am.style.opacity=ak;am.style.transform=`translateY(${(1-outCubic(ak))*6}px)`;
+    const sv=savs[i];sv.style.left=(STOPS[i]+4)+'px';sv.style.top=(337-up)+'px';sv.style.opacity=me?1:lerp(1,.45,pick);sv.style.transform=`scale(${Math.max(0,outBack(p(u,a+.04,a+.34)))})`});
+  rise($('tot2'),outExpo(p(u,LEGS[0][1]-.06,LEGS[0][1]+.26)));num($('tot'),SUMS[Math.max(1,done)]);
+  let bump=0;LEGS.forEach(([a,b])=>{const k=p(u,b,b+.22);if(k>0&&k<1)bump=Math.sin(k*Math.PI)});$('totv').style.transform=`scale(${1+.07*bump})`;
+  $('about').style.opacity=p(u,6.28,6.46);
+  rise($('brk'),outExpo(p(u,7.3,7.66)));
+  // the cursor lives in board space and follows the camera
+  let cx=960,cy=330;CW.forEach(([a,b,x,y,arc])=>{if(u>=a){const k=inOut(p(u,a,b)),sx=cx,sy=cy;cx=lerp(sx,x,k);cy=lerp(sy,y,k)-(arc?20*Math.sin(Math.PI*k):0)}});
+  const px=cx*cs+ctx,py=cy*cs+cty;
+  let dip=1,rg=0;PRESS.forEach(a=>{dip*=1-.16*Math.sin(Math.PI*p(u,a,a+.18));const k=p(u,a+.03,a+.3);if(k>0&&k<1)rg=k});
+  $('cur').style.opacity=u>=.05?1:0;$('cur').style.transform=`translate(${px-5}px,${py-3}px) scale(${dip})`;
+  $('ringc').style.opacity=rg>0?1-rg:0;$('ringc').style.transform=`translate(${px}px,${py}px) scale(${.3+.9*outCubic(rg)})`;
+
+  // ================= FORECAST
+  u=t-S.C+.4;vis($('C'),fade(t,S.C,$('C'))&&t<S.B+.4);
+  const sk=inOut(p(u,.78,1.38));dash($('solid'),sk);$('cAreaR').setAttribute('width',58+228*sk);
+  const sp=$('solid'),sl=sp.getTotalLength(),pt=sp.getPointAtLength(sl*sk);
+  const pk=inOut(p(u,1.55,2.2));$('cProjR').setAttribute('width',pk>0?452*pk+6:0);
+  const tx=pk>0?lerp(286,738,pk):pt.x,ty=pk>0?lerp(323,128,pk):pt.y;
+  $('tip').setAttribute('cx',tx);$('tip').setAttribute('cy',ty);$('tip').setAttribute('opacity',u>=.78?1:0);
+  $('tip').setAttribute('r',8+3*Math.sin(p(u,2.2,2.6)*Math.PI));
+  const rk=p(u,1.38,1.9);$('ring').setAttribute('r',8+26*outCubic(rk));$('ring').setAttribute('opacity',rk>0&&rk<1?1-rk:0);
+  $('todayL').setAttribute('opacity',p(u,1.3,1.5));$('lt').style.opacity=p(u,1.3,1.5);$('le').style.opacity=p(u,2.05,2.25);
+  rise($('cnr'),outExpo(p(u,.7,1.05)));num($('cn'),pk>0?Math.round(lerp(14180,42540,pk)/10)*10:Math.round(14180*sk/10)*10);
+  rise($('cc1'),outExpo(p(u,.8,1.1)),inCubic(p(u,1.45,1.62)));rise($('cc2'),outExpo(p(u,1.6,1.95)));rise($('cc3'),outExpo(p(u,1.7,2.05)));
+
+  // ================= SEE
+  u=t-S.B+.5;vis($('B'),fade(t,S.B,$('B'))&&t<S.E+.4);
+  tsm.forEach((el,i)=>{const a=.5+i*.06,k=p(u,a,a+.4);el.style.opacity=p(u,a,a+.1);el.style.transform=`scale(${Math.max(0,outBack(k))})`});
+  rise($('n1r'),outExpo(p(u,.82,1.2)));const c1=97*outCubic(p(u,.86,1.45));num($('n1'),c1);
+  $('t1').style.transform=`scaleX(${outExpo(p(u,.82,1.2))})`;$('f1').style.width=c1+'%';
+  $('who1').style.opacity=p(u,.95,1.15);$('who1').style.transform=`translateX(${(1-outCubic(p(u,.95,1.3)))*26}px)`;
+  $('pill').style.transform=`scale(${Math.max(0,outBack(p(u,1.36,1.62)))})`;
+  rise($('n2r'),outExpo(p(u,1.45,1.83)));const c2=6*outCubic(p(u,1.5,1.85));num($('n2'),c2);
+  $('t2').style.transform=`scaleX(${outExpo(p(u,1.45,1.83))})`;$('f2').style.width=c2+'%';
+  $('who2').style.opacity=p(u,1.58,1.78);$('who2').style.transform=`translateX(${(1-outCubic(p(u,1.58,1.93)))*26}px)`;
+
+  // ================= NEVER COLLECTED
+  u=t-S.E;vis($('E'),fade(t,S.E,$('E')));
+  // fade to white at the end so the loop restarts cleanly on the board
+  $('E').style.opacity=Math.min(+$('E').style.opacity,1-inOut(p(t,S.END-.32,S.END-.02)));
+  $('ecard').style.opacity=p(u,0,.25);$('ecard').style.transform=`scale(${lerp(.96,1,outCubic(p(u,0,.4)))})`;
+  $('shield').style.transform=`scale(${Math.max(0,outBack(p(u,.14,.5)))})`;dash($('shchk'),inOut(p(u,.42,.7)));
+  rise($('secl'),outExpo(p(u,.24,.62)));
+  eU.forEach((el,i)=>{rise(el,outExpo(p(u,.42+i*.07,.78+i*.07)));el.style.opacity=lerp(1,.38,p(u,.82+i*.09,1.0+i*.09))});
+  strikes.forEach((el,i)=>{el.style.transform=`scaleX(${outExpo(p(u,.78+i*.09,1.02+i*.09))})`});
+  rise($('never'),outExpo(p(u,1.12,1.48)));$('nvhl').style.transform=`scaleX(${outExpo(p(u,1.42,1.72))})`;
+
+  $('time').textContent=t.toFixed(1)+' / '+S.END+'s';scrub.value=t;
+}
+const btn=$('play'),scrub=$('scrub');let T=0,paused=false,last=0;
+btn.onclick=()=>{paused=!paused;btn.textContent=paused?'Play':'Pause'};
+scrub.oninput=()=>{T=+scrub.value;paused=true;btn.textContent='Play';draw(T)};
+window.__setT=t=>{T=t;paused=true;draw(t)};
+function loop(n){const d=Math.min(.1,(n-last)/1000);last=n;if(!paused)T=(T+d)%S.END;draw(T);requestAnimationFrame(loop)}
+requestAnimationFrame(n=>{last=n;loop(n)});
+
+</script></body></html>
