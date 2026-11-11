@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { HERO_VIDEO } from "@/lib/public/home-cta";
 import { UseJunctionHomeContent } from "@/components/public/use-junction-home-content";
 import { siteConfig } from "@/lib/public/config";
@@ -31,11 +29,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function HomePage() {
-  if ((await auth())?.user?.id) {
-    redirect("/auth/continue?from=%2Fdashboard");
-  }
-
+// Signed-in visitors see the homepage too; the header gives them a Dashboard button (see the public layout).
+export default function HomePage() {
   return (
     <>
       <link rel="preload" href={HERO_VIDEO.poster} as="image" />

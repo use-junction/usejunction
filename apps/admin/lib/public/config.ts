@@ -51,7 +51,7 @@ export const navAnchors = [{ id: "pricing", label: "Pricing" }] as const;
 
 /** Primary page links in the marketing header. Keep this short — brand, pricing, blog. */
 export const navLinks: ReadonlyArray<{ href: string; label: string }> = [
-  { href: "/", label: "For coders" },
+  { href: "/", label: "Home" },
   { href: "/blog", label: "Blog" },
 ];
 
