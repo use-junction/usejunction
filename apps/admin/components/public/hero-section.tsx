@@ -114,7 +114,7 @@ function HeroFilm({ reduceMotion }: { reduceMotion: boolean }) {
         type="button"
         onClick={toggle}
         aria-label={paused ? "Play video" : "Pause video"}
-        className={`absolute right-4 top-3 grid size-11 place-items-center border border-[var(--public-border)] bg-white text-[var(--public-fg)] transition-opacity duration-200 hover:border-[var(--public-fg)] focus-visible:opacity-100 group-hover:opacity-100 sm:right-3 sm:size-9 ${
+        className={`absolute bottom-3 left-4 grid size-11 place-items-center border border-[var(--public-border)] bg-white text-[var(--public-fg)] transition-opacity duration-200 hover:border-[var(--public-fg)] focus-visible:opacity-100 group-hover:opacity-100 sm:left-3 sm:size-9 ${
           paused ? "opacity-100" : "opacity-0"
         }`}
       >
