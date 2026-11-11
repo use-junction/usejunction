@@ -75,8 +75,10 @@ async function captureFrames(page, framesDir) {
 
 async function encode(framesDir) {
   const input = ["-y", "-hide_banner", "-loglevel", "error", "-framerate", String(FPS), "-i", path.join(framesDir, "%04d.png")];
-  const h264 = (w, crf) => [...input, "-vf", `scale=${w}:-2:flags=lanczos`, "-c:v", "libx264", "-preset", "slow", "-crf", String(crf), "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an"];
-  const vp9 = (w, crf) => [...input, "-vf", `scale=${w}:-2:flags=lanczos`, "-c:v", "libvpx-vp9", "-crf", String(crf), "-b:v", "0", "-row-mt", "1", "-pix_fmt", "yuv420p", "-an"];
+  // Tag the colour space so browsers decode the white background as the page's white, not a grey box.
+  const BT709 = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", "-color_range", "tv"];
+  const h264 = (w, crf) => [...input, "-vf", `scale=${w}:-2:flags=lanczos:out_color_matrix=bt709`, "-c:v", "libx264", "-preset", "slow", "-crf", String(crf), "-pix_fmt", "yuv420p", ...BT709, "-movflags", "+faststart", "-an"];
+  const vp9 = (w, crf) => [...input, "-vf", `scale=${w}:-2:flags=lanczos:out_color_matrix=bt709`, "-c:v", "libvpx-vp9", "-crf", String(crf), "-b:v", "0", "-row-mt", "1", "-pix_fmt", "yuv420p", ...BT709, "-an"];
   const jobs = [
     [h264(1280, 22), "hero-loop.mp4"],
     [h264(960, 25), "hero-loop-mobile.mp4"],

@@ -7,10 +7,9 @@
 *{box-sizing:border-box}
 .wrap{max-width:720px;margin:0 auto;font-family:var(--font-sans,system-ui)}
 .frame{position:relative;width:100%;aspect-ratio:800/500;overflow:hidden;border:1px solid var(--border)}
-#stage{position:absolute;left:0;top:0;width:800px;height:500px;transform-origin:0 0;font-family:"DM Sans",system-ui,sans-serif;background:#fafaf7}
+#stage{position:absolute;left:0;top:0;width:800px;height:500px;transform-origin:0 0;font-family:"DM Sans",system-ui,sans-serif;background:#fff}
 .sc{position:absolute;inset:0;overflow:hidden;visibility:hidden}
-.light{background:#fafaf7;color:#111210}
-.dark{background:#111210;color:#fafaf7}
+.light{background:#fff;color:#111210}
 .flash{position:absolute;inset:0;background:#e5ec67;visibility:hidden}
 .cal{font-family:"Cal Sans","DM Sans",sans-serif;letter-spacing:-.01em}
 .m{display:inline-block;overflow:hidden;vertical-align:top;padding:0 .14em .08em;margin:0 -.14em -.08em}
@@ -57,7 +56,7 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
 .tot .ab{font-size:22px;font-weight:600;color:#666861;margin-right:8px}
 .seg{position:absolute;top:254px;height:48px;overflow:hidden;display:flex;align-items:flex-end;white-space:nowrap}
 .seg span{display:block;padding:0 0 12px 11px;font-size:20px;font-weight:700;line-height:1.2}
-.chipk{position:absolute;top:211px;width:20px;height:14px;border:2px solid #111210;background:#fafaf7}
+.chipk{position:absolute;top:211px;width:20px;height:14px;border:2px solid #111210;background:#fff}
 .slot{position:absolute;top:334px;font-size:20px;white-space:nowrap;color:#3f5d63}
 .bhead{position:absolute;left:48px;top:84px;display:flex;align-items:center;gap:8px;font-size:17px;font-weight:700;color:#172b4d;opacity:0}
 .bhead span{color:#5e6c84;font-size:14px;font-weight:500}
@@ -93,7 +92,7 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
 #D .jr{height:24px}
 /* E */
 .pw{position:absolute;left:64px;font-size:62px;line-height:1.1;white-space:nowrap}
-.pw .strike{position:absolute;left:-12px;right:-12px;top:52%;height:6px;background:#e5ec67;transform-origin:0 50%;transform:scaleX(0)}
+.pw .strike{position:absolute;left:-12px;right:-12px;top:52%;height:5px;background:#111210;transform-origin:0 50%;transform:scaleX(0)}
 /* F */
 .end{position:absolute;left:0;right:0;text-align:center}
 /* controls */
@@ -139,26 +138,26 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
   <svg class="abs" id="cur" width="30" height="30" viewBox="0 0 24 24" style="left:0;top:0;transform-origin:5px 3px;opacity:0"><path d="M5 3l14 8.2-6.6 1.4L10 19.4z" fill="#111210" stroke="#fafaf7" stroke-width="1.6" stroke-linejoin="round"/></svg>
 </section>
 
-<section class="sc dark" id="C">
+<section class="sc light" id="C">
   <div class="chap cal" id="chC">Forecast</div>
   <svg class="full" viewBox="0 0 800 500">
     <defs><clipPath id="cArea"><rect id="cAreaR" x="0" y="0" width="0" height="500"/></clipPath><clipPath id="cProj"><rect id="cProjR" x="286" y="0" width="0" height="500"/></clipPath>
-    <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e5ec67" stop-opacity=".22"/><stop offset="1" stop-color="#e5ec67" stop-opacity="0"/></linearGradient></defs>
-    <g id="grid" stroke="#fafaf7" stroke-opacity=".08" stroke-dasharray="2 8"><path d="M58 128H742M58 220H742M58 312H742"/></g>
-    <path id="base" d="M58 420H742" stroke="#fafaf7" stroke-opacity=".18" stroke-width="2"/>
+    <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e5ec67" stop-opacity=".55"/><stop offset="1" stop-color="#e5ec67" stop-opacity="0"/></linearGradient></defs>
+    <g id="grid" stroke="#111210" stroke-opacity=".12" stroke-dasharray="2 8"><path d="M58 128H742M58 220H742M58 312H742"/></g>
+    <path id="base" d="M58 420H742" stroke="#111210" stroke-opacity=".16" stroke-width="2"/>
     <path d="M58 414 C 100 410, 120 396, 150 388 S 200 384, 226 364 S 262 334, 286 323 L286 420 L58 420Z" fill="url(#gA)" clip-path="url(#cArea)"/>
-    <path id="solid" d="M58 414 C 100 410, 120 396, 150 388 S 200 384, 226 364 S 262 334, 286 323" fill="none" stroke="#e5ec67" stroke-width="5" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
-    <path id="todayL" d="M286 323V420" stroke="#fafaf7" stroke-opacity=".3" stroke-width="2" stroke-dasharray="3 6" opacity="0"/>
-    <path d="M286 323 L738 128" fill="none" stroke="#e5ec67" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 14" clip-path="url(#cProj)"/>
-    <circle id="ring" cx="286" cy="323" r="8" fill="none" stroke="#e5ec67" stroke-width="2" opacity="0"/>
-    <circle id="tip" cx="58" cy="414" r="8" fill="#e5ec67" opacity="0"/>
+    <path id="solid" d="M58 414 C 100 410, 120 396, 150 388 S 200 384, 226 364 S 262 334, 286 323" fill="none" stroke="#08758a" stroke-width="5" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+    <path id="todayL" d="M286 323V420" stroke="#111210" stroke-opacity=".3" stroke-width="2" stroke-dasharray="3 6" opacity="0"/>
+    <path d="M286 323 L738 128" fill="none" stroke="#08758a" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 14" clip-path="url(#cProj)"/>
+    <circle id="ring" cx="286" cy="323" r="8" fill="none" stroke="#08758a" stroke-width="2" opacity="0"/>
+    <circle id="tip" cx="58" cy="414" r="8" fill="#08758a" opacity="0"/>
   </svg>
-  <div class="abs mono" id="lt" style="left:262px;top:432px;opacity:0;color:rgba(250,250,247,.55)">day 10</div>
-  <div class="abs mono" id="le" style="left:706px;top:432px;opacity:0;color:rgba(250,250,247,.55)">day 30</div>
+  <div class="abs mono" id="lt" style="left:262px;top:432px;opacity:0;color:rgba(17,18,16,.5)">day 10</div>
+  <div class="abs mono" id="le" style="left:706px;top:432px;opacity:0;color:rgba(17,18,16,.5)">day 30</div>
   <div class="abs cal" style="left:54px;top:88px;font-size:108px;line-height:1;white-space:nowrap"><span class="m"><span class="r" id="cnr">$<span id="cn">0</span></span></span></div>
-  <div class="cap" style="top:216px"><span class="m"><span class="r" id="cc1" style="color:rgba(250,250,247,.6)">spent so far</span></span></div>
-  <div class="cap" style="top:216px"><span class="m"><span class="r" id="cc2">by month end <span style="color:rgba(250,250,247,.5);font-weight:500">· 38 people</span></span></span></div>
-  <div class="cap" style="top:246px;font-weight:500"><span class="m"><span class="r" id="cc3" style="color:rgba(250,250,247,.5)">at the same daily pace</span></span></div>
+  <div class="cap" style="top:216px"><span class="m"><span class="r" id="cc1" style="color:#666861">spent so far</span></span></div>
+  <div class="cap" style="top:216px"><span class="m"><span class="r" id="cc2">by month end <span style="color:#8a8c84;font-weight:500">· 38 people</span></span></span></div>
+  <div class="cap" style="top:246px;font-weight:500"><span class="m"><span class="r" id="cc3" style="color:#8a8c84">at the same daily pace</span></span></div>
 </section>
 
 <i class="flash" id="fB"></i>
@@ -180,15 +179,15 @@ svg.full{position:absolute;inset:0;width:800px;height:500px;overflow:visible}
   </div>
 </section>
 
-<section class="sc dark" id="E">
+<section class="sc light" id="E">
   <div class="abs" style="left:64px;top:46px;display:flex;align-items:center;gap:12px;font-size:23px;font-weight:600;white-space:nowrap">
-    <svg id="shield" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#e5ec67" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="transform-origin:50% 50%;flex:none"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path id="shchk" d="m9 12 2 2 4-4" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg>
+    <svg id="shield" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#08758a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="transform-origin:50% 50%;flex:none"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path id="shchk" d="m9 12 2 2 4-4" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg>
     <span class="m"><span class="r" id="secl">The agent reads usage locally.</span></span>
   </div>
   <div class="pw cal" style="top:118px"><span class="m"><span class="r e">keystrokes</span></span><i class="strike"></i></div>
   <div class="pw cal" style="top:192px"><span class="m"><span class="r e">browser activity</span></span><i class="strike"></i></div>
   <div class="pw cal" style="top:266px"><span class="m"><span class="r e">network traffic</span></span><i class="strike"></i></div>
-  <div class="pw cal" style="top:372px;color:#e5ec67"><span class="m"><span class="r" id="never">Never collected.</span></span></div>
+  <div class="pw cal" style="top:372px"><span class="m"><span class="r" id="never"><span class="hlw"><i id="nvhl"></i><b>Never collected.</b></span></span></span></div>
 </section>
 
 <i class="flash" id="fF"></i>
@@ -222,7 +221,8 @@ function chapter(id,u,a){const e=$(id),[w,h]=dims[id];const k=inOut(p(u,a+.32,a+
 function iris(t,t0,cx,cy,flash,scene,r0){const R=1150;const a=inOut(p(t,t0,t0+.34)),b=inOut(p(t,t0+.13,t0+.5));
   vis(flash,t>=t0&&t<t0+.5);dia(flash,cx,cy,lerp(r0,R,a));
   if(t>=t0+.5)scene.style.clipPath='none';else dia(scene,cx,cy,lerp(0,R,b));return t>=t0+.13}
-function wipe(t,t0,scene){const k=inOut(p(t,t0,t0+.36));scene.style.clipPath=k>=1?'none':`inset(${(1-k)*100}% 0 0 0)`;return t>=t0}
+// Every scene is on white, so a wipe would just cut the last one in half; crossfade instead.
+function fade(t,t0,scene){scene.style.opacity=inOut(p(t,t0,t0+.34));return t>=t0}
 
 const eU=all('#E .e'), strikes=all('#E .strike'), segs=all('#D .seg'), jcards=all('#D .jc'), savs=all('#D .sav'), tsm=all('#B .tsm');
 const TASKI='<i class="ti task"><svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5.2l2 2 4-4.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></i>';
@@ -298,11 +298,11 @@ function draw(t){
   $('ringc').style.opacity=rg>0?1-rg:0;$('ringc').style.transform=`translate(${px}px,${py}px) scale(${.3+.9*outCubic(rg)})`;
 
   // ================= FORECAST
-  u=t-S.C;vis($('C'),wipe(t,S.C,$('C'))&&t<S.B+.55);
+  u=t-S.C;vis($('C'),fade(t,S.C,$('C'))&&t<S.B+.55);
   chapter('chC',u,.2);
   const sk=inOut(p(u,.78,1.38));dash($('solid'),sk);$('cAreaR').setAttribute('width',58+228*sk);
   const sp=$('solid'),sl=sp.getTotalLength(),pt=sp.getPointAtLength(sl*sk);
-  const pk=inOut(p(u,1.55,2.2));$('cProjR').setAttribute('width',452*pk+6);
+  const pk=inOut(p(u,1.55,2.2));$('cProjR').setAttribute('width',pk>0?452*pk+6:0);
   const tx=pk>0?lerp(286,738,pk):pt.x,ty=pk>0?lerp(323,128,pk):pt.y;
   $('tip').setAttribute('cx',tx);$('tip').setAttribute('cy',ty);$('tip').setAttribute('opacity',u>=.78?1:0);
   $('tip').setAttribute('r',8+3*Math.sin(p(u,2.2,2.6)*Math.PI));
@@ -324,12 +324,12 @@ function draw(t){
   $('who2').style.opacity=p(u,1.58,1.78);$('who2').style.transform=`translateX(${(1-outCubic(p(u,1.58,1.93)))*26}px)`;
 
   // ================= NEVER COLLECTED
-  u=t-S.E;vis($('E'),wipe(t,S.E,$('E'))&&t<S.F+.55);
+  u=t-S.E;vis($('E'),fade(t,S.E,$('E'))&&t<S.F+.55);
   $('shield').style.transform=`scale(${Math.max(0,outBack(p(u,.14,.5)))})`;dash($('shchk'),inOut(p(u,.42,.7)));
   rise($('secl'),outExpo(p(u,.24,.62)));
   eU.forEach((el,i)=>{rise(el,outExpo(p(u,.42+i*.07,.78+i*.07)));el.style.opacity=lerp(1,.38,p(u,.82+i*.09,1.0+i*.09))});
   strikes.forEach((el,i)=>{el.style.transform=`scaleX(${outExpo(p(u,.78+i*.09,1.02+i*.09))})`});
-  rise($('never'),outExpo(p(u,1.12,1.48)));
+  rise($('never'),outExpo(p(u,1.12,1.48)));$('nvhl').style.transform=`scaleX(${outExpo(p(u,1.42,1.72))})`;
 
   // ================= END CARD
   u=t-S.F;const fOn=iris(t,S.F,400,250,$('fF'),$('F'),0);vis($('F'),fOn);

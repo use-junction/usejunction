@@ -55,11 +55,12 @@ function HeroVideo({ reduceMotion }: { reduceMotion: boolean }) {
   }, [reduceMotion]);
 
   return (
-    // Edge to edge on phones, where every pixel of width makes the board text easier to read.
-    <div className="-mx-4 overflow-hidden border-y border-[var(--public-border)] bg-[#fafaf7] sm:mx-0 sm:border">
+    // No frame: the film is drawn on white, so it sits straight on the page. Edge to edge on phones, where every
+    // pixel of width makes the board text easier to read.
+    <div className="-mx-4 sm:mx-0">
       <video
         ref={ref}
-        className="block aspect-[8/5] h-auto w-full"
+        className="hero-video-edge block aspect-[8/5] h-auto w-full bg-white"
         width={HERO_VIDEO.width}
         height={HERO_VIDEO.height}
         poster={HERO_VIDEO.poster}
@@ -86,7 +87,7 @@ export function HeroSection() {
   return (
     <section className="hero-atmosphere relative overflow-x-clip bg-white">
       <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-0">
-        <div className="grid w-full grid-cols-1 items-center gap-10 pb-20 pt-24 md:gap-12 md:pt-28 lg:min-h-[74svh] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-14 lg:pb-28 lg:pt-28">
+        <div className="grid w-full grid-cols-1 items-center gap-10 pb-20 pt-24 md:gap-12 md:pt-28 lg:min-h-[74svh] lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:gap-12 lg:pb-28 lg:pt-28">
           <motion.div
             className="relative isolate flex min-w-0 flex-col items-start text-left"
             variants={reduceMotion ? undefined : container}
@@ -99,7 +100,7 @@ export function HeroSection() {
 
             <motion.h1
               variants={item}
-              className="mt-4 text-[2.25rem] font-bold leading-[1.04] tracking-[-0.035em] text-[var(--public-fg)] [text-wrap:balance] sm:text-5xl lg:text-[3.15rem] xl:text-[3.45rem]"
+              className="mt-4 text-[2rem] font-bold leading-[1.06] tracking-[-0.03em] text-[var(--public-fg)] [text-wrap:balance] sm:text-[2.75rem] lg:text-[2.25rem] xl:text-[2.5rem]"
             >
               See who{" "}
               <mark className="home-highlight whitespace-nowrap">actually uses</mark> the AI coding seats you pay for.
@@ -107,20 +108,20 @@ export function HeroSection() {
 
             <motion.p
               variants={item}
-              className="mt-6 max-w-xl text-base leading-relaxed text-[#3a3b37] sm:text-lg sm:leading-8"
+              className="mt-5 max-w-lg text-[0.9375rem] leading-relaxed text-[#3a3b37] sm:text-base sm:leading-7"
             >
               Claude, Cursor, Codex and Copilot each show only their own seats. UseJunction shows every person across
               all of them: who uses AI day by day, who is near a limit, and where the spend landed in GitHub.
             </motion.p>
 
-            <motion.div variants={item} className="mt-8 flex w-full flex-col items-start">
+            <motion.div variants={item} className="mt-7 flex w-full flex-col items-start">
               <div className="flex w-full flex-col items-stretch gap-4 sm:w-auto sm:flex-row sm:items-center sm:gap-6">
                 <Link
                   href={HOME_SIGNUP_HREF}
-                  className="public-btn public-btn-teal rounded-none px-8 py-3 text-base font-semibold"
+                  className="public-btn public-btn-teal rounded-none px-7 py-2.5 text-[0.9375rem] font-semibold"
                 >
                   {HOME_SIGNUP_LABEL}
-                  <ArrowRight className="h-5 w-5" aria-hidden />
+                  <ArrowRight className="h-4 w-4" aria-hidden />
                 </Link>
                 <a
                   href={siteConfig.githubUrl}
