@@ -709,16 +709,32 @@ test("a drain reseals history under a new snapshot version instead of leaving it
   const developer = await prisma.developer.create({
     data: { orgId: org.id, email: `bump-${suffix}@example.com`, name: "Bump Dev", role: "user" },
   });
+  const device = await prisma.device.create({
+    data: {
+      orgId: org.id,
+      userId: developer.id,
+      hostname: "bump-host",
+      os: "darwin",
+      architecture: "arm64",
+      agentVersion: "test",
+      deviceToken: `bump-tok-${suffix}`,
+    },
+  });
   const previousVersion = `org-day-snap-v2:usage-v2:previous-${suffix}`;
   const firstDay = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()) - 5 * 86_400_000);
   const days = [0, 1, 2].map((offset) => new Date(firstDay.getTime() + offset * 86_400_000));
 
   try {
+    // The device uploaded these days in a sync run, as every device row must be.
+    await prisma.syncRun.create({
+      data: { orgId: org.id, deviceId: device.id, status: "committed", windowFrom: days[0]!, windowTo: days[2]! },
+    });
     for (const [index, date] of days.entries()) {
       await prisma.usageDaily.create({
         data: {
           orgId: org.id,
           developerId: developer.id,
+          deviceId: device.id,
           date,
           provider: "cursor",
           product: "cursor",

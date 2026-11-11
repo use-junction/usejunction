@@ -188,6 +188,16 @@ test("actual ingest: invalidation + rematerialize + overlay shows spend", { skip
   const { org, user, device } = await seedDevice(suffix);
 
   try {
+    // ingestLocalUsageBatch only runs inside a sync run; snapshots require one.
+    await prisma.syncRun.create({
+      data: {
+        orgId: org.id,
+        deviceId: device.id,
+        status: "committed",
+        windowFrom: new Date("2026-07-01T00:00:00.000Z"),
+        windowTo: new Date("2026-07-31T00:00:00.000Z"),
+      },
+    });
     await ingestLocalUsageBatch({
       orgId: org.id,
       userId: user.id,

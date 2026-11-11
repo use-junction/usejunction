@@ -1354,6 +1354,8 @@ model SyncRun {
 
   @@index([orgId, deviceId, status])
   @@index([deviceId, startedAt])
+  /// Snapshot sync-trail check: does a run from this device cover a usage date?
+  @@index([deviceId, windowTo])
   @@map("sync_runs")
 }
 

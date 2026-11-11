@@ -3,8 +3,10 @@ import { Prisma, prisma } from "@usejunction/db";
 import { logServerError } from "@/lib/errors/public";
 import { CALCULATION_VERSION, PRICING_VERSION } from "@/lib/metrics/source-priority";
 import { DEFAULT_USAGE_RETENTION_DAYS } from "@/lib/legal/versions";
+import { countUnbackedDeviceRows, syncTrailBackedSql } from "./sync-trail";
 
-export const ORG_DAY_SNAPSHOT_VERSION = `org-day-snap-v2:${CALCULATION_VERSION}:${PRICING_VERSION}`;
+// v3: device rows without a covering sync run no longer count (see sync-trail.ts).
+export const ORG_DAY_SNAPSHOT_VERSION = `org-day-snap-v3:${CALCULATION_VERSION}:${PRICING_VERSION}`;
 export const ORG_DAY_WATERMARK_KIND = "org_usage_day";
 
 /** Prevent parallel ensure/materialize races for the same org (current+previous windows). */
@@ -166,7 +168,25 @@ export async function materializeOrgUsageRange(
   await withOrgDbLock(orgId, async () => {
     total = await materializeOrgUsageRangeChunks(orgId, fromDay, toDay, metricVersion, options.deadlineMs);
   });
+  await reportUnbackedDeviceRows(orgId, fromDay, toDay);
   return total;
+}
+
+/** Log device rows the sync-trail rule kept out of this range's snapshots. */
+async function reportUnbackedDeviceRows(orgId: string, fromDay: Date, toDay: Date): Promise<void> {
+  try {
+    const unbacked = await countUnbackedDeviceRows(orgId, isoDay(fromDay), isoDay(toDay));
+    if (unbacked.rows === 0) return;
+    console.warn("[snapshots/unbacked-device-rows]", {
+      orgId,
+      from: isoDay(fromDay),
+      to: isoDay(toDay),
+      rows: unbacked.rows,
+      costMicros: unbacked.costMicros.toString(),
+    });
+  } catch (error) {
+    logServerError("snapshots/unbacked_device_rows", error, { orgId });
+  }
 }
 
 /** Split [fromDay, toDay] into newest-first escalating chunks. Exported for tests. */
@@ -260,6 +280,7 @@ async function materializeOrgUsageRangeUnlocked(
       WHERE org_id = ${orgId}
         AND date >= ${fromKey}::date
         AND date <= ${toKey}::date
+        AND ${syncTrailBackedSql()}
     ), ranked AS (
       SELECT classified.*,
         MIN(activity_priority) FILTER (
@@ -766,6 +787,7 @@ async function findCorruptOrgDaySnapshots(
       WHERE org_id = ${orgId}
         AND date >= ${fromKey}::date
         AND date <= ${toKey}::date
+        AND ${syncTrailBackedSql()}
       GROUP BY date
     )
     SELECT o.date
@@ -864,6 +886,7 @@ export async function ensureOrgUsageDaySnapshots(
           FROM usage_daily
           WHERE org_id = ${orgId}
             AND date IN (${Prisma.join(missingKeys.map((d) => Prisma.sql`${d}::date`))})
+            AND ${syncTrailBackedSql()}
             AND (
               requests > 0 OR sessions > 0 OR input_tokens > 0 OR output_tokens > 0
               OR cost_micros > 0 OR active_seconds > 0
