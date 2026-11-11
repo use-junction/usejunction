@@ -79,8 +79,12 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
 
   const video = page.getByLabel(/UseJunction product video/i);
   await expect(video).toBeVisible();
-  await expect(video).toHaveAttribute("poster", "/video/hero-poster.jpg");
+  await expect(video).toHaveAttribute("poster", "/video/hero-loop-poster.jpg");
   await expect(video).toHaveJSProperty("muted", true);
+  await expect(video).toHaveJSProperty("loop", true);
+  // The loop actually loads and plays: the browser picked a source and the clock moves.
+  await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentSrc)).toMatch(/\/video\/hero-loop(-mobile)?\.(mp4|webm)$/);
+  await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime), { timeout: 10_000 }).toBeGreaterThan(0.5);
 
   const closing = page.getByRole("region", { name: /Connect your own laptop first/i });
   await expect(closing.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);

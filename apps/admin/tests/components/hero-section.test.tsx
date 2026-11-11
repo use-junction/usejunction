@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 
 const motion = vi.hoisted(() => ({ reduce: false }));
@@ -36,19 +36,35 @@ test("hero leads with per-person seat usage, a free sign-up and the price", () =
   expect(screen.getByText("Free for 5 seats, then $1 per active developer a month. No card.")).toBeTruthy();
 });
 
-test("hero video plays muted and loops without controls", () => {
+test("hero plays the product loop muted, inline and on repeat, with a smaller encode for phones", () => {
   render(<HeroSection />);
 
   const video = screen.getByLabelText(/UseJunction product video/) as HTMLVideoElement;
   expect(video.muted).toBe(true);
   expect(video.loop).toBe(true);
+  // happy-dom has no playsInline property; the attribute is what iOS Safari reads.
+  expect(video.hasAttribute("playsinline")).toBe(true);
   expect(video.controls).toBe(false);
-  expect(video.getAttribute("poster")).toBe("/video/hero-poster.jpg");
-  expect([...video.querySelectorAll("source")].map((source) => source.getAttribute("src"))).toEqual([
-    "/video/hero.webm",
-    "/video/hero.mp4",
+  expect(video.getAttribute("poster")).toBe("/video/hero-loop-poster.jpg");
+  // Phones match the first source; everyone else falls through to the full-size encode. VP9 comes last, for
+  // browsers that cannot play H.264.
+  expect(
+    [...video.querySelectorAll("source")].map((source) => [source.getAttribute("src"), source.getAttribute("media")]),
+  ).toEqual([
+    ["/video/hero-loop-mobile.mp4", "(max-width: 767px)"],
+    ["/video/hero-loop.mp4", null],
+    ["/video/hero-loop-mobile.webm", "(max-width: 767px)"],
+    ["/video/hero-loop.webm", null],
   ]);
   expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
+});
+
+test("hero video shows controls when the browser refuses autoplay, so a tap starts it", async () => {
+  vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValue(new DOMException("blocked", "NotAllowedError"));
+  render(<HeroSection />);
+
+  const video = screen.getByLabelText(/UseJunction product video/) as HTMLVideoElement;
+  await waitFor(() => expect(video.controls).toBe(true));
 });
 
 test("hero video stays still with controls when reduced motion is on", () => {

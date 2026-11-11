@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { siteConfig } from "@/lib/public/config";
 import { HERO_VIDEO, HOME_PRICE_LINE, HOME_SIGNUP_HREF, HOME_SIGNUP_LABEL } from "@/lib/public/home-cta";
 
@@ -27,8 +27,9 @@ const item = {
 
 function HeroVideo({ reduceMotion }: { reduceMotion: boolean }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const [blocked, setBlocked] = useState(false);
 
-  // Muted autoplay only; people who ask for less motion get the still frame and the controls.
+  // Muted autoplay on repeat; people who ask for less motion get the still frame and the controls.
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
@@ -36,27 +37,44 @@ function HeroVideo({ reduceMotion }: { reduceMotion: boolean }) {
       video.pause();
       return;
     }
-    video.play().catch(() => {
-      // Autoplay can be refused (low-power mode); the poster stays up.
+    const play = () =>
+      video.play().catch(() => {
+        // Autoplay can be refused (low-power mode, data saver); show controls so a tap starts it.
+        setBlocked(true);
+      });
+    play();
+
+    // Pause while scrolled out of view so phones do not decode a loop nobody sees.
+    if (typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry?.isIntersecting) play();
+      else video.pause();
     });
+    observer.observe(video);
+    return () => observer.disconnect();
   }, [reduceMotion]);
 
   return (
-    <div className="overflow-hidden border border-[var(--public-border)] bg-[#111210]">
+    // Edge to edge on phones, where every pixel of width makes the board text easier to read.
+    <div className="-mx-4 overflow-hidden border-y border-[var(--public-border)] bg-[#fafaf7] sm:mx-0 sm:border">
       <video
         ref={ref}
-        className="block aspect-video h-auto w-full"
+        className="block aspect-[8/5] h-auto w-full"
+        width={HERO_VIDEO.width}
+        height={HERO_VIDEO.height}
         poster={HERO_VIDEO.poster}
         muted
         loop
         playsInline
         autoPlay={!reduceMotion}
-        controls={reduceMotion}
-        preload="metadata"
-        aria-label="UseJunction product video: usage, cost and models across every AI coding tool, then one developer's detail"
+        controls={reduceMotion || blocked}
+        preload="auto"
+        onPlaying={() => setBlocked(false)}
+        aria-label="UseJunction product video: what one feature cost in AI and an estimate for the next, the month's forecast, who is near a limit, and what is never collected"
       >
-        <source src={HERO_VIDEO.webm} type="video/webm" />
-        <source src={HERO_VIDEO.mp4} type="video/mp4" />
+        {HERO_VIDEO.sources.map((source) => (
+          <source key={source.src} src={source.src} type={source.type} media={"media" in source ? source.media : undefined} />
+        ))}
       </video>
     </div>
   );

@@ -5,7 +5,8 @@ if (!process.env.AUTH_SECRET && process.env.NEXTAUTH_SECRET) {
 }
 
 export function isPublicPath(pathname: string): boolean {
-  if (/\.(?:png|svg|jpg|jpeg|gif|webp|ico|lottie|txt|xml|webmanifest)$/.test(pathname)) return true;
+  // Static files in public/, including the homepage hero video, are served without a session.
+  if (/\.(?:png|svg|jpg|jpeg|gif|webp|ico|lottie|mp4|webm|txt|xml|webmanifest)$/.test(pathname)) return true;
   if (
     pathname === "/" ||
     pathname === "/lottie-viewer" ||
