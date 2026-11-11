@@ -10,8 +10,9 @@ export const HOME_SIGNUP_HREF = `${siteConfig.signupUrl}?from=${encodeURICompone
 export const HOME_PRICE_LINE = `Free for ${USER_LIMIT_FREE} seats, then $${TEAM_PRICE_PER_DEV_USD} per active developer a month. No card.`;
 
 /**
- * The 19.9s hero loop, rendered from video/hero-loop/hero-loop.html by video/hero-loop/render.mjs.
- * Phones get a smaller encode; the poster is the hook frame ("One feature. $6,930 in AI.").
+ * The 18.4s hero loop, rendered from video/hero-loop/hero-loop.html by video/hero-loop/render.mjs.
+ * It has no captions or end card, because it plays beside the headline. Phones get a smaller encode; the poster
+ * is the opening close-up of the merged ticket and what it cost.
  * Sources are listed phone first, H.264 before VP9: the browser plays the first one whose media and codec it
  * supports, so most get the smaller MP4 and browsers without H.264 still get the loop as WebM.
  */
@@ -19,7 +20,6 @@ export const HERO_VIDEO = {
   poster: "/video/hero-loop-poster.jpg",
   width: 1280,
   height: 800,
-  duration: 19.9,
   sources: [
     { src: "/video/hero-loop-mobile.mp4", type: 'video/mp4; codecs="avc1.64001F"', media: "(max-width: 767px)" },
     { src: "/video/hero-loop.mp4", type: 'video/mp4; codecs="avc1.640020"' },
@@ -27,15 +27,3 @@ export const HERO_VIDEO = {
     { src: "/video/hero-loop.webm", type: 'video/webm; codecs="vp9"' },
   ],
 } as const;
-
-/**
- * The film's chapters, shown as a strip under it that fills as the film plays and jumps to a chapter on click.
- * `start` is the chapter's first second and must match `S` in video/hero-loop/hero-loop.html (a test checks it).
- * `still` is a settled frame from the chapter, shown instead of playing for visitors who ask for reduced motion.
- */
-export const HERO_CHAPTERS = [
-  { label: "Work", detail: "What a feature costs", start: 0, still: 10.9 },
-  { label: "Forecast", detail: "Where the month lands", start: 11.1, still: 13.7 },
-  { label: "See", detail: "Who is near a limit", start: 13.9, still: 16.2 },
-  { label: "Privacy", detail: "What is never collected", start: 16.4, still: 18.2 },
-] as const;

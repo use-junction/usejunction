@@ -86,14 +86,12 @@ test("landing page shows brand and primary CTA", async ({ page }) => {
   await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentSrc)).toMatch(/\/video\/hero-loop(-mobile)?\.(mp4|webm)$/);
   await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime), { timeout: 10_000 }).toBeGreaterThan(0.5);
 
-  // The chapter strip jumps the film to a chapter and marks it; the pause button stops the clock.
-  const chapters = page.getByRole("group", { name: "Video chapters" });
-  await chapters.getByRole("button", { name: /^Forecast/ }).click();
-  await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime)).toBeGreaterThanOrEqual(11.1);
-  await expect(chapters.getByRole("button", { name: /^Forecast/ })).toHaveAttribute("aria-current", "true");
-  await chapters.getByRole("button", { name: "Pause video" }).click();
+  // It does not present as a video player: no chapter strip, and the pause button appears only on hover.
+  await expect(page.getByRole("group", { name: "Video chapters" })).toHaveCount(0);
+  await video.hover();
+  await page.getByRole("button", { name: "Pause video" }).click();
   await expect(video).toHaveJSProperty("paused", true);
-  await expect(chapters.getByRole("button", { name: "Play video" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Play video" })).toBeVisible();
 
   const closing = page.getByRole("region", { name: /Connect your own laptop first/i });
   await expect(closing.getByRole("link", { name: "Start free" })).toHaveAttribute("href", /^\/signup/);
