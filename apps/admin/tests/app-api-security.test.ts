@@ -4,6 +4,7 @@ import { jsonSafe } from "@/lib/api/app-response";
 import { browserMutationGuard } from "@/lib/security/http";
 import { appApiSuccessSchema, memberSectionSchema } from "@/lib/api/contracts";
 import { isPublicPath } from "@/auth.config";
+import { HERO_VIDEO } from "@/lib/public/home-cta";
 
 describe("app API serialization", () => {
   it("serializes dates and bigint values without leaking server-only types", () => {
@@ -30,6 +31,11 @@ describe("app API middleware boundary", () => {
     expect(isPublicPath("/api/integrations/github/connect")).toBe(false);
     expect(isPublicPath("/dashboard")).toBe(false);
     expect(isPublicPath("/settings")).toBe(false);
+  });
+
+  it("serves the homepage hero video to signed-out visitors instead of redirecting them to sign in", () => {
+    for (const { src } of HERO_VIDEO.sources) expect(isPublicPath(src)).toBe(true);
+    expect(isPublicPath(HERO_VIDEO.poster)).toBe(true);
   });
 });
 
