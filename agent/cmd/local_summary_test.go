@@ -81,6 +81,17 @@ func TestSummarizeLocalUsageWithNothingToShow(t *testing.T) {
 	}
 }
 
+func TestHeadlineNamesTheToolWhenThereIsOnlyOne(t *testing.T) {
+	now := time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)
+	got := summarizeLocalUsage([]types.DailyUsage{
+		usageRow("2026-11-11", "claude", 250, types.CostKindEstimatedAPI),
+		usageRow("2026-11-10", "claude", 162.18, types.CostKindEstimatedAPI),
+	}, now, 30)
+	if got.headline() != "≈ $412 of Claude Code usage in the last 30 days" {
+		t.Fatalf("headline = %q", got.headline())
+	}
+}
+
 func TestBreakdownFoldsTheLongTail(t *testing.T) {
 	now := time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC)
 	var rows []types.DailyUsage

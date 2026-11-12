@@ -132,7 +132,12 @@ func (s localUsageSummary) headline() string {
 		}
 		return fmt.Sprintf("No AI coding usage found on this machine in the last %d days", s.Days)
 	}
-	return fmt.Sprintf("≈ %s of AI coding usage in the last %d days", formatUSD(s.Total), s.Days)
+	// With a single tool there is no breakdown line, so the headline names it.
+	what := "AI coding"
+	if len(s.Tools) == 1 && s.ToolsSeen == 1 {
+		what = s.Tools[0].Tool
+	}
+	return fmt.Sprintf("≈ %s of %s usage in the last %d days", formatUSD(s.Total), what, s.Days)
 }
 
 // breakdown names the tools behind the headline, or "" when there is one or none.
