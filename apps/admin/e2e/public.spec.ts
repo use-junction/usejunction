@@ -42,7 +42,7 @@ test("unknown routes redirect unauthenticated visitors to sign in", async ({ pag
 
 test("landing page shows brand and primary CTA", async ({ page }) => {
   await page.goto("/");
-  await expect(page).toHaveTitle("UseJunction — Team Usage Analytics for Claude, Cursor & Codex");
+  await expect(page).toHaveTitle("UseJunction — AI Coding Spend & Usage for Claude, Cursor & Codex");
   await expect(page.locator("title")).toHaveCount(1);
   await expect(page.getByRole("link", { name: "UseJunction home" }).first()).toBeVisible();
   await expect(
