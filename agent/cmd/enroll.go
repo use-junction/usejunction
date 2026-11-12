@@ -72,6 +72,12 @@ func doEnroll(opts enrollOptions) (*enrollResult, error) {
 		return nil, err
 	}
 
+	return finishEnrollment(url, resp, opts)
+}
+
+// finishEnrollment saves the credentials the control plane issued and runs the
+// first-run setup. Shared by token enrollment and sign-in from the terminal.
+func finishEnrollment(url string, resp *client.EnrollResponse, opts enrollOptions) (*enrollResult, error) {
 	cfg := &config.Config{
 		ControlPlaneURL: url,
 		DeviceToken:     resp.DeviceToken,
@@ -83,7 +89,7 @@ func doEnroll(opts enrollOptions) (*enrollResult, error) {
 	}
 	if resp.Otel != nil {
 		cfg.OtelEnabled = resp.Otel.Enabled
-		cfg.		OtelMetricsEndpoint = resp.Otel.MetricsEndpoint
+		cfg.OtelMetricsEndpoint = resp.Otel.MetricsEndpoint
 	}
 	cfg.CollectionNoticeVersion = CollectionNoticeVersion
 	if _, err := cfg.EnsureLocalSyncCredentials(); err != nil {
