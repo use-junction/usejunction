@@ -53,15 +53,20 @@ $RunnerPath = Join-Path $RootDir "run-agent.ps1"
 $LogPath = Join-Path $RootDir "agent.log"
 $ProfileArgs = if ($Profile -eq "test") { @("--profile", "test") } else { @() }
 
-function Show-Usage {
-  throw "Usage: install.ps1 [-Token <token> | -Upgrade | -Resume] [-Url <control-plane>]"
-}
-
 if ($Upgrade -and $Resume) {
   throw "-Upgrade and -Resume cannot be used together."
 }
+# No token: sign in through the browser instead of copying one from the site.
+$SignIn = $false
 if (-not $Upgrade -and -not $Resume -and [string]::IsNullOrWhiteSpace($Token)) {
-  Show-Usage
+  if (Test-Path $ConfigPath) {
+    # Running the one-line install again on a connected machine repairs the
+    # install; it must not ask the person to sign in a second time.
+    Write-Host "UseJunction is already connected on this machine. Refreshing the install..."
+    $Resume = $true
+  } else {
+    $SignIn = $true
+  }
 }
 if ($Upgrade -and -not (Test-Path $ConfigPath)) {
   throw "No existing UseJunction enrollment found at $ConfigPath"
@@ -281,11 +286,37 @@ if ($Resume) {
 }
 
 $onboardFailed = $false
-& $Binary @($ProfileArgs + @("onboard", "--token", $Token, "--url", $Url, "--accept-collection-notice"))
-if ($LASTEXITCODE -ne 0) {
-  if (-not (Test-Path $ConfigPath)) { throw "Device onboarding failed before enrollment completed." }
-  $onboardFailed = $true
-  Write-Warning "Device enrolled, but the first sync did not complete. The background agent will keep retrying."
+if ($SignIn) {
+  # An agent build from before terminal sign-in has no `login` command. Say so
+  # plainly instead of failing on a missing --token.
+  # try/catch: Windows PowerShell 5 turns a native command's stderr into a
+  # terminating error when it is redirected under ErrorActionPreference=Stop.
+  $canSignIn = $false
+  try {
+    & $Binary @($ProfileArgs + @("login", "--help")) *> $null
+    $canSignIn = ($LASTEXITCODE -eq 0)
+  } catch {
+    $canSignIn = $false
+  }
+  if (-not $canSignIn) {
+    throw "This UseJunction agent build cannot sign in from the terminal yet. Sign in at $Url, copy the install command with your token, and run that instead."
+  }
+  # The collection notice is shown and acknowledged in the browser.
+  & $Binary @($ProfileArgs + @("onboard", "--url", $Url))
+  if ($LASTEXITCODE -ne 0) {
+    if (-not (Test-Path $ConfigPath)) {
+      throw "Sign-in was not completed, so nothing was connected. Run the same command again when you are ready."
+    }
+    $onboardFailed = $true
+    Write-Warning "Device connected, but the first sync did not complete. The background agent will keep retrying."
+  }
+} else {
+  & $Binary @($ProfileArgs + @("onboard", "--token", $Token, "--url", $Url, "--accept-collection-notice"))
+  if ($LASTEXITCODE -ne 0) {
+    if (-not (Test-Path $ConfigPath)) { throw "Device onboarding failed before enrollment completed." }
+    $onboardFailed = $true
+    Write-Warning "Device enrolled, but the first sync did not complete. The background agent will keep retrying."
+  }
 }
 
 Register-AgentTask

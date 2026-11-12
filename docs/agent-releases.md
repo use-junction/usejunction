@@ -389,7 +389,7 @@ Local safety rules:
 
 `install.sh` and `install.ps1` support two main paths:
 
-- enrollment with `--token`
+- enrollment, either with `--token` or, with no token, by signing in through the browser (`usejunction login`)
 - upgrade-only bootstrap with `--upgrade`
 
 PowerShell uses the equivalent `-Token`, `-Url`, and `-Upgrade` parameters. It installs `usejunction.exe` for the current user and registers the `UseJunction Agent` logon task without elevation.
