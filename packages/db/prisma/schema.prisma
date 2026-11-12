@@ -84,6 +84,7 @@ model Organization {
   dailyReportUsageSnapshots DailyReportUsageSnapshot[]
   deviceRecoveryNotices     DeviceRecoveryNotice[]
   privacyRequests           PrivacyRequest[]
+  deviceAuthRequests        DeviceAuthRequest[]
 
   @@map("organizations")
 }
@@ -124,6 +125,7 @@ model Developer {
   deviceActivityEvents  DeviceActivityEvent[]
   syncRequests          SyncRequest[]
   privacyRequests       PrivacyRequest[]
+  deviceAuthRequests    DeviceAuthRequest[]
 
   @@unique([orgId, email])
   @@unique([orgId, authUserId])
@@ -468,6 +470,34 @@ model EnrollmentToken {
 
   @@index([repairDeviceId, usedAt])
   @@map("enrollment_tokens")
+}
+
+/// A device asking to be connected from the terminal. The agent keeps the
+/// device code; a signed-in person approves the matching user code in the
+/// browser, and the agent's next poll turns the approval into a device.
+model DeviceAuthRequest {
+  id             String    @id @default(cuid())
+  deviceCodeHash String    @unique @map("device_code_hash")
+  userCode       String    @unique @map("user_code")
+  hostname       String
+  os             String
+  architecture   String
+  agentVersion   String    @map("agent_version")
+  /// pending | approved | denied | consumed
+  status         String    @default("pending")
+  approvedByUserId String? @map("approved_by_user_id")
+  orgId          String?   @map("org_id")
+  developerId    String?   @map("developer_id")
+  expiresAt      DateTime  @map("expires_at")
+  approvedAt     DateTime? @map("approved_at")
+  consumedAt     DateTime? @map("consumed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  developer    Developer?    @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@map("device_auth_requests")
 }
 
 model ToolAccount {

@@ -12,6 +12,8 @@ export function isPublicPath(pathname: string): boolean {
     pathname === "/lottie-viewer" ||
     pathname === "/login" ||
     pathname === "/signup" ||
+    // Device sign-in: the page offers sign-in itself so the code survives the trip.
+    pathname === "/connect" ||
     pathname === "/contact" ||
     pathname === "/privacy" ||
     pathname === "/terms" ||
@@ -54,6 +56,8 @@ export function isPublicPath(pathname: string): boolean {
     pathname.startsWith("/api/join") ||
     pathname.startsWith("/api/i/") ||
     pathname.startsWith("/api/enroll") ||
+    // The agent has no session; the browser half answers JSON 401s itself.
+    pathname.startsWith("/api/device-auth") ||
     pathname.startsWith("/api/ingest") ||
     pathname.startsWith("/api/devices") ||
     pathname === "/api/agent-releases/latest" ||

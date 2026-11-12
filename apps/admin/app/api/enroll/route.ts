@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { Prisma, prisma } from "@usejunction/db";
 import { assertCanEnrollDevice } from "@/lib/saas-billing/status";
+import { createDevice, deviceCredentialsPayload } from "@/lib/device-enrollment";
 import { generateDeviceToken } from "@/lib/auth";
 import { normalizeAgentVersion } from "@/lib/agent-updates";
 import { getPublicAppUrl } from "@/lib/public-url";
@@ -113,19 +114,16 @@ export async function POST(req: NextRequest) {
         }
 
         await consumeEnrollmentToken(tx, enrollment.id);
-        return tx.device.create({
-          data: {
-            orgId,
-            userId: enrollment.developer!.id,
-            hostname: String(hostname || "unknown").slice(0, 255),
-            os: String(os || "unknown").slice(0, 64),
-            architecture: String(architecture || "unknown").slice(0, 64),
-            agentVersion: normalizeAgentVersion(agentVersion, "0.1.0"),
-            deviceToken: `rotated:new:${randomUUID()}`,
-            deviceTokenHash,
-            collectionNoticeAckAt: noticedAt,
-            collectionNoticeVersion: noticedAt ? noticeVersion : null,
-          },
+        return createDevice(tx, {
+          orgId,
+          developerId: enrollment.developer!.id,
+          hostname,
+          os,
+          architecture,
+          agentVersion,
+          deviceTokenHash,
+          noticedAt,
+          noticeVersion,
         });
       });
     } catch (error) {
@@ -145,20 +143,16 @@ export async function POST(req: NextRequest) {
     const telemetryEndpoint = await telemetryPromise;
     const appUrl = getPublicAppUrl(req);
 
-    return NextResponse.json({
-      deviceId: device.id,
-      userId: enrollment.developer.id,
-      orgId,
-      deviceToken,
-      // Observability-only product: never point agents at a gateway.
-      // Legacy clients may still read this field; keep it empty.
-      gatewayUrl: "",
-      status: "connected",
-      otel: {
-        enabled: telemetryEndpoint?.enabled ?? true,
-        metricsEndpoint: `${appUrl}/api/otel/v1/metrics`,
-      },
-    });
+    return NextResponse.json(
+      await deviceCredentialsPayload({
+        deviceId: device.id,
+        developerId: enrollment.developer.id,
+        orgId,
+        deviceToken,
+        appUrl,
+        telemetryEnabled: telemetryEndpoint?.enabled ?? null,
+      }),
+    );
   } catch (e) {
     logServerError("enroll", e);
     return NextResponse.json({ error: "enrollment failed" }, { status: 500 });
