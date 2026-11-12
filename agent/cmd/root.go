@@ -71,7 +71,7 @@ func platformInfo() (osName, arch string) {
 func requireConfig() (*config.Config, error) {
 	cfg, err := config.Load()
 	if err != nil {
-		return nil, fmt.Errorf("not enrolled — run: usejunction enroll --token <token>")
+		return nil, fmt.Errorf("not connected — run: usejunction login")
 	}
 	return cfg, nil
 }
