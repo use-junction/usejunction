@@ -26,6 +26,11 @@ export const HOME_FAQS: ContentFaq[] = [
     answer: "Your own usage appears once your machine reports in. The rest fills in as teammates connect their machines.",
   },
   {
+    question: "How does UseJunction know what a feature cost?",
+    answer:
+      "Connect GitHub. UseJunction matches each developer's AI coding usage to the pull requests and issues they worked on, so each one shows the AI spend behind it and whether it merged. Where the match isn't exact, the spend is marked as estimated.",
+  },
+  {
     question: "What data does UseJunction collect?",
     answer:
       "The agent reports tool, model, tokens, estimated cost, device, and status. There is no keystroke surveillance, browser capture, or network interception. Usage collection can be turned off per login.",
@@ -43,7 +48,7 @@ export const HOME_FAQS: ContentFaq[] = [
   {
     question: "What is UseJunction?",
     answer:
-      "UseJunction is open-source AI coding observability for teams. It shows which tools and models your team uses, estimated cost and latency, plan and seat utilization, and device health—self-hosted under the UseJunction Community License, with privacy-first controls over how much work detail is visible. The official site is https://usejunction.dev.",
+      "UseJunction shows where a team's AI coding spend goes: what each feature cost, where the month's bill will land, who is near a plan limit, and which seats go unused, across Claude Code, Cursor, Codex, GitHub Copilot and other tools. It is open source: self-host it under the UseJunction Community License, or use the hosted version. Each developer controls what is shared. The official site is https://usejunction.dev.",
   },
   {
     question: "Is UseJunction the same as Junction Panel / junctionpanel.dev?",

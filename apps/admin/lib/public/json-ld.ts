@@ -1,7 +1,8 @@
 import type { BlogPost, ContentFaq, ContentPage, HowToStep } from "@/content/types";
 import { AEO_FACTS } from "@/content/aeo/facts";
 import { HOME_FAQS } from "@/lib/public/home-faqs";
-import { OBSERVABILITY_FEATURES, siteConfig, twitterUrl } from "@/lib/public/config";
+import { siteConfig, twitterUrl } from "@/lib/public/config";
+import { siteOgImage } from "@/lib/public/seo-metadata";
 import { absoluteUrl, getSiteUrl } from "@/lib/public/site-url";
 import {
   USER_LIMIT_FREE,
@@ -69,6 +70,9 @@ export function buildHomeJsonLd() {
       sameAs: [siteConfig.githubUrl, twitterUrl].filter(Boolean),
       knowsAbout: [
         "AI coding spend management",
+        "AI coding spend per pull request",
+        "AI coding cost forecasting",
+        "Claude Team usage limits",
         "AI coding seat utilization",
         "CodexBar for teams",
         "CodexBar for Windows teams",
@@ -82,12 +86,19 @@ export function buildHomeJsonLd() {
       name: siteConfig.name,
       alternateName: ["usejunction", "Use Junction"],
       applicationCategory: "DeveloperApplication",
-      applicationSubCategory: "AI coding observability",
+      applicationSubCategory: "AI coding spend and usage analytics",
       operatingSystem: "Web, Windows, macOS, Linux",
       description: ENTITY_DESCRIPTION,
       url: baseUrl,
       license: `${siteConfig.githubUrl}/blob/main/LICENSE`,
-      featureList: OBSERVABILITY_FEATURES.map((feature) => feature.title),
+      featureList: [...AEO_FACTS.measures],
+      screenshot: {
+        "@type": "ImageObject",
+        url: absoluteUrl(siteOgImage.url),
+        width: siteOgImage.width,
+        height: siteOgImage.height,
+        caption: siteOgImage.alt,
+      },
       offers: [
         {
           "@type": "Offer",

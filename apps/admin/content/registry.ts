@@ -51,7 +51,7 @@ export function contentBreadcrumbs(page: ContentPage): { label: string; href?: s
 export function buildSitemapEntries(): SitemapEntry[] {
   const home: SitemapEntry = {
     path: "/",
-    lastModified: "2026-08-06",
+    lastModified: "2026-11-12",
     changeFrequency: "weekly",
     priority: 1,
   };

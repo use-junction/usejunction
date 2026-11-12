@@ -35,8 +35,10 @@ test("seo registry includes priority guides and compare pages", () => {
 });
 
 test("homepage keeps brand messaging while CodexBar for Windows stays in SEO surfaces", () => {
-  assert.equal(siteConfig.seoTitle, "UseJunction — Team Usage Analytics for Claude, Cursor & Codex");
-  assert.match(siteConfig.description, /Monitor your team's AI coding tools/i);
+  assert.equal(siteConfig.seoTitle, "UseJunction — AI Coding Spend & Usage for Claude, Cursor & Codex");
+  assert.ok(siteConfig.seoTitle.length <= 65, "title gets cut off in search results");
+  // Meta, OG, manifest and JSON-LD descriptions follow the homepage hero.
+  assert.match(siteConfig.description, /^See where your team's AI coding spend goes/);
   assert.match(siteConfig.description, /not Junction Panel/i);
   assert.doesNotMatch(siteConfig.description, /CodexBar for Windows/);
 
@@ -59,7 +61,7 @@ test("homepage keeps brand messaging while CodexBar for Windows stays in SEO sur
   );
 
   const homeSitemapEntry = buildSitemapEntries().find((entry) => entry.path === "/");
-  assert.equal(homeSitemapEntry?.lastModified, "2026-08-06");
+  assert.equal(homeSitemapEntry?.lastModified, "2026-11-12");
 
   const appManifest = buildWebAppManifest();
   assert.equal(appManifest.start_url, "/");

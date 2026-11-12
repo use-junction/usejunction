@@ -8,12 +8,12 @@ const configuredTwitterHandle = process.env.NEXT_PUBLIC_TWITTER_HANDLE?.trim();
 export const siteConfig = {
   name: "UseJunction",
   tagline: "Open-source AI coding observability for teams",
-  /** Secondary promise for SEO / AEO (plan usage + team insights) */
-  promise:
-    "See AI coding tool usage, plan utilization, and team insights—before you try to control it.",
+  /** Secondary promise for SEO / AEO — mirrors the homepage hero. */
+  promise: "What each feature costs, where the month will land, and who is near a limit.",
+  /** Meta / OG / manifest description. Keep it in step with the homepage hero. */
   description:
-    "Monitor your team's AI coding tools. See each developer's usage, plan limits, and seat type across Claude, Cursor, Codex, and Copilot. Free for 5 seats, self-hosted or managed at usejunction.dev — not Junction Panel.",
-  seoTitle: "UseJunction — Team Usage Analytics for Claude, Cursor & Codex",
+    "See where your team's AI coding spend goes: what each feature costs, where the month will land, and who is near a limit across Claude, Cursor, Codex and Copilot. Free for 5 seats, hosted or self-hosted at usejunction.dev — not Junction Panel.",
+  seoTitle: "UseJunction — AI Coding Spend & Usage for Claude, Cursor & Codex",
   /** Homepage meta keywords only — not shown in visible hero copy. */
   homeSeoKeywords: [
     "CodexBar for teams",
@@ -22,6 +22,11 @@ export const siteConfig = {
     "Win-CodexBar alternative for teams",
     "Codex usage dashboard for Windows teams",
     "AI coding spend management for teams",
+    "AI coding spend per pull request",
+    "AI coding cost per feature",
+    "Claude Team usage limits per person",
+    "Claude and Cursor seat overlap",
+    "AI coding spend forecast",
   ],
   url: process.env.NEXTAUTH_URL ?? "https://usejunction.dev",
   githubUrl: "https://github.com/use-junction/usejunction",
@@ -67,57 +72,6 @@ export const SUPPORTED_TOOLS = [
   { name: "GitHub Copilot", initials: "GH" },
   { name: "Ollama", initials: "OL" },
   { name: "LM Studio", initials: "LM" },
-] as const;
-
-export const OBSERVABILITY_FEATURES = [
-  {
-    title: "Who is using AI coding tools",
-    description: "Per-developer adoption across your org — active users, last seen, and coverage gaps.",
-    metric: "24 active devs",
-    icon: "fi-rr-users",
-  },
-  {
-    title: "Which tools & models",
-    description: "Tool installations and model calls broken down by user, team, and device.",
-    metric: "8 tools tracked",
-    icon: "fi-rr-layers",
-  },
-  {
-    title: "Cost by user / tool / model",
-    description: "Estimated spend attribution so finance and eng leads see where money goes.",
-    metric: "$284.50 / 24h",
-    icon: "fi-rr-dollar",
-  },
-  {
-    title: "Latency & failure rate",
-    description: "Per-model response times and error rates to spot degraded providers early.",
-    metric: "1.2s avg · 0.8% err",
-    icon: "fi-rr-pulse",
-  },
-  {
-    title: "Device configuration health",
-    description: "Agent heartbeats, config drift, and unhealthy device flags in one view.",
-    metric: "33 enrolled",
-    icon: "fi-rr-laptop-mobile",
-  },
-  {
-    title: "Personal vs company keys",
-    description: "Detect when developers use personal API keys instead of org-provisioned ones.",
-    metric: "3 personal keys",
-    icon: "fi-rr-key",
-  },
-  {
-    title: "Local models on devices",
-    description: "See which developers run Ollama, LM Studio, or other local inference.",
-    metric: "12 local runtimes",
-    icon: "fi-rr-microchip",
-  },
-  {
-    title: "Request activity log",
-    description: "Inspect individual requests with model, tokens, latency, and status.",
-    metric: "12,847 req / 24h",
-    icon: "fi-rr-list",
-  },
 ] as const;
 
 export const ROADMAP_ITEMS = [
