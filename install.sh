@@ -28,7 +28,8 @@ AGENT_ERR=""
 BINARY=""
 
 usage() {
-  echo "Usage: curl -fsSL <control-plane>/install.sh | sh -s -- [--token <token> | --upgrade | --resume] [--url <control-plane>] [--profile default|test]"
+  echo "Usage: curl -fsSL <control-plane>/install.sh | bash -s -- [--token <token> | --upgrade | --resume] [--url <control-plane>] [--profile default|test]"
+  echo "With no options, the installer shows this machine's usage and opens the browser so you can sign in."
   exit 1
 }
 
@@ -114,8 +115,17 @@ if [[ "$UPGRADE_ONLY" == true && "$RESUME_ONLY" == true ]]; then
   exit 1
 fi
 
+# No token: sign in through the browser instead of copying one from the site.
+SIGN_IN=false
 if [[ -z "$ENROLL_TOKEN" && "$UPGRADE_ONLY" != true && "$RESUME_ONLY" != true ]]; then
-  usage
+  if [[ -f "$CONFIG_PATH" ]]; then
+    # Running the one-line install again on a connected machine repairs the
+    # install; it must not ask the person to sign in a second time.
+    echo "UseJunction is already connected on this machine. Refreshing the install…"
+    RESUME_ONLY=true
+  else
+    SIGN_IN=true
+  fi
 fi
 
 if [[ "$UPGRADE_ONLY" == true && ! -f "$CONFIG_PATH" ]]; then
@@ -842,6 +852,26 @@ if [[ "$RESUME_ONLY" == true ]]; then
     else
       echo "Initial sync is still incomplete; the background agent will keep retrying." >&2
     fi
+  fi
+elif [[ "$SIGN_IN" == true ]]; then
+  # An agent build from before terminal sign-in has no `login` command. Say so
+  # plainly instead of failing on a missing --token.
+  # shellcheck disable=SC2046
+  if ! "$BINARY" $(agent_profile_args) login --help >/dev/null 2>&1; then
+    echo "This UseJunction agent build cannot sign in from the terminal yet." >&2
+    echo "Sign in at ${CONTROL_PLANE_URL}, copy the install command with your token, and run that instead." >&2
+    exit 1
+  fi
+  # The collection notice is shown and acknowledged in the browser.
+  # shellcheck disable=SC2046
+  if ! "$BINARY" $(agent_profile_args) onboard --url "$CONTROL_PLANE_URL"; then
+    if [[ ! -f "$CONFIG_PATH" ]]; then
+      echo "Sign-in was not completed, so nothing was connected." >&2
+      echo "Run the same command again when you are ready: curl -fsSL ${CONTROL_PLANE_URL}/install.sh | bash" >&2
+      exit 1
+    fi
+    ONBOARD_FAILED=true
+    echo "Device connected, but the first sync did not complete. The background agent will keep retrying." >&2
   fi
 else
   # shellcheck disable=SC2046

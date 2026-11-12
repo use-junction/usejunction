@@ -1,6 +1,7 @@
 import { readFile } from "fs/promises";
 import path from "path";
 import { NextResponse } from "next/server";
+import { installerControlPlaneUrl, stampControlPlaneUrl } from "@/lib/install-script";
 
 async function readInstallScript() {
   const candidates = [
@@ -18,9 +19,12 @@ async function readInstallScript() {
   return null;
 }
 
-export async function GET() {
-  const body = await readInstallScript();
-  if (!body) return NextResponse.json({ error: "install.ps1 not found" }, { status: 404 });
+export async function GET(request: Request) {
+  const script = await readInstallScript();
+  if (!script) return NextResponse.json({ error: "install.ps1 not found" }, { status: 404 });
+  // A one-line install passes no -Url, so the script defaults to this deployment.
+  const controlPlaneUrl = installerControlPlaneUrl(request);
+  const body = controlPlaneUrl ? stampControlPlaneUrl(script, "ps1", controlPlaneUrl) : script;
   return new NextResponse(body, {
     headers: {
       "content-type": "text/plain; charset=utf-8",
