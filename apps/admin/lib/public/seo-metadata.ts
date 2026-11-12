@@ -3,12 +3,16 @@ import type { BlogPost, ContentPage } from "@/content/types";
 import { absoluteUrl, getSiteUrl } from "@/lib/public/site-url";
 import { siteConfig } from "@/lib/public/config";
 
-/** Static screenshot of the live homepage — used for link previews in chat/social apps. */
+/**
+ * Screenshot of the homepage hero, used for link previews in chat/social apps.
+ * Regenerate with `node scripts/capture-og-image.mjs` whenever the hero changes; give the file a
+ * new name when you do, since WhatsApp, Slack and others cache previews by image URL.
+ */
 export const siteOgImage = {
-  url: "/og-home.png",
-  width: 1404,
-  height: 907,
-  alt: `${siteConfig.name} homepage`,
+  url: "/og-home-v2.png",
+  width: 1200,
+  height: 630,
+  alt: `${siteConfig.name} homepage: see where your AI coding spend goes`,
 } as const;
 
 export function contentPageMetadata(page: ContentPage): Metadata {

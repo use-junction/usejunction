@@ -33,7 +33,7 @@ Never brand publicly as bare “Junction.”
   - Confirm `https://usejunction.dev/indexnow-key.txt` returns the key
 6. Verify fetch:
   - `/` returns `200` to both a normal browser user agent and Googlebot
-  - Raw homepage HTML contains exactly one `<title>`: `UseJunction — AI Coding Spend Management for Teams`
+  - Raw homepage HTML contains exactly one `<title>`: `UseJunction — AI Coding Spend & Usage for Claude, Cursor & Codex`
   - `/` declares `https://usejunction.dev/` as canonical and does not emit a `noindex` meta tag or header
   - `/robots.txt` disallows `/dashboard`, `/api/`, auth routes
   - `/sitemap.xml` lists all public guides/compare/for/blog hubs (includes `/compare/junction-panel`)

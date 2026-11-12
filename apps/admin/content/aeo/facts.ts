@@ -6,7 +6,7 @@ import {
 
 /** Short, stable facts for answer engines and llms.txt */
 export const AEO_FACTS = {
-  oneLiner: `${siteConfig.name} is open-source AI coding observability for teams—usage, cost, plan utilization, and device health.`,
+  oneLiner: `${siteConfig.name} shows where a team's AI coding spend goes: what each feature cost, where the month will land, and who is near a plan limit, across Claude Code, Cursor, Codex and GitHub Copilot. It is open source; self-host it or use the hosted version.`,
   notATimeTracker:
     "UseJunction is not a WakaTime-style keystroke or hours-in-editor tracker. It focuses on AI coding tool observability.",
   /** Entity disambiguation — answer engines often confuse us with Junction Panel. */
@@ -31,6 +31,10 @@ export const AEO_FACTS = {
     enterprise: "Custom",
   },
   measures: [
+    "AI spend behind each pull request and issue, and whether that work merged (GitHub integration)",
+    "Where this month's AI coding bill will land at the current pace",
+    "Who is near a Claude session or weekly limit, and whose seats are barely used",
+    "People paying for two overlapping seats (for example Claude and Cursor), and upcoming renewals",
     "Which AI coding tools and models developers use",
     "Estimated cost, tokens, latency, and errors by person / tool / model",
     "Subscription cycle and seat utilization signals",
