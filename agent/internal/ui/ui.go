@@ -613,6 +613,37 @@ func QuietLine(msg string) {
 	fmt.Fprintf(out, "      %s\n", styleMuted().Render(msg))
 }
 
+// Headline prints the one line a step exists to show, at full strength.
+func Headline(msg string) {
+	if !Enabled() {
+		fmt.Fprintf(out, "      %s\n", msg)
+		return
+	}
+	fmt.Fprintf(out, "      %s\n", styleBody().Bold(true).Render(msg))
+}
+
+// SignInPrompt shows where to approve this device. The link is always printed,
+// so it works on a machine with no browser.
+func SignInPrompt(url, code string, opened bool) {
+	title := "Sign in to see the full breakdown"
+	lead := "Open this link in a browser (any device works):"
+	if opened {
+		lead = "Your browser is opening. If it does not, use this link:"
+	}
+	fmt.Fprintln(out)
+	if !Enabled() {
+		fmt.Fprintf(out, "%s\n", title)
+		fmt.Fprintf(out, "      %s\n", lead)
+		fmt.Fprintf(out, "      Link  %s\n", url)
+		fmt.Fprintf(out, "      Code  %s   (it should match the one in the browser)\n\n", code)
+		return
+	}
+	fmt.Fprintf(out, "  %s  %s\n", styleYellow().Render("◆"), styleTeal().Render(title))
+	fmt.Fprintf(out, "      %s\n", styleMuted().Render(lead))
+	fmt.Fprintf(out, "      %s  %s\n", styleMuted().Render(padRight("Link", 4)), styleBody().Render(url))
+	fmt.Fprintf(out, "      %s  %s%s\n\n", styleMuted().Render(padRight("Code", 4)), styleBody().Bold(true).Render(code), styleMuted().Render("   (it should match the one in the browser)"))
+}
+
 // WarnLine prints an orange warning.
 func WarnLine(msg string) {
 	if !Enabled() {
