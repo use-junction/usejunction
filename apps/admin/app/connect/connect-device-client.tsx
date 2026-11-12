@@ -270,8 +270,6 @@ function Approve({
           </p>
         ) : null}
 
-        <NoticeSummary notice={request.notice} />
-
         {blocked ? (
           <Alert>
             <AlertDescription>
@@ -300,9 +298,13 @@ function Approve({
             {busy === "deny" ? "Refusing…" : "This isn’t my device"}
           </Button>
         </div>
-        <p className="text-xs leading-5 text-muted-foreground">
-          Connecting confirms you’ve read what is collected (notice {request.notice.version}).
-        </p>
+        {/* The action stays in view; what it agrees to sits directly under it. */}
+        <div className="space-y-3 pt-1">
+          <p className="text-xs leading-5 text-muted-foreground">
+            Connecting confirms you’ve read what is collected from this device (notice {request.notice.version}):
+          </p>
+          <NoticeSummary notice={request.notice} />
+        </div>
       </div>
     </AuthShell>
   );
