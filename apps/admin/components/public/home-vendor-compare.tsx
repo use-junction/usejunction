@@ -145,7 +145,7 @@ export function HomeVendorCompare() {
   const sprintDetail = person ? `${person.tickets} of the ${SPRINT_TICKETS} tickets` : SPRINT.detail;
   return (
     <section aria-labelledby="home-compare-heading" className="overflow-x-clip bg-white pt-24 sm:pt-32 lg:pt-[9.5rem]">
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-0">
+      <div className="mx-auto w-full max-w-[75rem] px-4 sm:px-6">
         <h2 id="home-compare-heading" className="text-[1.6rem] font-medium leading-tight tracking-[-0.02em] text-[#3a3b37] sm:text-[1.95rem]">
           Four tabs open, and you’re still guessing.
         </h2>

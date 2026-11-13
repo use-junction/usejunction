@@ -218,6 +218,25 @@ test("homepage Start free buttons stand out from the page", async ({ page }) => 
   }
 });
 
+test("homepage keeps a side margin on laptop widths just above the large breakpoint", async ({ page }) => {
+  // Between 1024px and the content width, the sections used to drop their padding and sit on the window edge.
+  for (const width of [1024, 1076, 1180]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    const checks = [
+      page.getByRole("heading", { level: 1 }),
+      page.getByText("What each feature costs, where the month will land, and who is near a limit."),
+      page.getByText(/^Works with/).first(),
+    ];
+    for (const locator of checks) {
+      const box = (await locator.boundingBox())!;
+      expect(box.x, `${width}px: left margin`).toBeGreaterThanOrEqual(16);
+    }
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, `${width}px: horizontal scroll`).toBeLessThanOrEqual(0);
+  }
+});
+
 test("homepage compares each vendor's admin, explains pricing, and shows the rollout and what is collected", async ({ page }) => {
   await page.goto("/");
 

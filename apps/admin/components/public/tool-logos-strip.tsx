@@ -62,7 +62,7 @@ export function ToolLogosStrip() {
   const more = SUPPORTED_TOOLS.length - STRIP_TOOLS.length;
   return (
     <section aria-label="Supported AI coding tools" className="border-y border-border bg-white">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center gap-x-9 gap-y-3.5 px-4 py-6 text-[0.9375rem] sm:px-6 lg:px-0">
+      <div className="mx-auto flex w-full max-w-[75rem] flex-wrap items-center gap-x-9 gap-y-3.5 px-4 py-6 text-[0.9375rem] sm:px-6">
         <p className="text-muted-foreground">Works with</p>
         <ul className="flex flex-wrap gap-x-9 gap-y-3.5">
           {STRIP_TOOLS.map((name) => (

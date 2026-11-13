@@ -117,7 +117,7 @@ function LimitRow({
 export function HomeWeeksChapter() {
   return (
     <section id="product" aria-labelledby="home-weeks-heading" className="scroll-mt-20 overflow-x-clip bg-white pt-24 sm:pt-32 lg:pt-44">
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-0">
+      <div className="mx-auto w-full max-w-[75rem] px-4 sm:px-6">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-end lg:gap-20">
           <h2 id="home-weeks-heading" className={HOME_BIG_H2}>
             You’ve probably had one of these weeks.
@@ -222,7 +222,7 @@ const SEAT_GRID =
 export function HomePaidTwiceBand() {
   return (
     <section aria-labelledby="home-paid-twice-heading" className="mt-24 overflow-x-clip bg-brand-yellow sm:mt-32 lg:mt-44">
-      <div className="mx-auto w-full max-w-6xl px-4 pb-[4.5rem] pt-16 sm:px-6 lg:px-0 lg:pb-32 lg:pt-[7.5rem]">
+      <div className="mx-auto w-full max-w-[75rem] px-4 pb-[4.5rem] pt-16 sm:px-6 lg:pb-32 lg:pt-[7.5rem]">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-end lg:gap-20">
           <h2
             id="home-paid-twice-heading"

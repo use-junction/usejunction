@@ -130,7 +130,7 @@ export function HeroSection() {
 
   return (
     <section className="hero-atmosphere relative overflow-x-clip bg-white">
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-0">
+      <div className="relative z-10 mx-auto w-full max-w-[75rem] px-4 sm:px-6">
         {/* The headline is the only headline-sized type; the film shows the product at its own scale.
             Phones read top to bottom: headline, one line of detail, the film, then the actions. From lg up the
             text and actions share the left column and the film takes the right. */}

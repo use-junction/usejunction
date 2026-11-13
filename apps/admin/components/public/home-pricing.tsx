@@ -35,7 +35,7 @@ const OPTIONS: Option[] = [
 export function HomePricing() {
   return (
     <section id="pricing" aria-labelledby="home-pricing-heading" className="scroll-mt-20 bg-brand-yellow-pale">
-      <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 pb-[4.5rem] pt-16 sm:px-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-[5.5rem] lg:px-0 lg:pb-[7.5rem] lg:pt-28">
+      <div className="mx-auto grid w-full max-w-[75rem] gap-10 px-4 pb-[4.5rem] pt-16 sm:px-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-[5.5rem] lg:pb-[7.5rem] lg:pt-28">
         <div>
           <p aria-hidden className="text-[7.5rem] font-bold leading-[0.85] tracking-[-0.06em] sm:text-[11.5rem]">
             ${TEAM_PRICE_PER_DEV_USD}
