@@ -492,7 +492,7 @@ export function HomeRoles() {
       aria-labelledby="home-roles-heading"
       className="mt-24 overflow-x-clip border-y border-border bg-[#fafaf7] pb-16 pt-16 sm:mt-32 lg:mt-[9.5rem] lg:pb-28 lg:pt-[7.5rem]"
     >
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-0">
+      <div className="mx-auto w-full max-w-[75rem] px-4 sm:px-6">
         <h2 id="home-roles-heading" className="text-[1.6rem] font-medium leading-tight tracking-[-0.02em] text-[#3a3b37] sm:text-[1.95rem]">
           Someone is going to ask you.
         </h2>

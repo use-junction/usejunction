@@ -45,7 +45,7 @@ export function UseJunctionHomeContent() {
       <HomeFaq />
 
       <section aria-labelledby="home-close-heading" className="bg-primary">
-        <div className="mx-auto flex w-full max-w-6xl flex-col items-start gap-10 px-4 pb-[4.5rem] pt-16 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:gap-16 lg:px-0 lg:pb-[7.5rem] lg:pt-28">
+        <div className="mx-auto flex w-full max-w-[75rem] flex-col items-start gap-10 px-4 pb-[4.5rem] pt-16 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:gap-16 lg:pb-[7.5rem] lg:pt-28">
           <h2
             id="home-close-heading"
             className="max-w-[13em] text-[2.1rem] font-semibold leading-[1.05] tracking-[-0.03em] !text-white [text-wrap:balance] sm:text-5xl lg:text-[3.5rem]"

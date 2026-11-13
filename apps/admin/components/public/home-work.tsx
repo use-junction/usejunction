@@ -17,7 +17,7 @@ const usd = (value: number) => `$${value.toLocaleString("en-US")}`;
 export function HomeWork() {
   return (
     <section aria-labelledby="home-work-heading" className="overflow-x-clip bg-white pt-24 sm:pt-32 lg:pt-[9.5rem]">
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-0">
+      <div className="mx-auto w-full max-w-[75rem] px-4 sm:px-6">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-end lg:gap-20">
           <h2 id="home-work-heading" className={HOME_BIG_H2}>
             Where the AI spend landed.

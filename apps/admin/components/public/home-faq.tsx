@@ -23,7 +23,7 @@ export function HomeFaq() {
 
   return (
     <section id="faq" aria-labelledby="home-faq-heading" className="scroll-mt-20 bg-white pb-24 pt-24 sm:pb-32 sm:pt-32 lg:pb-44 lg:pt-44">
-      <div className="mx-auto grid w-full max-w-6xl gap-12 px-4 sm:px-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-24 lg:px-0 xl:grid-cols-[26rem_minmax(0,1fr)]">
+      <div className="mx-auto grid w-full max-w-[75rem] gap-12 px-4 sm:px-6 lg:grid-cols-[22rem_minmax(0,1fr)] lg:gap-24 xl:grid-cols-[26rem_minmax(0,1fr)]">
         <div>
           <h2 id="home-faq-heading" className="text-[1.6rem] font-medium leading-tight tracking-[-0.02em] text-[#3a3b37] sm:text-[1.95rem]">
             Before you install.

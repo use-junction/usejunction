@@ -36,7 +36,7 @@ const MACHINE_TOOLS = ["claude.svg", "cursor.svg", "chatgpt.svg", "copilot.svg"]
 export function HomePrivacyFlow() {
   return (
     <section aria-labelledby="home-privacy-heading" className="bg-white pt-24 sm:pt-32 lg:pt-44">
-      <div className="mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-0">
+      <div className="mx-auto w-full max-w-[75rem] px-4 sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between sm:gap-10">
           <h2 id="home-privacy-heading" className="text-[1.6rem] font-medium leading-tight tracking-[-0.02em] text-[#3a3b37] sm:text-[1.95rem]">
             Your developers will ask what it collects.
