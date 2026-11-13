@@ -22,6 +22,8 @@ export function SignupForm() {
   const emailPrefill = params.get("email") ?? "";
   const joiningInvite =
     from.startsWith("/i/") || from.startsWith("/join/");
+  // Arrived from the install command: after signup they go back to approve the device.
+  const connectingDevice = from.startsWith("/connect");
   const hasOAuth = getEnabledOAuthProviders().length > 0;
 
   const [name, setName] = useState("");
@@ -70,9 +72,11 @@ export function SignupForm() {
         <AlertDescription>
           {joiningInvite
             ? "Check your email for a verification link. After verifying, sign in — you'll return to your invite to install UseJunction."
-            : soloMode
-              ? "Check your email for a verification link. Once verified, sign in to analyze your own AI coding usage."
-              : "Check your email for a verification link. Once verified, sign in to open your dashboard."}
+            : connectingDevice
+              ? "Check your email for a verification link. Once verified, sign in and you'll return to connect your device. Keep your terminal open."
+              : soloMode
+                ? "Check your email for a verification link. Once verified, sign in to analyze your own AI coding usage."
+                : "Check your email for a verification link. Once verified, sign in to open your dashboard."}
         </AlertDescription>
       </Alert>
     );
