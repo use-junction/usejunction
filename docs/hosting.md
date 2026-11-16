@@ -267,6 +267,8 @@ After install, `usejunction` is on `PATH` in new terminals.
 
 `usejunction`, `usejunction daily` and `usejunction monthly` read local logs only and upload nothing, connected or not. They take `--since` and `--until` (`YYYYMMDD` or `YYYY-MM-DD`), `--tool`, `--order`, `--breakdown` and `--json`. Days are UTC and only the last 60 days are read. In a terminal the table ends with one line pointing to sign-in; `USEJUNCTION_NO_TIPS=1` removes it.
 
+To try the tables without installing anything, run `npx usejunction` (it downloads and verifies the release binary, then runs it), or `brew install use-junction/tap/usejunction` once the tap is published. Neither signs in or starts a background service.
+
 `session`, `blocks` and `statusline` cover Claude Code only and show local time. They also read local logs only and upload nothing. To show cost under the Claude Code prompt, add this to `~/.claude/settings.json`:
 
 ```json

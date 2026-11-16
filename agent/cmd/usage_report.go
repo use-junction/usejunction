@@ -536,7 +536,7 @@ func usageReportJSON(report usageReport) map[string]any {
 // usageTip is the one line under a table that points past the terminal. It is
 // for a person at a terminal only: scripts, pipes and JSON never get it, and
 // USEJUNCTION_NO_TIPS turns it off.
-func usageTip(connected bool, dashboardURL string, terminal, jsonOut bool, noTips string) string {
+func usageTip(connected bool, dashboardURL string, terminal, jsonOut bool, noTips, signInCommand string) string {
 	if jsonOut || !terminal || strings.TrimSpace(noTips) != "" {
 		return ""
 	}
@@ -546,5 +546,19 @@ func usageTip(connected bool, dashboardURL string, terminal, jsonOut bool, noTip
 		}
 		return ""
 	}
-	return "→ Charts, cost by repo, and your whole team: usejunction login"
+	return "→ Charts, cost by repo, and your whole team: " + signInCommand
+}
+
+// usageSignInCommand is what to type to get past the terminal. Run through
+// npx, the agent is not on PATH and nothing keeps it syncing, so the command
+// that works is the installer, which installs it and signs in.
+func usageSignInCommand(runner, goos, controlPlaneURL string) string {
+	if !strings.EqualFold(strings.TrimSpace(runner), "npx") {
+		return "usejunction login"
+	}
+	controlPlaneURL = strings.TrimRight(strings.TrimSpace(controlPlaneURL), "/")
+	if goos == "windows" {
+		return fmt.Sprintf("irm %s/install.ps1 | iex", controlPlaneURL)
+	}
+	return fmt.Sprintf("curl -fsSL %s/install.sh | bash", controlPlaneURL)
 }

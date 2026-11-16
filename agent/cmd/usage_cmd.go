@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -110,7 +111,8 @@ func writeUsageTip(out io.Writer, cfg *config.Config, hasRows, terminal bool) {
 	if cfg != nil {
 		dashboardURL = cfg.ControlPlaneURL
 	}
-	if tip := usageTip(cfg != nil, dashboardURL, terminal, false, os.Getenv("USEJUNCTION_NO_TIPS")); tip != "" {
+	signIn := usageSignInCommand(os.Getenv("USEJUNCTION_RUNNER"), runtime.GOOS, resolveLoginURL(""))
+	if tip := usageTip(cfg != nil, dashboardURL, terminal, false, os.Getenv("USEJUNCTION_NO_TIPS"), signIn); tip != "" {
 		fmt.Fprintf(out, "\n %s\n", ui.Muted(tip))
 	}
 	fmt.Fprintln(out)

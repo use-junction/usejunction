@@ -220,21 +220,38 @@ func TestUsageNumberFormats(t *testing.T) {
 // --json must never get it, and it can be switched off.
 func TestUsageTip(t *testing.T) {
 	signIn := "→ Charts, cost by repo, and your whole team: usejunction login"
-	if got := usageTip(false, "", true, false, ""); got != signIn {
+	if got := usageTip(false, "", true, false, "", "usejunction login"); got != signIn {
 		t.Errorf("tip = %q", got)
 	}
-	if got := usageTip(true, "https://usejunction.dev", true, false, ""); got != "→ Your dashboard: https://usejunction.dev" {
+	if got := usageTip(true, "https://usejunction.dev", true, false, "", "usejunction login"); got != "→ Your dashboard: https://usejunction.dev" {
 		t.Errorf("connected tip = %q", got)
 	}
 	silent := map[string]string{
-		"piped":     usageTip(false, "", false, false, ""),
-		"json":      usageTip(false, "", true, true, ""),
-		"opted out": usageTip(false, "", true, false, "1"),
-		"no url":    usageTip(true, "", true, false, ""),
+		"piped":     usageTip(false, "", false, false, "", "usejunction login"),
+		"json":      usageTip(false, "", true, true, "", "usejunction login"),
+		"opted out": usageTip(false, "", true, false, "1", "usejunction login"),
+		"no url":    usageTip(true, "", true, false, "", "usejunction login"),
 	}
 	for name, got := range silent {
 		if got != "" {
 			t.Errorf("%s: tip = %q, want none", name, got)
+		}
+	}
+}
+
+// Through npx the agent is not on PATH, so "usejunction login" would not run.
+// The line has to name a command that does.
+func TestUsageSignInCommandFitsHowTheAgentWasRun(t *testing.T) {
+	cases := []struct{ runner, goos, want string }{
+		{"", "darwin", "usejunction login"},
+		{"brew", "linux", "usejunction login"},
+		{"npx", "darwin", "curl -fsSL https://usejunction.dev/install.sh | bash"},
+		{"npx", "linux", "curl -fsSL https://usejunction.dev/install.sh | bash"},
+		{"NPX", "windows", "irm https://usejunction.dev/install.ps1 | iex"},
+	}
+	for _, c := range cases {
+		if got := usageSignInCommand(c.runner, c.goos, "https://usejunction.dev/"); got != c.want {
+			t.Errorf("runner %q on %s: %q, want %q", c.runner, c.goos, got, c.want)
 		}
 	}
 }
