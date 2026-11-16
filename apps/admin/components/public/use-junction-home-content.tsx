@@ -8,6 +8,7 @@ import { HomeHowItStarts } from "@/components/public/home-how-it-starts";
 import { HomePricing } from "@/components/public/home-pricing";
 import { HomePaidTwiceBand, HomeWeeksChapter } from "@/components/public/home-story";
 import { HomeRoles } from "@/components/public/home-roles";
+import { HomeTerminal } from "@/components/public/home-terminal";
 import { HomeVendorCompare } from "@/components/public/home-vendor-compare";
 import { HomeWork } from "@/components/public/home-work";
 import { HomePrivacyFlow } from "@/components/public/home-world-class";
@@ -29,6 +30,9 @@ export function UseJunctionHomeContent() {
 
       <HeroSection />
       <ToolLogosStrip />
+
+      {/* The free way in: a terminal table from local logs, with no account. */}
+      <HomeTerminal />
 
       {/* Three problems for an example team, one picture each: limits, duplicate seats, where the spend landed. */}
       <HomeWeeksChapter />

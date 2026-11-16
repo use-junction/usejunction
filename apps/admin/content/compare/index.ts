@@ -422,11 +422,106 @@ export const compareJunctionPanel: ContentPage = {
   ],
 };
 
+export const compareCcusage: ContentPage = {
+  kind: "compare",
+  slug: "ccusage",
+  path: "/compare/ccusage",
+  title: "ccusage Alternative for Teams: UseJunction vs ccusage",
+  description:
+    "ccusage and UseJunction both print AI coding usage and cost from the logs on your laptop, with no account. Compare what each reads, how each prices, and what happens when a team needs the same view.",
+  primaryKeyword: "ccusage alternative",
+  secondaryKeywords: ["UseJunction vs ccusage", "ccusage for teams", "Claude Code usage CLI", "Claude Code cost tracker"],
+  updatedAt: "2026-11-16",
+  answer:
+    "ccusage is a free command-line tool that reads the logs AI coding tools write to your machine and prints usage and estimated cost. UseJunction has the same kind of table: run npx usejunction, with no account, and nothing leaves the machine. The difference is what comes after. ccusage is a personal tool and stays in the terminal. UseJunction can also show the same numbers as charts, split cost by repository, and put a whole team's usage in one place once you sign in. If the terminal is all you want, ccusage reads more command-line agents today and is a fine choice.",
+  compareOtherName: "ccusage",
+  compareRows: [
+    { feature: "How you run it", usejunction: "npx usejunction", other: "npx ccusage" },
+    { feature: "Account needed for the terminal table", usejunction: "No", other: "No" },
+    { feature: "Usage uploaded by the terminal table", usejunction: "Nothing", other: "Nothing" },
+    {
+      feature: "Tools read from local logs",
+      usejunction: "Claude Code, Codex, Cursor, OpenCode, Antigravity, Cline, Roo Code",
+      other: "Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Amp, Cline and more (19 in v20)",
+    },
+    { feature: "Cursor", usejunction: "Yes", other: "Not listed in v20" },
+    { feature: "Reports", usejunction: "Daily, monthly, session, 5-hour blocks, status line", other: "The same, plus weekly" },
+    { feature: "Price list", usejunction: "UseJunction's own table, shared with the dashboard", other: "LiteLLM's list" },
+    { feature: "Charts and history across machines", usejunction: "Yes, after sign-in", other: "No" },
+    { feature: "Cost by repository and pull request", usejunction: "Yes, after sign-in", other: "No" },
+    { feature: "Team view, seats and plan limits", usejunction: "Yes", other: "No, it is a personal tool" },
+  ],
+  sections: [
+    {
+      heading: "What the two have in common",
+      body: [
+        "Both read the usage numbers your AI coding tools already write to disk. Neither needs an account for the terminal table, and neither uploads your usage.",
+        "Both print estimated cost at API list prices. That is not your bill: on a subscription you pay what the plan costs, whatever the estimate says.",
+        "Both have daily, monthly, session and 5-hour block reports, a status line for Claude Code, date filters and JSON output.",
+      ],
+    },
+    {
+      heading: "Do the numbers match?",
+      body: [
+        "We ran both on the same 15 days of Claude Code and Codex logs on 16 November 2026, against ccusage v20. Input, output, cache-write and cache-read tokens matched exactly on all 8 models.",
+        "Estimated cost did not match, because the price lists differ. ccusage reads LiteLLM's list, which prices 1-hour cache writes higher than 5-minute ones. UseJunction uses one cache-write price per model. Over those 15 days UseJunction showed $568 and ccusage $610.",
+        "UseJunction counts days in UTC, the same days its dashboard uses. ccusage uses your local time zone unless you pass one.",
+      ],
+    },
+    {
+      heading: "Pick ccusage when",
+      body: [
+        "You want a personal command-line tool and nothing else.",
+        "You use a command-line agent UseJunction does not read yet, such as Gemini CLI, Amp or Goose.",
+        "You want a weekly report.",
+      ],
+    },
+    {
+      heading: "Pick UseJunction when",
+      body: [
+        "You want the terminal table now and the option of charts and history later, from the same tool.",
+        "You use Cursor as well as Claude Code or Codex.",
+        "You need to know which repository or pull request the spend went to.",
+        "More than one person is spending. A team view shows every tool, seat and plan limit together, and each developer has their own switch for what is shared.",
+      ],
+    },
+  ],
+  faq: [
+    {
+      question: "Is UseJunction a drop-in replacement for ccusage?",
+      answer:
+        "For the common commands, yes: npx usejunction, monthly, session, blocks and statusline exist, and --since, --until and --json work the same way. It is not a copy of every ccusage option, it has no weekly report, and its JSON has its own field names.",
+    },
+    {
+      question: "Does npx usejunction send my usage anywhere?",
+      answer:
+        "No. The usage commands read local files and make no network request after the program itself is downloaded. Usage is uploaded only if you install the agent and sign in.",
+    },
+    {
+      question: "Why is the cost different from ccusage?",
+      answer:
+        "The token counts match. The estimate differs because the two tools use different price lists, mainly for 1-hour cache writes. Both are estimates at API list prices, not a bill.",
+    },
+    {
+      question: "Can I use both?",
+      answer: "Yes. They read the same log files and do not change them.",
+    },
+  ],
+  relatedPaths: [
+    "/for/claude-code",
+    "/compare/codexbar",
+    "/guides/see-team-ai-coding-usage",
+    "/solutions/ai-coding-spend-management",
+    "/for/cursor",
+  ],
+};
+
 export const COMPARE_PAGES: ContentPage[] = [
   compareEngineeringIntelligence,
   compareJunctionPanel,
   compareWakatime,
   compareCodexbar,
+  compareCcusage,
   compareHelicone,
   comparePortkey,
   compareLangfuse,
