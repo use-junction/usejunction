@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/usejunction/agent/internal/scan"
 	"github.com/usejunction/agent/internal/types"
 )
 
@@ -238,8 +239,16 @@ func TestUsageTip(t *testing.T) {
 	}
 }
 
+// A real run parses flags once. Tests run several commands in one process, so
+// the values a previous command set have to be cleared.
+func resetUsageFlags() {
+	usageSince, usageUntil, usageTool, usageOrder = "", "", "all", "asc"
+	usageJSON, usageBreakdown, usageActiveOnly = false, false, false
+}
+
 func runUsageCommand(t *testing.T, args ...string) string {
 	t.Helper()
+	resetUsageFlags()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("USEJUNCTION_HOME", filepath.Join(home, ".usejunction"))
@@ -247,18 +256,19 @@ func runUsageCommand(t *testing.T, args ...string) string {
 	// Other tests leave the shared --format flag on "json".
 	previousFormat := format
 	format = "text"
-	previousScan, previousNow := scanUsageForReport, usageReportNow
+	previousScan, previousNow, previousEvents := scanUsageForReport, usageReportNow, scanClaudeEventsForReport
 	scanUsageForReport = func(context.Context) ([]types.DailyUsage, bool) { return usageTestRows(), true }
+	scanClaudeEventsForReport = func(time.Time) []scan.UsageEvent { return usageTestEvents() }
 	usageReportNow = func() time.Time { return usageTestNow }
 	var out bytes.Buffer
 	rootCmd.SetOut(&out)
 	rootCmd.SetArgs(append([]string{}, args...))
 	t.Cleanup(func() {
 		format = previousFormat
-		scanUsageForReport, usageReportNow = previousScan, previousNow
-		usageSince, usageUntil, usageTool, usageOrder = "", "", "all", "asc"
-		usageJSON, usageBreakdown = false, false
+		scanUsageForReport, usageReportNow, scanClaudeEventsForReport = previousScan, previousNow, previousEvents
+		resetUsageFlags()
 		rootCmd.SetOut(nil)
+		rootCmd.SetIn(nil)
 		rootCmd.SetArgs(nil)
 	})
 	if err := rootCmd.Execute(); err != nil {

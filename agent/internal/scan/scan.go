@@ -19,7 +19,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -204,9 +203,8 @@ func processFile(
 		if payload, ok2 := row["payload"].(map[string]any); ok2 && msgID == "" {
 			msgID, _ = payload["id"].(string)
 		}
-		dedupeKey := reqID + msgID + hit.date + hit.model + "|" +
-			strconv.Itoa(hit.input) + "|" + strconv.Itoa(hit.output) + "|" + strconv.Itoa(hit.cacheRead)
-		if dedupeKey != "|||" {
+		dedupeKey := usageDedupeKey(reqID, msgID, hit.date, hit.model, hit.input, hit.output, hit.cacheRead)
+		if dedupeKey != "" {
 			if seen[dedupeKey] {
 				return nil
 			}

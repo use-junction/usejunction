@@ -471,9 +471,18 @@ func renderUsageReport(w io.Writer, report usageReport, connected bool) {
 		formatTokens(report.Totals.InputTokens), formatTokens(report.Totals.OutputTokens),
 		formatTokens(report.Totals.CacheReadTokens + report.Totals.CacheWriteTokens), formatCost(report.Totals.EstimatedCost),
 	}
+	writeUsageTable(w, table, total, textColumns)
+	fmt.Fprintln(w)
+	for _, line := range report.method(connected) {
+		fmt.Fprintf(w, " %s\n", ui.Muted(line))
+	}
+}
 
+// writeUsageTable prints a header line, the rows and a total line. The first
+// textColumns columns are left-aligned text; the rest are right-aligned numbers.
+func writeUsageTable(w io.Writer, table [][]string, total []string, textColumns int) {
 	widths := make([]int, len(table[0]))
-	for _, line := range append(table, total) {
+	for _, line := range append(append([][]string{}, table...), total) {
 		for i, cell := range line {
 			if n := utf8.RuneCountInString(cell); n > widths[i] {
 				widths[i] = n
@@ -497,10 +506,7 @@ func renderUsageReport(w io.Writer, report usageReport, connected bool) {
 	for _, line := range table[1:] {
 		fmt.Fprintf(w, " %s\n", format(line))
 	}
-	fmt.Fprintf(w, " %s\n\n", ui.Strong(format(total)))
-	for _, line := range report.method(connected) {
-		fmt.Fprintf(w, " %s\n", ui.Muted(line))
-	}
+	fmt.Fprintf(w, " %s\n", ui.Strong(format(total)))
 }
 
 // usageReportJSON is the --json form. The rows sit under the period's name
