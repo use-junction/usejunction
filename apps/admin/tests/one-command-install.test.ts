@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -222,4 +222,66 @@ test("install.sh on an already connected machine refreshes it without a second s
   assert.match(run.stdout, /already connected on this machine/);
   assert.ok(!run.calls.some((call) => /(^| )onboard( |$)/.test(call) && !call.includes("--complete")), run.calls.join(" | "));
   assert.ok(run.calls.some((call) => /(^| )setup$/.test(call)), run.calls.join(" | "));
+});
+
+/**
+ * `--local`: the view-only install. It puts the agent on PATH and shows the
+ * usage table. It must not sign in, start a background service or connect
+ * anything.
+ */
+function backgroundServiceFiles(home: string) {
+  const found: string[] = [];
+  for (const dir of [path.join(home, "Library", "LaunchAgents"), path.join(home, ".config", "systemd", "user")]) {
+    if (existsSync(dir)) found.push(...readdirSync(dir));
+  }
+  return found;
+}
+
+test("install.sh --local installs the usage table without signing in or starting a service", { skip: !hasBash }, () => {
+  const run = runInstaller({ agentScript: signInCapableAgent, args: ["--local"] });
+  assert.equal(run.status, 0, run.stderr || run.stdout);
+
+  // The agent is asked whether it has the table, then run with no command.
+  const commands = run.calls.map((call) => call.replace("--profile test", "").trim());
+  assert.deepEqual(commands, ["daily --help", ""]);
+  assert.ok(!run.calls.some((call) => /onboard|login|enroll|setup/.test(call)), `--local must not sign in: ${run.calls.join(" | ")}`);
+
+  assert.ok(!existsSync(path.join(run.home, ".usejunction-test", "config.json")), "--local must not connect the machine");
+  assert.deepEqual(backgroundServiceFiles(run.home), [], "--local must not install a background service");
+
+  assert.match(run.stdout, /Nothing was connected and nothing runs in the background\./);
+  assert.match(run.stdout, /run the installer without --local: curl -fsSL http:\/\/127\.0\.0\.1:9\/install\.sh \| bash/);
+});
+
+test("install.sh --local on an older agent says the table is not there yet", { skip: !hasBash }, () => {
+  const oldAgent = `#!/bin/bash\necho "$*" >> "$AGENT_CALLS"\n[[ " $* " == *" daily "* ]] && exit 1\nexit 0\n`;
+  const run = runInstaller({ agentScript: oldAgent, args: ["--local"] });
+  assert.equal(run.status, 0, run.stderr || run.stdout);
+  assert.match(run.stdout, /has no terminal usage table yet/);
+  assert.equal(run.calls.length, 1, "an agent without the table is not run bare, which would print its help");
+});
+
+test("install.sh --local leaves a connected machine's install alone", { skip: !hasBash }, () => {
+  const run = runInstaller({ agentScript: signInCapableAgent, args: ["--local"], existingConfig: true });
+  assert.equal(run.status, 0, run.stderr || run.stdout);
+  assert.match(run.stdout, /already connected on this machine, so there is nothing to install/);
+  assert.deepEqual(run.calls, [], "nothing is built, replaced or signed in");
+});
+
+test("install.sh --local cannot be combined with a token", { skip: !hasBash }, () => {
+  const run = runInstaller({ agentScript: signInCapableAgent, args: ["--local", "--token", "uj_enroll_x"] });
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /--local installs without signing in/);
+  assert.deepEqual(run.calls, []);
+});
+
+test("install.ps1 has the same view-only switch", () => {
+  assert.match(installPs1, /\[switch\]\$Local/);
+  assert.match(installPs1, /if \(-not \$Local -and -not \$Upgrade -and -not \$Resume/);
+  // The view-only branch ends before the scheduled task is registered for a normal install.
+  const local = installPs1.indexOf("if ($Local) {");
+  const firstRegister = installPs1.indexOf("\n  Register-AgentTask");
+  assert.ok(local > 0 && local < firstRegister, "-Local must exit before any scheduled task is registered");
+  assert.match(installPs1.slice(local, firstRegister), /exit 0/);
+  assert.doesNotMatch(installPs1.slice(local, firstRegister), /onboard|"login"|Register-ScheduledTask/);
 });

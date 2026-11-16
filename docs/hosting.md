@@ -161,6 +161,16 @@ Windows 10/11 PowerShell (x64 or ARM64, no administrator shell required):
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-RestMethod -UseBasicParsing 'https://YOUR_APP_ORIGIN/install.ps1')))"
 ```
 
+To install without signing in, add `--local`. It puts `usejunction` on `PATH` and prints the usage table from the machine's own logs. Nothing is connected, no background service is installed and no tool's settings are changed. Running the installer again without `--local` signs in.
+
+```bash
+curl -fsSL https://YOUR_APP_ORIGIN/install.sh | bash -s -- --local
+```
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-RestMethod -UseBasicParsing 'https://YOUR_APP_ORIGIN/install.ps1'))) -Local"
+```
+
 With an enrollment token from the dashboard instead (what invite links and the in-app connect step use):
 
 ```bash

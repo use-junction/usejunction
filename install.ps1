@@ -4,7 +4,8 @@ param(
   [string]$Url = "",
   [string]$Profile = "",
   [switch]$Upgrade,
-  [switch]$Resume
+  [switch]$Resume,
+  [switch]$Local
 )
 
 $ErrorActionPreference = "Stop"
@@ -56,9 +57,12 @@ $ProfileArgs = if ($Profile -eq "test") { @("--profile", "test") } else { @() }
 if ($Upgrade -and $Resume) {
   throw "-Upgrade and -Resume cannot be used together."
 }
+if ($Local -and ($Upgrade -or $Resume -or -not [string]::IsNullOrWhiteSpace($Token))) {
+  throw "-Local installs without signing in, so it cannot be combined with -Token, -Upgrade or -Resume."
+}
 # No token: sign in through the browser instead of copying one from the site.
 $SignIn = $false
-if (-not $Upgrade -and -not $Resume -and [string]::IsNullOrWhiteSpace($Token)) {
+if (-not $Local -and -not $Upgrade -and -not $Resume -and [string]::IsNullOrWhiteSpace($Token)) {
   if (Test-Path $ConfigPath) {
     # Running the one-line install again on a connected machine repairs the
     # install; it must not ask the person to sign in a second time.
@@ -197,6 +201,14 @@ exit `$LASTEXITCODE
 
 $Version = "0.1.0"
 $Version = Get-LatestVersion
+# A connected machine already has the agent, kept current by its own updater.
+# -Local must not replace a running install: just show the table.
+if ($Local -and (Test-Path $ConfigPath)) {
+  Write-Host "UseJunction is already connected on this machine, so there is nothing to install."
+  if (Test-Path $Binary) { & $Binary @ProfileArgs }
+  exit 0
+}
+
 $Architecture = Get-AgentArchitecture
 $Artifact = "usejunction-windows-$Architecture.exe"
 
@@ -254,6 +266,30 @@ if ($repairInstall) {
 } else {
   Write-Host "Using existing UseJunction agent for setup recovery."
   Add-AgentToPath
+}
+
+if ($Local) {
+  # View-only: the agent is on PATH and that is all. No sign-in, no scheduled
+  # task, and no change to any tool's settings.
+  $hasTable = $false
+  try {
+    & $Binary @($ProfileArgs + @("daily", "--help")) *> $null
+    $hasTable = ($LASTEXITCODE -eq 0)
+  } catch {
+    $hasTable = $false
+  }
+  if ($hasTable) {
+    # The closing lines below say how to connect, so the agent's own line is off.
+    $env:USEJUNCTION_NO_TIPS = "1"
+    & $Binary @ProfileArgs
+    Remove-Item Env:USEJUNCTION_NO_TIPS -ErrorAction SilentlyContinue
+  } else {
+    Write-Host "This UseJunction agent build has no terminal usage table yet; a newer release adds it."
+  }
+  Write-Host "UseJunction is installed. Nothing was connected and nothing runs in the background."
+  Write-Host "Run it any time: usejunction   (open a new terminal if the command is not found)"
+  Write-Host "To see charts and your team, run the installer without -Local: irm $Url/install.ps1 | iex"
+  exit 0
 }
 
 if ($Upgrade) {
