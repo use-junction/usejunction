@@ -34,6 +34,13 @@ type usageHit struct {
 	ok                       bool
 }
 
+// countedUsage remembers what one response added and where, so a later, more
+// complete line for the same response can replace it instead of adding to it.
+type countedUsage struct {
+	bucket string
+	hit    usageHit
+}
+
 // lineParser extracts usage metadata from a single JSONL object.
 type lineParser func(row map[string]any) usageHit
 
@@ -88,7 +95,7 @@ func scanJSONLDirs(tool string, roots []string, parser lineParser, forceFull boo
 	}
 
 	buckets := map[string]*types.DailyUsage{}
-	seen := map[string]bool{}
+	seen := map[string]*countedUsage{}
 	accountFiles := snap.cloneAccountFiles()
 	signedIn := SignedInAccount(tool)
 
@@ -104,6 +111,10 @@ func scanJSONLDirs(tool string, roots []string, parser lineParser, forceFull boo
 
 	result := make([]types.DailyUsage, 0, len(buckets))
 	for _, b := range buckets {
+		// Left empty when a response's final line landed in another bucket.
+		if b.Requests <= 0 && b.InputTokens+b.OutputTokens+b.CacheReadTokens+b.CacheWriteTokens <= 0 {
+			continue
+		}
 		if b.EstimatedCost == 0 {
 			b.EstimatedCost = EstimateCostForTool(tool, b.Model, b.InputTokens, b.OutputTokens, b.CacheReadTokens, b.CacheWriteTokens)
 		}
@@ -158,7 +169,7 @@ func processFile(
 	path, tool string,
 	parser lineParser,
 	buckets map[string]*types.DailyUsage,
-	seen map[string]bool,
+	seen map[string]*countedUsage,
 	accountFiles map[string]string,
 	signedIn string,
 ) {
@@ -203,12 +214,26 @@ func processFile(
 		if payload, ok2 := row["payload"].(map[string]any); ok2 && msgID == "" {
 			msgID, _ = payload["id"].(string)
 		}
-		dedupeKey := usageDedupeKey(reqID, msgID, hit.date, hit.model, hit.input, hit.output, hit.cacheRead)
-		if dedupeKey != "" {
-			if seen[dedupeKey] {
+		// One response can be logged over several lines: early ones carry a
+		// partial output count and the same cache tokens as the final one. Only
+		// the most complete line counts, or the cache tokens are counted twice.
+		responseKey := usageResponseKey(reqID, msgID)
+		dedupeKey := responseKey
+		if dedupeKey == "" {
+			dedupeKey = usageDedupeKey(reqID, msgID, hit.date, hit.model, hit.input, hit.output, hit.cacheRead)
+		}
+		if previous := seen[dedupeKey]; previous != nil {
+			if responseKey == "" || hit.output <= previous.hit.output {
 				return nil
 			}
-			seen[dedupeKey] = true
+			if counted := buckets[previous.bucket]; counted != nil {
+				counted.InputTokens -= previous.hit.input
+				counted.OutputTokens -= previous.hit.output
+				counted.CacheReadTokens -= previous.hit.cacheRead
+				counted.CacheWriteTokens -= previous.hit.cacheWrite
+				counted.ReasoningTokens -= previous.hit.reasoning
+				counted.Requests--
+			}
 		}
 
 		repoKey := ""
@@ -229,6 +254,9 @@ func processFile(
 		b.CacheWriteTokens += hit.cacheWrite
 		b.ReasoningTokens += hit.reasoning
 		b.Requests++
+		if dedupeKey != "" {
+			seen[dedupeKey] = &countedUsage{bucket: key, hit: hit}
+		}
 		return nil
 	})
 }

@@ -526,6 +526,20 @@ func cursorEventsCachePath() string {
 	return filepath.Join(config.CacheDir(), "cursor-usage-events.json")
 }
 
+// CachedCursorUsageEvents returns the Cursor usage events a previous networked
+// scan saved to disk, or nil when there are none. It reads local files only.
+func CachedCursorUsageEvents() []types.DailyUsage {
+	cached, err := loadCursorEventsCache(cursorEventsCachePath())
+	if err != nil || len(cached) == 0 {
+		return nil
+	}
+	rows := finalizeCursorEventRows(cached)
+	if token, terr := cursorAccessToken(); terr == nil {
+		rows = stampCursorEventAccount(rows, cursorAccountKey(token))
+	}
+	return rows
+}
+
 func stampCursorEventAccount(rows []types.DailyUsage, accountKey string) []types.DailyUsage {
 	accountKey = strings.TrimSpace(accountKey)
 	if accountKey == "" {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/usejunction/agent/internal/providers"
+	"github.com/usejunction/agent/internal/scan"
 	"github.com/usejunction/agent/internal/types"
 	"github.com/usejunction/agent/internal/ui"
 )
@@ -44,6 +45,7 @@ type localUsageSummary struct {
 var toolDisplayNames = map[string]string{
 	"claude":      "Claude Code",
 	"codex":       "Codex",
+	"codex-work":  "Codex Work",
 	"cursor":      "Cursor",
 	"copilot":     "Copilot",
 	"opencode":    "OpenCode",
@@ -177,7 +179,11 @@ func plural(n int, one, many string) string {
 // scanLocalUsage reads every provider's local usage side by side. It returns
 // ok=false when the scan outlives timeout; the readers are left to finish in
 // the background and their results are dropped.
+//
+// It is a local-only scan: what it shows is labelled as never having left the
+// machine, so no provider may call its vendor's servers from here.
 func scanLocalUsage(ctx context.Context, timeout time.Duration) (rows []types.DailyUsage, ok bool) {
+	ctx = scan.LocalOnly(ctx)
 	done := make(chan []types.DailyUsage, 1)
 	go func() {
 		var (
