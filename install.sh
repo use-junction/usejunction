@@ -7,6 +7,7 @@ AGENT_PROFILE="${USEJUNCTION_PROFILE:-default}"
 VERSION="0.1.0"
 UPGRADE_ONLY=false
 RESUME_ONLY=false
+LOCAL_ONLY=false
 
 # Profile paths — resolved by resolve_profile_paths after args/URL are known.
 HOME_DIR=""
@@ -28,8 +29,9 @@ AGENT_ERR=""
 BINARY=""
 
 usage() {
-  echo "Usage: curl -fsSL <control-plane>/install.sh | bash -s -- [--token <token> | --upgrade | --resume] [--url <control-plane>] [--profile default|test]"
+  echo "Usage: curl -fsSL <control-plane>/install.sh | bash -s -- [--token <token> | --local | --upgrade | --resume] [--url <control-plane>] [--profile default|test]"
   echo "With no options, the installer shows this machine's usage and opens the browser so you can sign in."
+  echo "With --local, it installs the usage table only: no sign-in and nothing running in the background."
   exit 1
 }
 
@@ -40,6 +42,7 @@ while [[ $# -gt 0 ]]; do
     --profile) AGENT_PROFILE="$2"; shift 2 ;;
     --upgrade) UPGRADE_ONLY=true; shift ;;
     --resume) RESUME_ONLY=true; shift ;;
+    --local) LOCAL_ONLY=true; shift ;;
     -h|--help) usage ;;
     *) echo "Unknown option: $1"; usage ;;
   esac
@@ -115,9 +118,14 @@ if [[ "$UPGRADE_ONLY" == true && "$RESUME_ONLY" == true ]]; then
   exit 1
 fi
 
+if [[ "$LOCAL_ONLY" == true && ( -n "$ENROLL_TOKEN" || "$UPGRADE_ONLY" == true || "$RESUME_ONLY" == true ) ]]; then
+  echo "--local installs without signing in, so it cannot be combined with --token, --upgrade or --resume." >&2
+  exit 1
+fi
+
 # No token: sign in through the browser instead of copying one from the site.
 SIGN_IN=false
-if [[ -z "$ENROLL_TOKEN" && "$UPGRADE_ONLY" != true && "$RESUME_ONLY" != true ]]; then
+if [[ -z "$ENROLL_TOKEN" && "$UPGRADE_ONLY" != true && "$RESUME_ONLY" != true && "$LOCAL_ONLY" != true ]]; then
   if [[ -f "$CONFIG_PATH" ]]; then
     # Running the one-line install again on a connected machine repairs the
     # install; it must not ask the person to sign in a second time.
@@ -786,6 +794,18 @@ if [[ "$UPGRADE_ONLY" == true && -x "$BINARY" ]]; then
   fi
 fi
 
+# A connected machine already has the agent, kept current by its own updater.
+# --local must not replace a running install: just show the table.
+if [[ "$LOCAL_ONLY" == true && -f "$CONFIG_PATH" ]]; then
+  echo "UseJunction is already connected on this machine, so there is nothing to install."
+  LOCAL_EXISTING_BINARY="$(installed_agent_binary 2>/dev/null || true)"
+  if [[ -n "$LOCAL_EXISTING_BINARY" && -x "$LOCAL_EXISTING_BINARY" ]]; then
+    # shellcheck disable=SC2046
+    "$LOCAL_EXISTING_BINARY" $(agent_profile_args) || true
+  fi
+  exit 0
+fi
+
 RESUME_EXISTING_BINARY=""
 if [[ "$RESUME_ONLY" == true ]]; then
   RESUME_EXISTING_BINARY="$(installed_agent_binary 2>/dev/null || true)"
@@ -815,6 +835,23 @@ else
   chmod +x "$BINARY"
 fi
 ensure_cli_on_path
+
+if [[ "$LOCAL_ONLY" == true ]]; then
+  # View-only: the agent is on PATH and that is all. No sign-in, no background
+  # service, and no change to any tool's settings.
+  # shellcheck disable=SC2046
+  if "$BINARY" $(agent_profile_args) daily --help >/dev/null 2>&1; then
+    # The closing lines below say how to connect, so the agent's own line is off.
+    # shellcheck disable=SC2046
+    USEJUNCTION_NO_TIPS=1 "$BINARY" $(agent_profile_args) || true
+  else
+    echo "This UseJunction agent build has no terminal usage table yet; a newer release adds it."
+  fi
+  echo "UseJunction is installed. Nothing was connected and nothing runs in the background."
+  echo "Run it any time: ${CLI_NAME}   (open a new terminal if the command is not found)"
+  echo "To see charts and your team, run the installer without --local: curl -fsSL ${CONTROL_PLANE_URL}/install.sh | bash"
+  exit 0
+fi
 
 if [[ "$UPGRADE_ONLY" == true ]]; then
   echo "Restarting existing background agent…"
