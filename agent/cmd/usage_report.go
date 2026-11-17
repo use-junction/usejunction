@@ -19,6 +19,7 @@ import (
 
 const (
 	usagePeriodDaily   = "daily"
+	usagePeriodWeekly  = "weekly"
 	usagePeriodMonthly = "monthly"
 
 	// Days shown by the daily table when no --since is given.
@@ -36,6 +37,9 @@ type usageReportOptions struct {
 	Tool      string
 	Breakdown bool
 	Order     string
+	// Last is the number of most recent periods to show, the current one
+	// included: 1 is today, this week or this month. 0 means no --last.
+	Last int
 }
 
 // usageTokens holds the four token buckets a row or a total is made of.
@@ -82,6 +86,8 @@ type usageReport struct {
 	Until  string
 	// DefaultWindow is true when the person gave no dates of their own.
 	DefaultWindow bool
+	// Last is the --last count the window came from, or 0.
+	Last int
 	// HistoryStart is the oldest day the scanner reads. Asking for earlier
 	// days gets a note rather than a silent gap.
 	HistoryStart  string
@@ -108,19 +114,82 @@ func parseUsageDate(value string) (string, error) {
 	return day.Format(usageDateLayout), nil
 }
 
+// weekStart returns the Monday that starts the week holding day. Weeks run
+// Monday to Sunday, on the same UTC days as the daily table.
+func weekStart(day time.Time) time.Time {
+	day = time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+	return day.AddDate(0, 0, -((int(day.Weekday()) + 6) % 7))
+}
+
+// periodStart returns the first day of the period holding day.
+func periodStart(period string, day time.Time) time.Time {
+	day = time.Date(day.Year(), day.Month(), day.Day(), 0, 0, 0, 0, time.UTC)
+	switch period {
+	case usagePeriodWeekly:
+		return weekStart(day)
+	case usagePeriodMonthly:
+		return time.Date(day.Year(), day.Month(), 1, 0, 0, 0, 0, time.UTC)
+	}
+	return day
+}
+
+// periodKey files a YYYY-MM-DD day under its period: the day itself, the
+// Monday its week starts on, or its month.
+func periodKey(period, date string) string {
+	switch period {
+	case usagePeriodMonthly:
+		if len(date) >= 7 {
+			return date[:7]
+		}
+	case usagePeriodWeekly:
+		if day, err := time.Parse(usageDateLayout, date); err == nil {
+			return weekStart(day).Format(usageDateLayout)
+		}
+	}
+	return date
+}
+
 // resolveUsageWindow turns the flags into the first and last day to show.
 // Days are UTC, the same days the scanners file usage under.
 func resolveUsageWindow(now time.Time, opts usageReportOptions) (usageReport, error) {
 	report := usageReport{Period: opts.Period, AllEstimated: true}
-	if report.Period != usagePeriodMonthly {
+	if report.Period != usagePeriodMonthly && report.Period != usagePeriodWeekly {
 		report.Period = usagePeriodDaily
 	}
 	today := now.UTC()
 	report.HistoryStart = scan.UsageLookbackStart(now).Format(usageDateLayout)
-	report.DefaultWindow = strings.TrimSpace(opts.Since) == "" && strings.TrimSpace(opts.Until) == ""
+	hasSince, hasUntil := strings.TrimSpace(opts.Since) != "", strings.TrimSpace(opts.Until) != ""
+	report.DefaultWindow = !hasSince && !hasUntil && opts.Last == 0
+
+	if order := strings.ToLower(strings.TrimSpace(opts.Order)); order != "" && order != "asc" && order != "desc" {
+		return report, fmt.Errorf("--order must be asc or desc, not %q", opts.Order)
+	}
+
+	switch {
+	case opts.Last < 0:
+		return report, fmt.Errorf("--last must be 1 or more, not %d", opts.Last)
+	case opts.Last > 0 && (hasSince || hasUntil):
+		return report, fmt.Errorf("--last counts back from today, so it cannot be used with --since or --until")
+	case opts.Last > 0:
+		// The current period and the ones before it, up to today.
+		first := periodStart(report.Period, today)
+		switch report.Period {
+		case usagePeriodWeekly:
+			first = first.AddDate(0, 0, -7*(opts.Last-1))
+		case usagePeriodMonthly:
+			first = first.AddDate(0, -(opts.Last - 1), 0)
+		default:
+			first = first.AddDate(0, 0, -(opts.Last - 1))
+		}
+		report.Last = opts.Last
+		report.Since = first.Format(usageDateLayout)
+		report.Until = today.Format(usageDateLayout)
+		report.BeforeHistory = report.Since < report.HistoryStart
+		return report, nil
+	}
 
 	report.Until = today.Format(usageDateLayout)
-	if strings.TrimSpace(opts.Until) != "" {
+	if hasUntil {
 		until, err := parseUsageDate(opts.Until)
 		if err != nil {
 			return report, fmt.Errorf("--until: %w", err)
@@ -129,14 +198,14 @@ func resolveUsageWindow(now time.Time, opts usageReportOptions) (usageReport, er
 	}
 
 	switch {
-	case strings.TrimSpace(opts.Since) != "":
+	case hasSince:
 		since, err := parseUsageDate(opts.Since)
 		if err != nil {
 			return report, fmt.Errorf("--since: %w", err)
 		}
 		report.Since = since
 		report.BeforeHistory = since < report.HistoryStart
-	case report.Period == usagePeriodMonthly:
+	case report.Period == usagePeriodMonthly || report.Period == usagePeriodWeekly:
 		report.Since = report.HistoryStart
 	default:
 		report.Since = today.AddDate(0, 0, -(usageDailyDefaultDays - 1)).Format(usageDateLayout)
@@ -148,9 +217,6 @@ func resolveUsageWindow(now time.Time, opts usageReportOptions) (usageReport, er
 
 	if report.Since > report.Until {
 		return report, fmt.Errorf("--since %s is after --until %s", report.Since, report.Until)
-	}
-	if order := strings.ToLower(strings.TrimSpace(opts.Order)); order != "" && order != "asc" && order != "desc" {
-		return report, fmt.Errorf("--order must be asc or desc, not %q", opts.Order)
 	}
 	return report, nil
 }
@@ -200,17 +266,29 @@ func shortModelName(model string) string {
 	return modelDateSuffix.ReplaceAllString(model, "")
 }
 
-// monthCoverage says which days of a month the window holds, or "" when it
-// holds the whole month.
-func monthCoverage(month, from, to string) string {
-	first, err := time.Parse("2006-01", month)
-	if err != nil {
+// periodCoverage says which days of a week or month the window holds, or ""
+// when it holds the whole period. key is the period's key: a week's Monday
+// (2026-11-16) or a month (2026-11).
+func periodCoverage(period, key, from, to string) string {
+	var first, last time.Time
+	switch period {
+	case usagePeriodMonthly:
+		month, err := time.Parse("2006-01", key)
+		if err != nil {
+			return ""
+		}
+		first, last = month, month.AddDate(0, 1, -1)
+	case usagePeriodWeekly:
+		monday, err := time.Parse(usageDateLayout, key)
+		if err != nil {
+			return ""
+		}
+		first, last = monday, monday.AddDate(0, 0, 6)
+	default:
 		return ""
 	}
-	monthStart := first.Format(usageDateLayout)
-	monthEnd := first.AddDate(0, 1, -1).Format(usageDateLayout)
-	startsLate := from > monthStart
-	endsEarly := to < monthEnd
+	startsLate := from > first.Format(usageDateLayout)
+	endsEarly := to < last.Format(usageDateLayout)
 	switch {
 	case startsLate && endsEarly:
 		return fmt.Sprintf("%s to %s", from, to)
@@ -250,10 +328,7 @@ func buildUsageReport(rows []types.DailyUsage, now time.Time, opts usageReportOp
 		if input+row.OutputTokens+row.CacheReadTokens+row.CacheWriteTokens == 0 && row.EstimatedCost <= 0 {
 			continue
 		}
-		period := row.Date
-		if report.Period == usagePeriodMonthly && len(row.Date) >= 7 {
-			period = row.Date[:7]
-		}
+		period := periodKey(report.Period, row.Date)
 		toolID := strings.ToLower(strings.TrimSpace(row.ToolName))
 		key := period + "|" + toolID
 		b := buckets[key]
@@ -282,7 +357,7 @@ func buildUsageReport(rows []types.DailyUsage, now time.Time, opts usageReportOp
 		}
 	}
 
-	// A month row is only as complete as the days the scanner reads.
+	// A week or month row is only as complete as the days the scanner reads.
 	coveredFrom, coveredTo := report.Since, report.Until
 	if coveredFrom < report.HistoryStart {
 		coveredFrom = report.HistoryStart
@@ -308,9 +383,7 @@ func buildUsageReport(rows []types.DailyUsage, now time.Time, opts usageReportOp
 		for _, line := range b.row.ModelBreakdown {
 			b.row.Models = append(b.row.Models, line.Model)
 		}
-		if report.Period == usagePeriodMonthly {
-			b.row.Covers = monthCoverage(b.row.Period, coveredFrom, coveredTo)
-		}
+		b.row.Covers = periodCoverage(report.Period, b.row.Period, coveredFrom, coveredTo)
 		if !opts.Breakdown {
 			b.row.ModelBreakdown = nil
 		}
@@ -383,16 +456,29 @@ func cutToWidth(s string, width int) string {
 
 func (r usageReport) title() string {
 	what := "AI coding usage"
-	if r.Period == usagePeriodMonthly {
+	switch r.Period {
+	case usagePeriodWeekly:
+		what = "AI coding usage by week"
+	case usagePeriodMonthly:
 		what = "AI coding usage by month"
 	}
 	window := fmt.Sprintf("%s to %s", r.Since, r.Until)
-	if r.DefaultWindow {
-		if r.Period == usagePeriodMonthly {
-			window = "since " + r.Since
-		} else {
-			window = fmt.Sprintf("last %d days", usageDailyDefaultDays)
-		}
+	switch {
+	case r.Last == 1:
+		// One period needs no "by week": "today", "this week", "this month".
+		what = "AI coding usage"
+		window = map[string]string{
+			usagePeriodDaily:   "today",
+			usagePeriodWeekly:  "this week, from Monday " + r.Since,
+			usagePeriodMonthly: "this month",
+		}[r.Period]
+	case r.Last > 1:
+		unit := map[string]string{usagePeriodDaily: "days", usagePeriodWeekly: "weeks", usagePeriodMonthly: "months"}[r.Period]
+		window = fmt.Sprintf("last %d %s", r.Last, unit)
+	case r.DefaultWindow && r.Period == usagePeriodDaily:
+		window = fmt.Sprintf("last %d days", usageDailyDefaultDays)
+	case r.DefaultWindow:
+		window = "since " + r.Since
 	}
 	return fmt.Sprintf("%s · %s · this machine", what, window)
 }
@@ -436,10 +522,7 @@ func renderUsageReport(w io.Writer, report usageReport, connected bool) {
 		return
 	}
 
-	periodHeader := "Date"
-	if report.Period == usagePeriodMonthly {
-		periodHeader = "Month"
-	}
+	periodHeader := map[string]string{usagePeriodDaily: "Date", usagePeriodWeekly: "Week of", usagePeriodMonthly: "Month"}[report.Period]
 	// Left-aligned text columns first, then right-aligned numbers.
 	const textColumns = 3
 	table := [][]string{{periodHeader, "Tool", "Models", "Input", "Output", "Cache", "Cost"}}
@@ -510,7 +593,8 @@ func writeUsageTable(w io.Writer, table [][]string, total []string, textColumns 
 }
 
 // usageReportJSON is the --json form. The rows sit under the period's name
-// ("daily" or "monthly"), next to the totals and the window they cover.
+// ("daily", "weekly" or "monthly"), next to the totals and the window they
+// cover. A weekly row's period is the Monday its week starts on.
 func usageReportJSON(report usageReport) map[string]any {
 	rows := report.Rows
 	if rows == nil {

@@ -63,7 +63,7 @@ func TestUsageCommandsMakeNoNetworkRequests(t *testing.T) {
 		rootCmd.SetArgs(nil)
 	})
 
-	for _, args := range [][]string{{}, {"daily"}, {"monthly", "--breakdown"}, {"session"}, {"blocks"}, {"statusline"}, {"daily", "--json"}} {
+	for _, args := range [][]string{{}, {"daily"}, {"weekly"}, {"monthly", "--breakdown"}, {"today"}, {"week"}, {"month"}, {"daily", "--last", "7"}, {"session"}, {"blocks"}, {"statusline"}, {"daily", "--json"}} {
 		resetUsageFlags()
 		var out bytes.Buffer
 		rootCmd.SetOut(&out)
