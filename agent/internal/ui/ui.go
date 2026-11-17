@@ -56,11 +56,34 @@ func Enabled() bool {
 	if os.Getenv("NO_COLOR") != "" {
 		return false
 	}
+	return IsTerminal()
+}
+
+// IsTerminal reports whether output goes to a person's terminal rather than a
+// pipe or a file. Unlike Enabled, it ignores the color settings.
+func IsTerminal() bool {
 	f, ok := out.(*os.File)
 	if !ok {
 		return false
 	}
 	return isatty.IsTerminal(f.Fd()) || isatty.IsCygwinTerminal(f.Fd())
+}
+
+// Muted styles secondary text, and returns it unchanged when styling is off.
+func Muted(s string) string {
+	if !Enabled() {
+		return s
+	}
+	return styleMuted().Render(s)
+}
+
+// Strong styles the text a table exists to show, and returns it unchanged when
+// styling is off.
+func Strong(s string) string {
+	if !Enabled() {
+		return s
+	}
+	return styleBody().Bold(true).Render(s)
 }
 
 func styleTeal() lipgloss.Style {

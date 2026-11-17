@@ -21,9 +21,13 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "usejunction",
-	Short: "UseJunction local agent — AI coding observability",
-	Long: `UseJunction local agent detects AI coding tools on this device
-and reports usage telemetry to the control plane.`,
+	Short: "See what your AI coding tools cost, from the logs on this machine",
+	Long: `UseJunction reads the usage numbers AI coding tools write to this machine
+and shows what they cost.
+
+Run it with no command for a daily table of the last 30 days. That needs no
+account and uploads nothing. Sign in with "usejunction login" to see charts,
+cost by repo, and your whole team on the dashboard.`,
 }
 
 // Execute is the entry point called by main.
