@@ -44,6 +44,7 @@
     "@tanstack/react-query": "^5.101.3",
     "@usejunction/db": "workspace:*",
     "@usejunction/usage-schema": "workspace:*",
+    "@vercel/analytics": "^2.0.1",
     "ably": "^2.26.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
