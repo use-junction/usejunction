@@ -50,40 +50,62 @@ test("the homepage strip offers the terminal table: one command to copy, no acco
   expect(within(section).getByText(HOME_TERMINAL_COMMAND)).toBeTruthy();
   expect(HOME_TERMINAL_COMMAND).toBe("npx usejunction");
 
-  fireEvent.click(within(section).getByRole("button", { name: "Copy" }));
+  // The command is the only button: clicking it copies it, with no separate copy button beside it.
+  const command = within(section).getByRole("button");
+  expect(command.getAttribute("aria-label")).toBe("Copy npx usejunction");
+  fireEvent.click(command);
   await waitFor(() => expect(writeText).toHaveBeenCalledWith("npx usejunction"));
-  expect(await within(section).findByRole("button", { name: "Copied" })).toBeTruthy();
+  expect(await within(command).findByText("Copied")).toBeTruthy();
 });
 
-test("the strip stays one line: no table, no tabs, no link out, and the numbers are marked as an example", () => {
+test("the strip stays one line: a small graph and one readout, with no table, tabs, link or example label", () => {
   render(<HomeTerminal />);
   const section = screen.getByRole("region", { name: HEADING });
 
   for (const role of ["figure", "table", "tablist", "link"]) {
     expect(within(section).queryByRole(role)).toBeNull();
   }
-  expect(section.textContent).not.toMatch(/ccusage/);
-  expect(within(section).getByText("Example")).toBeTruthy();
+  expect(section.textContent).not.toMatch(/ccusage|Example/i);
+  expect(within(section).getByRole("img", { name: /spend rising over the last 30 days/ })).toBeTruthy();
 });
 
-test("once on screen the readout takes turns: total spent, next month, the plans we recommend", () => {
+test("once on screen the number counts up and the readout takes turns: total spent, next month, the plans we recommend", () => {
   vi.useFakeTimers();
   const scrollIntoView = stubScrollIntoView();
 
   render(<HomeTerminal />);
   const section = screen.getByRole("region", { name: HEADING });
+  const graph = within(section).getByRole("img");
 
-  // Off screen it waits on the first readout.
+  // Off screen it waits on the first readout, drawn finished.
   act(() => void vi.advanceTimersByTime(10_000));
   expect(shown(section)).toBe("Total spent$412.60");
 
   scrollIntoView();
-  act(() => void vi.advanceTimersByTime(3200));
-  expect(shown(section)).toBe("Estimated next month$430");
-  act(() => void vi.advanceTimersByTime(3200));
-  expect(shown(section)).toBe("We recommendClaude Max $100+ChatGPT Plus $20");
-  act(() => void vi.advanceTimersByTime(3200));
+  act(() => void vi.advanceTimersByTime(300));
+  const counting = Number(shown(section)!.replace("Total spent$", ""));
+  expect(counting).toBeGreaterThan(0);
+  expect(counting).toBeLessThan(412.6);
+  act(() => void vi.advanceTimersByTime(900));
   expect(shown(section)).toBe("Total spent$412.60");
+  // The dashed stretch of the graph is next month's, so it is not drawn yet.
+  expect(graph.getAttribute("data-ahead")).toBe("false");
+
+  // 1.2s of the first turn are gone; each swap is followed by a second for the number to count up.
+  act(() => void vi.advanceTimersByTime(3600 - 1200));
+  expect(shown(section)).toMatch(/^Estimated next month/);
+  act(() => void vi.advanceTimersByTime(1200));
+  expect(shown(section)).toBe("Estimated next month$430");
+  expect(graph.getAttribute("data-ahead")).toBe("true");
+
+  act(() => void vi.advanceTimersByTime(3600 - 1200));
+  expect(shown(section)).toBe("We recommendClaude Max $100+ChatGPT Plus $20");
+  expect(graph.getAttribute("data-ahead")).toBe("true");
+
+  act(() => void vi.advanceTimersByTime(3600));
+  act(() => void vi.advanceTimersByTime(1200));
+  expect(shown(section)).toBe("Total spent$412.60");
+  expect(graph.getAttribute("data-ahead")).toBe("false");
 });
 
 test("pointing at the strip holds the readout, and it carries on afterwards", () => {
@@ -99,8 +121,21 @@ test("pointing at the strip holds the readout, and it carries on afterwards", ()
   expect(shown(section)).toBe("Total spent$412.60");
 
   fireEvent.mouseLeave(section);
-  act(() => void vi.advanceTimersByTime(3200));
+  act(() => void vi.advanceTimersByTime(3600));
+  act(() => void vi.advanceTimersByTime(1200));
   expect(shown(section)).toBe("Estimated next month$430");
+});
+
+test("with reduced motion the numbers do not count up", () => {
+  vi.useFakeTimers();
+  const scrollIntoView = stubScrollIntoView();
+  vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("reduce") }));
+
+  render(<HomeTerminal />);
+  const section = screen.getByRole("region", { name: HEADING });
+  scrollIntoView();
+  act(() => void vi.advanceTimersByTime(100));
+  expect(shown(section)).toBe("Total spent$412.60");
 });
 
 test("the strip sits below the first story section, not under the hero", () => {
