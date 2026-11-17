@@ -19,7 +19,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Cr
 Works with **Claude Code**, **Codex**, and **Cursor** — plus OpenCode, Gemini, Antigravity, and Copilot.
 
 <p>
-  <a href="https://github.com/Dinuda/usejunction/actions/workflows/admin-tests.yml"><img src="https://github.com/Dinuda/usejunction/actions/workflows/admin-tests.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/use-junction/usejunction/actions/workflows/admin-tests.yml"><img src="https://github.com/use-junction/usejunction/actions/workflows/admin-tests.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Community-0F172A" alt="License"></a>
   <img src="https://img.shields.io/badge/Claude_Code-verified-059669" alt="Claude Code verified">
   <img src="https://img.shields.io/badge/Codex-verified-059669" alt="Codex verified">

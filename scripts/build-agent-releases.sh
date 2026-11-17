@@ -93,7 +93,7 @@ cat "${OUT}/checksums.txt"
 )
 
 # Prefer the Actions repo (owner/name); fall back for local builds.
-GITHUB_RELEASE_REPO="${GITHUB_REPOSITORY:-Dinuda/usejunction}"
+GITHUB_RELEASE_REPO="${GITHUB_REPOSITORY:-use-junction/usejunction}"
 
 node - "$OUT" "$VERSION" "$URGENCY" "$GITHUB_RELEASE_REPO" <<'NODE'
 const fs = require("fs");
