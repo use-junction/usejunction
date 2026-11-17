@@ -24,6 +24,22 @@ export function buildWindowsInstallCommand(token: string, controlPlaneUrl: strin
   return buildPowerShellInstallCommand(token, controlPlaneUrl);
 }
 
+/**
+ * The one-line install: no token. The installer shows local usage, then opens
+ * the browser to sign in and approve the device. install.sh is a bash script,
+ * so it is piped to bash rather than sh.
+ */
+export function buildSignInInstallCommand(controlPlaneUrl: string) {
+  const base = controlPlaneUrl.replace(/\/$/, "");
+  return `curl -fsSL ${base}/install.sh | bash`;
+}
+
+export function buildWindowsSignInInstallCommand(controlPlaneUrl: string) {
+  const base = controlPlaneUrl.replace(/\/$/, "");
+  const scriptUrl = powerShellLiteral(`${base}/install.ps1`);
+  return `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-RestMethod -UseBasicParsing ${scriptUrl})))"`;
+}
+
 export function buildResumeCommand(controlPlaneUrl: string) {
   const base = controlPlaneUrl.replace(/\/$/, "");
   return `curl -fsSL ${base}/install.sh | sh -s -- --resume --url ${base}`;

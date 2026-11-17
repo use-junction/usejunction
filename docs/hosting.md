@@ -143,20 +143,35 @@ For local development, register a second App whose Setup URL is `http://localhos
 From a checkout (builds the Go agent locally — preferred for development):
 
 ```bash
-./install.sh --token <token> --url http://localhost:3001
+./install.sh --url http://localhost:3001                    # sign in through the browser
+./install.sh --token <token> --url http://localhost:3001    # or with a token from the dashboard
 ```
 
-Against a hosted or Vercel control plane:
+Against a hosted or Vercel control plane, one command with no token:
 
 ```bash
-curl -fsSL https://YOUR_APP_ORIGIN/install.sh | sh -s -- --token <token> --url https://YOUR_APP_ORIGIN
+curl -fsSL https://YOUR_APP_ORIGIN/install.sh | bash
 ```
+
+The installer shows the last 30 days of usage found on the machine, prints a link and a short code, and opens the browser. Sign in (or sign up), check that the code and machine name match, and click **Connect this device**. Nothing is uploaded before that. On a machine with no browser, open the printed link on any other device. The script is served with its own address as the default control plane, so `--url` is only needed to point somewhere else.
 
 Windows 10/11 PowerShell (x64 or ARM64, no administrator shell required):
 
 ```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-RestMethod -UseBasicParsing 'https://YOUR_APP_ORIGIN/install.ps1')))"
+```
+
+With an enrollment token from the dashboard instead (what invite links and the in-app connect step use):
+
+```bash
+curl -fsSL https://YOUR_APP_ORIGIN/install.sh | bash -s -- --token <token> --url https://YOUR_APP_ORIGIN
+```
+
+```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((Invoke-RestMethod -UseBasicParsing 'https://YOUR_APP_ORIGIN/install.ps1'))) -Token '<token>' -Url 'https://YOUR_APP_ORIGIN'"
 ```
+
+Running the one-line install again on a machine that is already connected refreshes the install; it does not ask you to sign in twice.
 
 The installer adds `~/.usejunction/bin` (Windows: `%USERPROFILE%\.usejunction\bin`) to `PATH`. Open a new terminal before using `usejunction` commands.
 
@@ -249,6 +264,7 @@ After install, `usejunction` is on `PATH` in new terminals.
 
 | Command                          | Description                                             |
 | -------------------------------- | ------------------------------------------------------- |
+| `usejunction login`              | Sign in through the browser and connect this device     |
 | `usejunction enroll --token <t>` | Enroll device (runs setup by default)                   |
 | `usejunction setup`              | Enable Claude OTEL and send initial report              |
 | `usejunction doctor`             | Detect installed tools                                  |
