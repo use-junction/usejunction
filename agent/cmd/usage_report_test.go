@@ -153,8 +153,8 @@ func TestRenderUsageReport(t *testing.T) {
 
 	for _, want := range []string{
 		"AI coding usage · last 30 days · this machine",
-		"Date        Tool         Models",
-		"2026-11-13  Claude Code  opus-4-5",
+		"│ Date       │ Tool        │ Models",
+		"│ 2026-11-13 │ Claude Code │ opus-4-5",
 		"└ sonnet-4-5",
 		"$9.75",
 		"$77.05",
@@ -170,11 +170,11 @@ func TestRenderUsageReport(t *testing.T) {
 	}
 	var total string
 	for _, line := range strings.Split(text, "\n") {
-		if strings.HasPrefix(strings.TrimSpace(line), "Total") {
+		if strings.HasPrefix(strings.TrimSpace(line), "│ Total") {
 			total = line
 		}
 	}
-	if !strings.HasSuffix(total, "$77.05") {
+	if !strings.HasSuffix(total, "$77.05 │") {
 		t.Errorf("total line = %q", total)
 	}
 

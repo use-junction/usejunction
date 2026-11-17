@@ -105,6 +105,9 @@ Dates are `YYYYMMDD` or `YYYY-MM-DD`. Add `--help` to any command for the rest.
 - 📊 **Daily, Weekly and Monthly Reports**: Token usage and estimated cost by day, by week (Monday to Sunday) or by month
 - ⚡ **Today, Week and Month**: One word for the period you are in: `today`, `week`, `month`
 - ⏱️ **Recent Periods**: `--last N` on any daily, weekly or monthly report
+- 💰 **Cost by Tool and by Model**: Every report ends with where the money went, with each tool's and each model's share, without any extra flag
+- ➕ **Totals per Period**: A day, week or month that used more than one tool gets its own total line
+- 🔍 **Says What It Found**: Names the tools it read, and the ones with no usage in the period shown
 - 💬 **Session Report**: Claude Code cost per session, with the project it ran in
 - ⏰ **5-Hour Blocks Report**: Track Claude's 5-hour usage windows, with the time left, the spend per hour and where the active block is heading
 - 🚀 **Statusline Integration**: Session, today and block cost on one line in Claude Code's status bar
@@ -115,6 +118,8 @@ Dates are `YYYYMMDD` or `YYYY-MM-DD`. Add `--help` to any command for the rest.
 - 🔎 **One Source at a Time**: `--tool claude`, `--tool cursor`, and so on
 - 📄 **JSON Output**: Structured output with `--json`, for scripts
 - 🔄 **Cache Tokens Counted Once**: Uncached input, output and cache tokens are kept apart, so nothing is counted twice
+- 🎨 **Easy-to-Read Tables**: Bordered tables that fit your terminal: the Models column narrows first, and drops out on a narrow window
+- ⚠️ **Honest About Prices**: Models missing from the price table are named, not quietly guessed
 - 🔒 **Offline by Design**: The usage commands make no network requests and upload nothing. Prompt text is never read
 - 👥 **Team Dashboard When You Want It**: Install the agent and sign in to see charts, cost by repository and your whole team
 

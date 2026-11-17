@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -99,11 +100,7 @@ func runUsageReportFor(cmd *cobra.Command, period string, last int) error {
 		return err
 	}
 	if step != nil {
-		tools := map[string]bool{}
-		for _, row := range report.Rows {
-			tools[row.Tool] = true
-		}
-		step.Done(fmt.Sprintf("%d %s", len(tools), plural(len(tools), "tool", "tools")))
+		step.Done(foundToolsLine(report.toolNames()))
 	}
 
 	out := cmd.OutOrStdout()
@@ -115,6 +112,14 @@ func runUsageReportFor(cmd *cobra.Command, period string, last int) error {
 	renderUsageReport(out, report, cfg != nil)
 	writeUsageTip(out, cfg, len(report.Rows) > 0, terminal)
 	return nil
+}
+
+// foundToolsLine names the tools a report found, most expensive first.
+func foundToolsLine(names []string) string {
+	if len(names) == 0 {
+		return "nothing in this period"
+	}
+	return strings.Join(names, ", ")
 }
 
 // writeUsageTip ends a table with the line that points past the terminal.

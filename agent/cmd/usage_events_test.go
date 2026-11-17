@@ -164,9 +164,9 @@ func TestRenderBlockAndSessionReports(t *testing.T) {
 	text := out.String()
 	for _, want := range []string{
 		"Claude Code 5-hour blocks · last 7 days · this machine",
-		"2026-11-14 09:00  4h 10m",
-		"2026-11-16 14:00  active, 4h 00m left",
-		"Total             3 blocks",
+		"│ 2026-11-14 09:00 │ 4h 10m",
+		"│ 2026-11-16 14:00 │ active, 4h 00m left",
+		"│ Total            │ 3 blocks",
 		"Active block: $4.00 so far · $6.00/hr · about $28.00 by 19:00 at this pace",
 		"A block is 5 hours from the hour of its first message",
 		"Times are local.",
@@ -183,8 +183,8 @@ func TestRenderBlockAndSessionReports(t *testing.T) {
 	text = out.String()
 	for _, want := range []string{
 		"Claude Code sessions · last 30 days · this machine",
-		"2026-11-14 09:40  billing     opus-4-5, sonnet-4-5",
-		"Total             3 sessions",
+		"│ 2026-11-14 09:40 │ billing    │ opus-4-5, sonnet-4-5",
+		"│ Total            │ 3 sessions │",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("sessions table is missing %q:\n%s", want, text)

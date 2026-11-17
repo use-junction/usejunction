@@ -59,3 +59,16 @@ func TestRateForModelGPT6Family(t *testing.T) {
 		t.Fatalf("unlisted gpt-6 variant should use default rates: %+v", got)
 	}
 }
+
+func TestHasListPriceTellsTableEntriesFromTheDefaultRate(t *testing.T) {
+	for _, model := range []string{"claude-opus-4-5-20251101", "gpt-5", "gemini-3.1-pro", "auto"} {
+		if !HasListPrice(model) {
+			t.Errorf("%s is in the price table", model)
+		}
+	}
+	for _, model := range []string{"", "default", "plan", "big-pickle", "north-mini-code-free"} {
+		if HasListPrice(model) {
+			t.Errorf("%q has no list price and falls back to the default rate", model)
+		}
+	}
+}

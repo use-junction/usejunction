@@ -83,6 +83,22 @@ func rateForModel(model string) ModelRate {
 	return defaultRates
 }
 
+// HasListPrice reports whether model is in the price table. A model that is
+// not falls back to defaultRates, so its cost is a guess, and the terminal
+// tables say so.
+func HasListPrice(model string) bool {
+	m := strings.ToLower(strings.TrimSpace(model))
+	if m == "" || m == "default" || m == "plan" {
+		return false
+	}
+	for _, entry := range modelRates {
+		if strings.Contains(m, entry.match) {
+			return true
+		}
+	}
+	return false
+}
+
 // BillableInputTokens returns uncached input for OpenAI-style semantics.
 func BillableInputTokens(tool string, input, cacheRead int) int {
 	if tool == "claude" || strings.Contains(strings.ToLower(tool), "claude") {
