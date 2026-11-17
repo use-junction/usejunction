@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { DM_Sans, Figtree, JetBrains_Mono } from "next/font/google";
 import { AppProviders } from "@/components/app-providers";
+import { WebAnalytics } from "@/components/web-analytics";
 import { siteConfig } from "@/lib/public/config";
 import { siteOgImage } from "@/lib/public/seo-metadata";
 import { siteIcons } from "@/lib/public/site-icons";
@@ -74,6 +75,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`${dmSans.variable} ${figtree.variable} ${jetbrainsMono.variable}`}>
         <AppProviders><Suspense fallback={null}>{children}</Suspense></AppProviders>
+        {/* Vercel Web Analytics only exists on Vercel; self-hosted installs skip it. */}
+        {process.env.VERCEL === "1" ? <WebAnalytics /> : null}
       </body>
     </html>
   );

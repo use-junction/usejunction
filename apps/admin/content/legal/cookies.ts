@@ -27,6 +27,7 @@ export const cookiesPage: ContentPage = {
       body: [
         "uj_consent: stores your analytics opt-out choice for up to 12 months.",
         "PostHog cookies (ph_*) are set unless you turn analytics off. They measure product usage. Host: us.i.posthog.com on the US deployment, eu.i.posthog.com on the EU deployment.",
+        "Vercel Web Analytics counts page views on usejunction.dev without cookies. It records the page, never the query string, and invite tokens and ids are removed from the address first. It follows the same analytics switch.",
         "Turning analytics off does not affect sign-in or the observability product.",
       ],
     },
