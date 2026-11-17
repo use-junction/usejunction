@@ -441,11 +441,15 @@ export const compareCcusage: ContentPage = {
     { feature: "Usage uploaded by the terminal table", usejunction: "Nothing", other: "Nothing" },
     {
       feature: "Tools read from local logs",
-      usejunction: "Claude Code, Codex, Cursor, OpenCode, Antigravity, Cline, Roo Code",
+      usejunction: "Claude Code, Codex, Cursor, Copilot Chat, OpenCode, Antigravity, Cline, Roo Code, Continue",
       other: "Claude Code, Codex, OpenCode, Gemini CLI, Copilot CLI, Amp, Cline and more (19 in v20)",
     },
     { feature: "Cursor", usejunction: "Yes", other: "Not listed in v20" },
-    { feature: "Reports", usejunction: "Daily, monthly, session, 5-hour blocks, status line", other: "The same, plus weekly" },
+    {
+      feature: "Reports",
+      usejunction: "Daily, weekly, monthly, session, 5-hour blocks, status line, and today, week and month in one word",
+      other: "Daily, weekly, monthly, session, 5-hour blocks, status line",
+    },
     { feature: "Price list", usejunction: "UseJunction's own table, shared with the dashboard", other: "LiteLLM's list" },
     { feature: "Charts and history across machines", usejunction: "Yes, after sign-in", other: "No" },
     { feature: "Cost by repository and pull request", usejunction: "Yes, after sign-in", other: "No" },
@@ -457,7 +461,7 @@ export const compareCcusage: ContentPage = {
       body: [
         "Both read the usage numbers your AI coding tools already write to disk. Neither needs an account for the terminal table, and neither uploads your usage.",
         "Both print estimated cost at API list prices. That is not your bill: on a subscription you pay what the plan costs, whatever the estimate says.",
-        "Both have daily, monthly, session and 5-hour block reports, a status line for Claude Code, date filters and JSON output.",
+        "Both have daily, weekly, monthly, session and 5-hour block reports, a status line for Claude Code, date filters, --last and JSON output.",
       ],
     },
     {
@@ -473,7 +477,7 @@ export const compareCcusage: ContentPage = {
       body: [
         "You want a personal command-line tool and nothing else.",
         "You use a command-line agent UseJunction does not read yet, such as Gemini CLI, Amp or Goose.",
-        "You want a weekly report.",
+        "You want ccusage's extra options, such as --timezone, --instances or --compact.",
       ],
     },
     {
@@ -490,7 +494,7 @@ export const compareCcusage: ContentPage = {
     {
       question: "Is UseJunction a drop-in replacement for ccusage?",
       answer:
-        "For the common commands, yes: npx usejunction, monthly, session, blocks and statusline exist, and --since, --until and --json work the same way. It is not a copy of every ccusage option, it has no weekly report, and its JSON has its own field names.",
+        "For the common commands, yes: npx usejunction, daily, weekly, monthly, session, blocks and statusline exist, and --since, --until, --last and --json work the same way. It is not a copy of every ccusage option (there is no --timezone, --instances or --compact), and its JSON has its own field names.",
     },
     {
       question: "Does npx usejunction send my usage anywhere?",

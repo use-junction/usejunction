@@ -149,3 +149,17 @@ test("the strip sits below the first story section, directly on the yellow band"
   // The comparison page tells people the same command the homepage does.
   expect(compareCcusage.compareRows?.find((entry) => entry.feature === "How you run it")?.usejunction).toBe(HOME_TERMINAL_COMMAND);
 });
+
+test("the ccusage comparison keeps up with the agent: weekly, --last and today/week/month", () => {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const commands = readFileSync(path.join(here, "..", "..", "..", "..", "agent", "cmd", "usage_cmd.go"), "utf8");
+  for (const command of ["weekly", "today", "week", "month"]) {
+    expect(commands).toContain(`Use:   "${command}"`);
+  }
+
+  const page = JSON.stringify(compareCcusage);
+  // These were true before the agent had a weekly report and --last.
+  expect(page).not.toMatch(/no weekly report|You want a weekly report|plus weekly/i);
+  expect(compareCcusage.compareRows?.find((entry) => entry.feature === "Reports")?.usejunction).toMatch(/weekly.*today, week and month/);
+  expect(page).toContain("--last");
+});
