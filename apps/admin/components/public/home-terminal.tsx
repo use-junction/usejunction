@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { Check, SquareTerminal } from "lucide-react";
+import { Check, Clipboard, SquareTerminal } from "lucide-react";
 import { DecorativeToolIcon } from "@/components/public/tool-logos-strip";
 import { HOME_TERMINAL_COMMAND } from "@/lib/public/home-cta";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 /** How long each readout stays up. */
 const READOUT_MS = 3600;
 
-/** One developer's last 30 days of spend, in cents a day, weekends quiet. They add up to the total shown. */
+/** One developer's last 30 days of spend, in cents a day, weekends quiet. */
 const DAYS = [
   1420, 980, 0, 210, 1845, 2230, 1275, 2760, 1120, 0, 0, 1690, 3140, 1985, 860, 1335, 425, 0, 2170, 1715, 2490, 1550,
   1040, 0, 320, 1960, 1231, 4659, 2134, 716,
@@ -18,18 +18,6 @@ const TOTAL_CENTS = DAYS.reduce((sum, cents) => sum + cents, 0);
 const NEXT_MONTH_CENTS = 43000;
 
 const PLANS_DOLLARS = 120;
-
-/** The line for "Total spent": spend adding up over the 30 days. Drawn in a 100 x 40 box that stretches to the space it gets. */
-const LINE_BOX = { width: 100, height: 40 };
-const lineY = (cents: number) => LINE_BOX.height - 2 - (cents / TOTAL_CENTS) * (LINE_BOX.height - 6);
-const TOTAL_LINE = (() => {
-  let spent = 0;
-  return DAYS.map((cents, index) => {
-    spent += cents;
-    const x = (index / (DAYS.length - 1)) * LINE_BOX.width;
-    return `${index ? "L" : "M"}${x.toFixed(1)} ${lineY(spent).toFixed(1)}`;
-  }).join(" ");
-})();
 
 /**
  * The bars for "Estimated next month": the 30 days in two-day bars, then next month's in the same
@@ -68,16 +56,6 @@ const after = (index: number) => ({ "--i": index }) as CSSProperties;
 
 const READOUTS: { label: string; graph: string; describes: string; value: (animate: boolean) => ReactNode }[] = [
   {
-    label: "Total spent",
-    graph: "total",
-    describes: "A line of spend adding up over the last 30 days",
-    value: (animate) => (
-      <span className={NUMBER}>
-        <Amount cents={TOTAL_CENTS} animate={animate} />
-      </span>
-    ),
-  },
-  {
     label: "Estimated next month",
     graph: "forecast",
     describes: "Bars of spend over the last 30 days, then paler bars for next month",
@@ -113,35 +91,6 @@ const READOUTS: { label: string; graph: string; describes: string; value: (anima
   },
 ];
 
-/** Total spent: one line rising to the total, uncovered from the left, with a dot where it ends. */
-function TotalGraph() {
-  return (
-    <div className="absolute inset-y-0 left-0 right-1.5">
-      <svg
-        viewBox={`0 0 ${LINE_BOX.width} ${LINE_BOX.height}`}
-        preserveAspectRatio="none"
-        className="home-term-draw block size-full"
-        aria-hidden
-      >
-        <path d={`${TOTAL_LINE} L${LINE_BOX.width} ${LINE_BOX.height} L0 ${LINE_BOX.height} Z`} className="fill-primary/15" />
-        <path
-          d={TOTAL_LINE}
-          className="fill-none stroke-primary"
-          strokeWidth="2"
-          strokeLinejoin="round"
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
-      <span
-        className="home-term-dot absolute left-full size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary"
-        style={{ top: `${(lineY(TOTAL_CENTS) / LINE_BOX.height) * 100}%` }}
-      >
-        <span className="absolute inset-0 animate-ping rounded-full bg-primary/60" />
-      </span>
-    </div>
-  );
-}
-
 /** Estimated next month: this month's bars, then next month's in a paler shade. */
 function ForecastGraph() {
   return (
@@ -158,25 +107,29 @@ function ForecastGraph() {
   );
 }
 
-/** We recommend: the same work at API prices, and on the two plans. */
+/** We recommend: the same work at API prices, and on the two plans. The short bar's label sits beside it, where it always has room. */
 function PlansGraph() {
-  const row = "home-term-grow flex h-[17px] items-center whitespace-nowrap px-1.5 text-[0.6875rem] font-semibold leading-none";
+  const row = "flex h-[17px] items-center whitespace-nowrap text-[0.6875rem] font-semibold leading-none";
   return (
     <div className="absolute inset-0 flex flex-col justify-between">
-      <span className={cn(row, "bg-[#deded6]")}>${NEXT_MONTH_CENTS / 100} at API prices</span>
-      <span
-        className={cn(row, "bg-brand-yellow")}
-        style={{ ...after(3), width: `${(PLANS_DOLLARS / (NEXT_MONTH_CENTS / 100)) * 100}%` }}
-      >
-        ${PLANS_DOLLARS} on plans
+      <span className={cn(row, "home-term-grow bg-[#deded6] px-1.5")}>${NEXT_MONTH_CENTS / 100} at API prices</span>
+      <span className={cn(row, "gap-1.5")}>
+        <span
+          className="home-term-grow h-full shrink-0 bg-brand-yellow"
+          style={{ ...after(3), width: `${(PLANS_DOLLARS / (NEXT_MONTH_CENTS / 100)) * 100}%` }}
+        />
+        <span className="home-term-rise" style={after(6)}>
+          ${PLANS_DOLLARS} on plans
+        </span>
       </span>
     </div>
   );
 }
 
 /**
- * A one-line strip, the weight of the "Works with" strip: the free terminal
- * command, and beside it one short readout of what the command tells you, with
+ * A one-line strip, the weight of the "Works with" strip, sitting directly on
+ * the yellow band below it: the free terminal command with a copy button, and
+ * beside it one short readout of what the command tells you, with
  * its own small graph. The command stays still. Once the strip is on screen the
  * readouts take turns, each graph drawing itself, and hold while somebody
  * points at the strip.
@@ -233,7 +186,7 @@ export function HomeTerminal() {
       onMouseLeave={() => setHeld(false)}
       onFocus={() => setHeld(true)}
       onBlur={() => setHeld(false)}
-      className="mt-16 border-y border-border bg-white sm:mt-20 lg:mt-28"
+      className="mt-16 border-t border-border bg-white sm:mt-20 lg:mt-28"
     >
       <div className="mx-auto flex w-full max-w-[75rem] flex-wrap items-center gap-x-9 gap-y-4 px-4 py-5 text-[0.9375rem] sm:px-6">
         <div>
@@ -244,32 +197,22 @@ export function HomeTerminal() {
           <p className="mt-0.5 pl-8 text-[0.8125rem] text-muted-foreground">No account. Nothing leaves your machine.</p>
         </div>
 
-        {/* The command is its own copy button: click it and it is on the clipboard. */}
-        <button
-          type="button"
-          onClick={copy}
-          title="Click to copy"
-          aria-label={`Copy ${HOME_TERMINAL_COMMAND}`}
-          className="grid w-full border border-border bg-muted px-4 py-2 text-left font-mono text-[0.875rem] transition-colors hover:border-foreground sm:w-auto"
-        >
-          <code className={cn("col-start-1 row-start-1 flex items-center gap-2.5 whitespace-nowrap", copied && "invisible")}>
+        <div className="flex w-full items-stretch border border-border bg-muted font-mono text-[0.875rem] sm:w-auto">
+          <code className="flex min-w-0 flex-1 items-center gap-2.5 whitespace-nowrap px-4 py-2">
             <span aria-hidden className="select-none text-muted-foreground">
               $
             </span>
             {HOME_TERMINAL_COMMAND}
           </code>
-          <span
-            aria-live="polite"
-            className={cn("col-start-1 row-start-1 flex items-center gap-2 font-sans font-semibold", !copied && "invisible")}
+          <button
+            type="button"
+            onClick={copy}
+            className="flex shrink-0 items-center gap-1.5 border-l border-border px-3 font-sans text-[0.8125rem] font-semibold transition-colors hover:bg-white"
           >
-            {copied ? (
-              <>
-                <Check className="size-4 text-primary" aria-hidden />
-                Copied
-              </>
-            ) : null}
-          </span>
-        </button>
+            {copied ? <Check className="size-3.5 text-primary" aria-hidden /> : <Clipboard className="size-3.5" aria-hidden />}
+            <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
+          </button>
+        </div>
 
         {/* The graph takes whatever room the row has left, so the strip runs the full width of the page column. */}
         <div className="flex w-full min-w-0 items-center gap-x-6 lg:w-auto lg:flex-1 lg:gap-x-9">
@@ -281,9 +224,8 @@ export function HomeTerminal() {
           >
             {/* Keyed so each graph draws itself again when its turn comes. */}
             <div key={`${onScreen}-${turn}`} className="absolute inset-0">
-              {readout === 0 ? <TotalGraph /> : null}
-              {readout === 1 ? <ForecastGraph /> : null}
-              {readout === 2 ? <PlansGraph /> : null}
+              {readout === 0 ? <ForecastGraph /> : null}
+              {readout === 1 ? <PlansGraph /> : null}
             </div>
           </div>
 

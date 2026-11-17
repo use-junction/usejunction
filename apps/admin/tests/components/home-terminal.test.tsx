@@ -38,7 +38,7 @@ function shown(section: HTMLElement) {
   return readouts[0]!.textContent;
 }
 
-test("the homepage strip offers the terminal table: one command to copy, no account, nothing uploaded", async () => {
+test("the homepage strip offers the terminal table: one command with a copy button, no account, nothing uploaded", async () => {
   const writeText = vi.fn(async () => undefined);
   Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
 
@@ -50,26 +50,22 @@ test("the homepage strip offers the terminal table: one command to copy, no acco
   expect(within(section).getByText(HOME_TERMINAL_COMMAND)).toBeTruthy();
   expect(HOME_TERMINAL_COMMAND).toBe("npx usejunction");
 
-  // The command is the only button: clicking it copies it, with no separate copy button beside it.
-  const command = within(section).getByRole("button");
-  expect(command.getAttribute("aria-label")).toBe("Copy npx usejunction");
-  fireEvent.click(command);
+  fireEvent.click(within(section).getByRole("button", { name: "Copy" }));
   await waitFor(() => expect(writeText).toHaveBeenCalledWith("npx usejunction"));
-  expect(await within(command).findByText("Copied")).toBeTruthy();
+  expect(await within(section).findByRole("button", { name: "Copied" })).toBeTruthy();
 });
 
-test("the strip stays one line: a small graph and one readout, with no table, tabs, link or example label", () => {
+test("the strip stays one line: no table, tabs, link, example label or total", () => {
   render(<HomeTerminal />);
   const section = screen.getByRole("region", { name: HEADING });
 
   for (const role of ["figure", "table", "tablist", "link"]) {
     expect(within(section).queryByRole(role)).toBeNull();
   }
-  expect(section.textContent).not.toMatch(/ccusage|Example/i);
-  expect(within(section).getByRole("img", { name: "A line of spend adding up over the last 30 days" })).toBeTruthy();
+  expect(section.textContent).not.toMatch(/ccusage|Example|Total spent/i);
 });
 
-test("once on screen the readouts take turns, each with its own graph: total spent, next month, the plans we recommend", () => {
+test("once on screen the readouts take turns, each with its own graph: next month, then the plans we recommend", () => {
   vi.useFakeTimers();
   const scrollIntoView = stubScrollIntoView();
 
@@ -79,22 +75,14 @@ test("once on screen the readouts take turns, each with its own graph: total spe
 
   // Off screen it waits on the first readout, drawn finished.
   act(() => void vi.advanceTimersByTime(10_000));
-  expect(shown(section)).toBe("Total spent$412.60");
+  expect(shown(section)).toBe("Estimated next month$430");
 
   scrollIntoView();
   act(() => void vi.advanceTimersByTime(300));
-  const counting = Number(shown(section)!.replace("Total spent$", ""));
+  const counting = Number(shown(section)!.replace("Estimated next month$", ""));
   expect(counting).toBeGreaterThan(0);
-  expect(counting).toBeLessThan(412.6);
+  expect(counting).toBeLessThan(430);
   act(() => void vi.advanceTimersByTime(900));
-  expect(shown(section)).toBe("Total spent$412.60");
-  expect(graph.getAttribute("data-graph")).toBe("total");
-  expect(graph.querySelector("svg path")).toBeTruthy();
-
-  // 1.2s of the first turn are gone; each swap is followed by a second for the number to count up.
-  act(() => void vi.advanceTimersByTime(3600 - 1200));
-  expect(shown(section)).toMatch(/^Estimated next month/);
-  act(() => void vi.advanceTimersByTime(1200));
   expect(shown(section)).toBe("Estimated next month$430");
   // Next month gets bars: this month's, then as many paler ones for the month ahead.
   expect(graph.getAttribute("data-graph")).toBe("forecast");
@@ -109,8 +97,8 @@ test("once on screen the readouts take turns, each with its own graph: total spe
 
   act(() => void vi.advanceTimersByTime(3600));
   act(() => void vi.advanceTimersByTime(1200));
-  expect(shown(section)).toBe("Total spent$412.60");
-  expect(graph.getAttribute("data-graph")).toBe("total");
+  expect(shown(section)).toBe("Estimated next month$430");
+  expect(graph.getAttribute("data-graph")).toBe("forecast");
 });
 
 test("pointing at the strip holds the readout, and it carries on afterwards", () => {
@@ -123,12 +111,11 @@ test("pointing at the strip holds the readout, and it carries on afterwards", ()
 
   fireEvent.mouseEnter(section);
   act(() => void vi.advanceTimersByTime(10_000));
-  expect(shown(section)).toBe("Total spent$412.60");
+  expect(shown(section)).toBe("Estimated next month$430");
 
   fireEvent.mouseLeave(section);
   act(() => void vi.advanceTimersByTime(3600));
-  act(() => void vi.advanceTimersByTime(1200));
-  expect(shown(section)).toBe("Estimated next month$430");
+  expect(shown(section)).toBe("We recommendClaude Max $100+ChatGPT Plus $20");
 });
 
 test("with reduced motion the numbers do not count up", () => {
@@ -140,10 +127,10 @@ test("with reduced motion the numbers do not count up", () => {
   const section = screen.getByRole("region", { name: HEADING });
   scrollIntoView();
   act(() => void vi.advanceTimersByTime(100));
-  expect(shown(section)).toBe("Total spent$412.60");
+  expect(shown(section)).toBe("Estimated next month$430");
 });
 
-test("the strip sits below the first story section, not under the hero", () => {
+test("the strip sits below the first story section, directly on the yellow band", () => {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const home = readFileSync(path.join(here, "..", "..", "components", "public", "use-junction-home-content.tsx"), "utf8");
   const weeks = home.indexOf("<HomeWeeksChapter />");
@@ -152,6 +139,12 @@ test("the strip sits below the first story section, not under the hero", () => {
   expect(weeks).toBeGreaterThan(0);
   expect(terminal).toBeGreaterThan(weeks);
   expect(terminal).toBeLessThan(paidTwice);
+
+  // The strip sits directly on the yellow band: the band has no gap of its own above it.
+  const story = readFileSync(path.join(here, "..", "..", "components", "public", "home-story.tsx"), "utf8");
+  const band = story.match(/<section aria-labelledby="home-paid-twice-heading" className="([^"]*)"/);
+  expect(band?.[1]).toContain("bg-brand-yellow");
+  expect(band?.[1]).not.toMatch(/\bmt-/);
 
   // The comparison page tells people the same command the homepage does.
   expect(compareCcusage.compareRows?.find((entry) => entry.feature === "How you run it")?.usejunction).toBe(HOME_TERMINAL_COMMAND);
