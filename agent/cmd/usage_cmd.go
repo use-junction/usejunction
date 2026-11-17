@@ -4,10 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/usejunction/agent/internal/config"
+	"github.com/usejunction/agent/internal/providers"
+	"github.com/usejunction/agent/internal/scan"
 	"github.com/usejunction/agent/internal/types"
 	"github.com/usejunction/agent/internal/ui"
 )
@@ -16,18 +20,23 @@ import (
 const usageReportScanTimeout = 10 * time.Minute
 
 var (
-	usageSince     string
-	usageUntil     string
-	usageTool      string
-	usageOrder     string
-	usageJSON      bool
-	usageBreakdown bool
+	usageSince      string
+	usageUntil      string
+	usageTool       string
+	usageOrder      string
+	usageJSON       bool
+	usageBreakdown  bool
+	usageActiveOnly bool
 
 	// Swapped out in tests so a command can run without reading real logs.
 	scanUsageForReport = func(ctx context.Context) ([]types.DailyUsage, bool) {
 		return scanLocalUsage(ctx, usageReportScanTimeout)
 	}
 	usageReportNow = time.Now
+	// Claude Code events from session files changed since the given time.
+	scanClaudeEventsForReport = func(modifiedSince time.Time) []scan.UsageEvent {
+		return scan.ScanClaudeEvents(providers.ClaudeProjectRoots(), modifiedSince)
+	}
 )
 
 func addUsageReportFlags(cmd *cobra.Command) {
@@ -83,23 +92,122 @@ func runUsageReport(cmd *cobra.Command, period string) error {
 
 	out := cmd.OutOrStdout()
 	if jsonOut {
-		enc := json.NewEncoder(out)
-		enc.SetIndent("", "  ")
-		return enc.Encode(usageReportJSON(report))
+		return writeUsageJSON(out, usageReportJSON(report))
 	}
 
 	cfg := alreadyConnected()
 	renderUsageReport(out, report, cfg != nil)
+	writeUsageTip(out, cfg, len(report.Rows) > 0, terminal)
+	return nil
+}
+
+// writeUsageTip ends a table with the line that points past the terminal.
+func writeUsageTip(out io.Writer, cfg *config.Config, hasRows, terminal bool) {
+	if !hasRows {
+		return
+	}
 	dashboardURL := ""
 	if cfg != nil {
 		dashboardURL = cfg.ControlPlaneURL
 	}
-	if len(report.Rows) > 0 {
-		if tip := usageTip(cfg != nil, dashboardURL, terminal, jsonOut, os.Getenv("USEJUNCTION_NO_TIPS")); tip != "" {
-			fmt.Fprintf(out, "\n %s\n", ui.Muted(tip))
-		}
-		fmt.Fprintln(out)
+	if tip := usageTip(cfg != nil, dashboardURL, terminal, false, os.Getenv("USEJUNCTION_NO_TIPS")); tip != "" {
+		fmt.Fprintf(out, "\n %s\n", ui.Muted(tip))
 	}
+	fmt.Fprintln(out)
+}
+
+func writeUsageJSON(out io.Writer, value any) error {
+	enc := json.NewEncoder(out)
+	enc.SetIndent("", "  ")
+	return enc.Encode(value)
+}
+
+// runSessionReport prints one row per Claude Code session.
+func runSessionReport(cmd *cobra.Command) error {
+	jsonOut := usageJSON || format == "json"
+	now := usageReportNow()
+	window, err := resolveEventWindow(now, usageSince, usageUntil, usageSessionDefaultDays)
+	if err != nil {
+		return err
+	}
+	descending, err := checkUsageOrder(usageOrder)
+	if err != nil {
+		return err
+	}
+	terminal := ui.IsTerminal()
+	var step *ui.Step
+	if terminal && !jsonOut {
+		step = ui.StepStart("Reading Claude Code sessions")
+	}
+	report := buildSessionReport(scanClaudeEventsForReport(window.From), window, usageBreakdown, descending)
+	if step != nil {
+		step.Done(fmt.Sprintf("%d %s", len(report.Rows), plural(len(report.Rows), "session", "sessions")))
+	}
+	out := cmd.OutOrStdout()
+	if jsonOut {
+		return writeUsageJSON(out, sessionReportJSON(report))
+	}
+	cfg := alreadyConnected()
+	renderSessionReport(out, report, cfg != nil)
+	writeUsageTip(out, cfg, len(report.Rows) > 0, terminal)
+	return nil
+}
+
+// runBlockReport prints Claude Code usage in 5-hour blocks.
+func runBlockReport(cmd *cobra.Command) error {
+	jsonOut := usageJSON || format == "json"
+	now := usageReportNow()
+	window, err := resolveEventWindow(now, usageSince, usageUntil, usageBlockDefaultDays)
+	if err != nil {
+		return err
+	}
+	descending, err := checkUsageOrder(usageOrder)
+	if err != nil {
+		return err
+	}
+	terminal := ui.IsTerminal()
+	var step *ui.Step
+	if terminal && !jsonOut {
+		step = ui.StepStart("Reading Claude Code usage")
+	}
+	// Where a block starts depends on the activity before it.
+	events := scanClaudeEventsForReport(window.From.Add(-usageBlockLeadIn))
+	report := buildBlockReport(events, now, window, usageActiveOnly, descending)
+	if step != nil {
+		step.Done(fmt.Sprintf("%d %s", len(report.Blocks), plural(len(report.Blocks), "block", "blocks")))
+	}
+	out := cmd.OutOrStdout()
+	if jsonOut {
+		return writeUsageJSON(out, blockReportJSON(report))
+	}
+	cfg := alreadyConnected()
+	renderBlockReport(out, report, now, cfg != nil)
+	writeUsageTip(out, cfg, len(report.Blocks) > 0, terminal)
+	return nil
+}
+
+// readStatuslineInput takes the JSON Claude Code pipes to a status line
+// command. Run by hand there is nothing on stdin, and that is fine.
+func readStatuslineInput(in io.Reader) statuslineInput {
+	var input statuslineInput
+	if file, ok := in.(*os.File); ok {
+		if info, err := file.Stat(); err != nil || info.Mode()&os.ModeCharDevice != 0 {
+			return input
+		}
+	}
+	raw, err := io.ReadAll(io.LimitReader(in, 1<<20))
+	if err != nil {
+		return input
+	}
+	_ = json.Unmarshal(raw, &input)
+	return input
+}
+
+func runStatusline(cmd *cobra.Command) error {
+	now := usageReportNow()
+	input := readStatuslineInput(cmd.InOrStdin())
+	events := scanClaudeEventsForReport(now.Add(-usageBlockLeadIn))
+	fmt.Fprintln(cmd.OutOrStdout(), buildStatusline(events, now, input))
 	return nil
 }
 
@@ -129,7 +237,62 @@ partial; the table says which days each month covers.`,
 	},
 }
 
+var sessionCmd = &cobra.Command{
+	Use:   "session",
+	Short: "Show Claude Code usage and estimated cost per session",
+	Long: `session prints one row per Claude Code session active in the last 30 days:
+the project it ran in, when it was last active, and what it cost.
+
+It reads local logs only. No account is needed and nothing is uploaded.`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error { return runSessionReport(cmd) },
+}
+
+var blocksCmd = &cobra.Command{
+	Use:   "blocks",
+	Short: "Show Claude Code usage in 5-hour blocks, with the pace of the active one",
+	Long: `blocks groups the last 7 days of Claude Code usage into 5-hour blocks, the
+window Claude's usage limits run on. For the block in progress it shows the
+time left, the spend per hour so far, and where that pace ends up.
+
+It reads local logs only. No account is needed and nothing is uploaded.`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error { return runBlockReport(cmd) },
+}
+
+var statuslineCmd = &cobra.Command{
+	Use:   "statusline",
+	Short: "Print one line of Claude Code cost for its status line",
+	Long: `statusline prints what this session, today and the current 5-hour block
+have cost, on one line. Point Claude Code's status line at it in
+~/.claude/settings.json:
+
+  "statusLine": { "type": "command", "command": "usejunction statusline" }
+
+It reads local logs only and uploads nothing.`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error { return runStatusline(cmd) },
+}
+
 func init() {
+	sessionFlags := sessionCmd.Flags()
+	sessionFlags.StringVar(&usageSince, "since", "", "First day to show (YYYYMMDD or YYYY-MM-DD)")
+	sessionFlags.StringVar(&usageUntil, "until", "", "Last day to show (YYYYMMDD or YYYY-MM-DD)")
+	sessionFlags.StringVar(&usageOrder, "order", "asc", "Oldest first (asc) or newest first (desc)")
+	sessionFlags.BoolVar(&usageBreakdown, "breakdown", false, "Add a line per model under each session")
+	sessionFlags.BoolVar(&usageJSON, "json", false, "Print JSON instead of a table")
+
+	blockFlags := blocksCmd.Flags()
+	blockFlags.StringVar(&usageSince, "since", "", "First day to show (YYYYMMDD or YYYY-MM-DD)")
+	blockFlags.StringVar(&usageUntil, "until", "", "Last day to show (YYYYMMDD or YYYY-MM-DD)")
+	blockFlags.StringVar(&usageOrder, "order", "asc", "Oldest first (asc) or newest first (desc)")
+	blockFlags.BoolVar(&usageActiveOnly, "active", false, "Show only the block in progress")
+	blockFlags.BoolVar(&usageJSON, "json", false, "Print JSON instead of a table")
+
+	rootCmd.AddCommand(sessionCmd)
+	rootCmd.AddCommand(blocksCmd)
+	rootCmd.AddCommand(statuslineCmd)
+
 	// With no command, show the daily table rather than the help text.
 	rootCmd.RunE = func(cmd *cobra.Command, args []string) error {
 		return runUsageReport(cmd, usagePeriodDaily)

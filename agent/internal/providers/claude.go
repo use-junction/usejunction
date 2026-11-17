@@ -65,11 +65,15 @@ func (p *ClaudeProvider) ScanLocalUsage(ctx context.Context, refresh bool) ([]ty
 	// Desktop-launched sessions name their login; everything else falls back
 	// to the active one.
 	scan.SetSessionAccounts(p.ID(), probe.ClaudeSessionAccountKeys())
+	return scan.ScanClaude(ClaudeProjectRoots(), refresh)
+}
+
+// ClaudeProjectRoots lists the folders Claude Code may keep session logs in.
+func ClaudeProjectRoots() []string {
 	home, _ := os.UserHomeDir()
-	roots := []string{
+	return []string{
 		filepath.Join(claudeConfigDir(), "projects"),
 		filepath.Join(home, ".claude", "projects"),
 		filepath.Join(home, ".config", "claude", "projects"),
 	}
-	return scan.ScanClaude(roots, refresh)
 }

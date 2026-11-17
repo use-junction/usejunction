@@ -255,6 +255,9 @@ After install, `usejunction` is on `PATH` in new terminals.
 | `usejunction status`             | Show enrollment state                                   |
 | `usejunction`                    | Daily usage table for the last 30 days; no account      |
 | `usejunction monthly`            | The same by month; add `--breakdown` for model lines    |
+| `usejunction session`            | Claude Code cost per session, with its project          |
+| `usejunction blocks`             | Claude Code in 5-hour blocks; `--active` for the pace   |
+| `usejunction statusline`         | One line of cost for Claude Code's status line          |
 | `usejunction cost --tool all`    | Local usage scan (JSONL / sqlite / extension task JSON) |
 | `usejunction update --check`     | Check the active release without installing             |
 | `usejunction update`             | Download, verify, and install an available update       |
@@ -263,6 +266,12 @@ After install, `usejunction` is on `PATH` in new terminals.
 | `usejunction uninstall`          | Remove agent                                            |
 
 `usejunction`, `usejunction daily` and `usejunction monthly` read local logs only and upload nothing, connected or not. They take `--since` and `--until` (`YYYYMMDD` or `YYYY-MM-DD`), `--tool`, `--order`, `--breakdown` and `--json`. Days are UTC and only the last 60 days are read. In a terminal the table ends with one line pointing to sign-in; `USEJUNCTION_NO_TIPS=1` removes it.
+
+`session`, `blocks` and `statusline` cover Claude Code only and show local time. They also read local logs only and upload nothing. To show cost under the Claude Code prompt, add this to `~/.claude/settings.json`:
+
+```json
+"statusLine": { "type": "command", "command": "usejunction statusline" }
+```
 
 Existing `0.1.0` installations need one updater bootstrap after the first release is promoted:
 
