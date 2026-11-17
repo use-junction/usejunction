@@ -226,6 +226,29 @@ curl -fsSL https://usejunction.dev/install.sh | sh -s -- --upgrade --url https:/
 
 Subsequent OTAs then verify signed manifests normally.
 
+### npm and Homebrew
+
+Two more ways to get the agent point at the same release binaries. Neither installs a background service or signs anyone in; they exist so people can run the usage tables (`usejunction`, see `docs/usage-numbers.md`) without an account.
+
+- **npm**: `npx usejunction` runs `npm/usejunction/bin/usejunction.js`. It downloads the release binary for the platform, checks it against the `checksums.txt` that was copied into the package when it was published (not one fetched next to the binary), keeps it in the user's cache folder, and checks the cached copy again on every run. The package version is the agent version, and it is published with npm provenance.
+- **Homebrew**: `brew install use-junction/tap/usejunction` installs the release binary from a formula in the `use-junction/homebrew-tap` repository.
+
+Both are part of the release cycle. When **Agent release control** promotes a release, its `distribute` job calls **Agent release to npm and Homebrew** (`agent-release-distribute.yml`) with the same version, after the promotion has succeeded. Pre-releases (`1.2.3-beta.1`) are not published. The npm half skips a version npm already has, so the workflow can be run again by hand to retry. It runs `scripts/publish-npm-wrapper.sh` and `scripts/build-homebrew-formula.sh`; both stop if the release is missing a platform. To do it by hand:
+
+```bash
+scripts/publish-npm-wrapper.sh 0.5.0 --dry-run   # then without --dry-run
+scripts/build-homebrew-formula.sh 0.5.0 > Formula/usejunction.rb   # in a checkout of the tap
+```
+
+Secrets:
+
+1. `NPM_TOKEN`: an npm token that can publish `usejunction`. Set on 2026-11-17.
+2. `HOMEBREW_TAP_TOKEN`: not set yet. Create the public repository `use-junction/homebrew-tap` and add a token that can push to it.
+
+The workflow skips whichever half has no secret.
+
+Workflow inputs reach scripts through `env`, never pasted into a `run:` block, so a crafted version string cannot run as shell.
+
 ## Control plane API surface
 
 The release system is backed by these routes:
@@ -389,7 +412,7 @@ Local safety rules:
 
 `install.sh` and `install.ps1` support two main paths:
 
-- enrollment with `--token`
+- enrollment, either with `--token` or, with no token, by signing in through the browser (`usejunction login`)
 - upgrade-only bootstrap with `--upgrade`
 
 PowerShell uses the equivalent `-Token`, `-Url`, and `-Upgrade` parameters. It installs `usejunction.exe` for the current user and registers the `UseJunction Agent` logon task without elevation.

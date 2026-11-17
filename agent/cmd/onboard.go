@@ -25,6 +25,7 @@ var (
 	onboardComplete     bool
 	onboardAcceptNotice bool
 	onboardAccounts     string
+	onboardNoBrowser    bool
 )
 
 var onboardCmd = &cobra.Command{
@@ -36,6 +37,9 @@ var onboardCmd = &cobra.Command{
   3. Upload initial usage and scan for AI coding tools
   4. Turn on Claude Code metrics export, if Claude Code is installed
   5. Show a status card
+
+Without --token, step 1 shows the last 30 days of local usage, then opens the
+browser so you can sign in and approve this device (see: usejunction login).
 
 After the installer starts the background agent, call again with --complete
 to print the success panel (admin URL + PATH tips).`,
@@ -76,7 +80,10 @@ func runOnboardComplete() error {
 
 func runOnboard() error {
 	if onboardToken == "" {
-		return fmt.Errorf("--token is required")
+		if cfg := alreadyConnected(); cfg != nil {
+			return fmt.Errorf("this device is already connected (%s); to restart setup run the install command with --resume", deviceLabel(cfg.DeviceID))
+		}
+		return runSignInOnboard(loginOptions{URL: onboardURL, NoBrowser: onboardNoBrowser}, onboardAccounts)
 	}
 
 	if format == "json" {
@@ -126,13 +133,62 @@ func runOnboard() error {
 		return err
 	}
 	enrollStep.Done(deviceLabel(res.cfg.DeviceID))
+	return finishOnboard(res.cfg, onboardAccounts)
+}
+
+// runSignInOnboard is the first run without a token: show what this machine
+// already knows, sign in through the browser, then the same steps as a token
+// enrollment.
+func runSignInOnboard(opts loginOptions, accountsSpec string) error {
+	ctx := context.Background()
+
+	if format == "json" {
+		res, err := doLogin(ctx, opts)
+		if err != nil {
+			return err
+		}
+		if err := configure.RunSetup(res.cfg, configure.SetupOptions{EnableOtel: true}); err != nil {
+			fmt.Fprintf(os.Stderr, "setup warning: %v\n", err)
+		}
+		selection, err := runAccountSelection(ctx, client.New(res.cfg), accountsSpec)
+		if err != nil {
+			return err
+		}
+		if _, err := runInitialReport(true); err != nil {
+			fmt.Fprintf(os.Stderr, "initial report warning: %v\n", err)
+		}
+		tools := detectTools()
+		printJSON(map[string]any{
+			"deviceId":      res.cfg.DeviceID,
+			"orgId":         res.cfg.OrgID,
+			"agentVersion":  config.Version,
+			"toolsDetected": len(tools),
+			"tools":         tools,
+			"accounts":      selection,
+		})
+		return nil
+	}
+
+	ui.Banner()
+	showLocalUsageSummary(ctx)
+
+	res, err := doLogin(ctx, opts)
+	if err != nil {
+		return err
+	}
+	return finishOnboard(res.cfg, accountsSpec)
+}
+
+// finishOnboard runs everything after the device has credentials: account
+// choices, the first upload, and the tool scan.
+func finishOnboard(cfg *config.Config, accountsSpec string) error {
 	ui.QuietLine("Settings  " + homeRelative(config.ConfigPath()))
 
 	// Written quietly so Claude Code metrics work even if it is installed later;
 	// only mentioned once we know Claude Code is on this machine.
-	setupErr := configure.RunSetup(res.cfg, configure.SetupOptions{EnableOtel: true})
+	setupErr := configure.RunSetup(cfg, configure.SetupOptions{EnableOtel: true})
 
-	chooseOnboardAccounts(client.New(res.cfg))
+	chooseOnboardAccounts(client.New(cfg), accountsSpec)
 
 	toolIDs := providerToolIDs()
 	reportPanel := ui.ScanPanelStart("Uploading initial usage", toolIDs)
@@ -240,7 +296,7 @@ func reportClaudeMetrics(tools []types.ToolStatus, setupErr error) {
 
 // chooseOnboardAccounts lets the developer pick accounts before the first
 // report reads any usage. Failures leave collection off and are not fatal.
-func chooseOnboardAccounts(api *client.APIClient) {
+func chooseOnboardAccounts(api *client.APIClient, accountsSpec string) {
 	findStep := ui.StepStart("Finding signed-in accounts")
 	accounts, err := loadSelectableAccounts(context.Background(), api)
 	if err != nil {
@@ -257,7 +313,7 @@ func chooseOnboardAccounts(api *client.APIClient) {
 		return
 	}
 
-	selection, err := chooseAccounts(api, accounts, onboardAccounts)
+	selection, err := chooseAccounts(api, accounts, accountsSpec)
 	saveStep := ui.StepStart("Saving account choices")
 	if err != nil {
 		saveStep.Fail(err.Error())
@@ -331,7 +387,8 @@ func humanizeCollectProgress(step, message string) string {
 }
 
 func init() {
-	onboardCmd.Flags().StringVar(&onboardToken, "token", "", "Enrollment token (required unless --complete)")
+	onboardCmd.Flags().StringVar(&onboardToken, "token", "", "Enrollment token; without one, sign in through the browser")
+	onboardCmd.Flags().BoolVar(&onboardNoBrowser, "no-browser", false, "Print the sign-in link without opening a browser")
 	onboardCmd.Flags().StringVar(&onboardURL, "url", "", "Control plane URL")
 	onboardCmd.Flags().StringVar(&onboardEmail, "email", "", "Developer email")
 	onboardCmd.Flags().StringVar(&onboardName, "name", "", "Developer name")

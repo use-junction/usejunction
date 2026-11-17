@@ -44,7 +44,7 @@ jobs:
           GOARCH: arm64
 
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     needs: windows-test
     # Signing keys live on the agent-production environment (not repo secrets).
     environment: agent-production

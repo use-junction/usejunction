@@ -37,6 +37,7 @@ export function LoginForm() {
   const verified = searchParams.get("verified") === "1";
   const joiningInvite =
     from.startsWith("/i/") || from.startsWith("/join/");
+  const connectingDevice = from.startsWith("/connect");
   const [email, setEmail] = useState(searchParams.get("email") ?? "");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +65,9 @@ export function LoginForm() {
           <AlertDescription>
             {joiningInvite
               ? "Your email is verified. Sign in to continue with your invite."
-              : "Your email is verified. Sign in to open your dashboard."}
+              : connectingDevice
+                ? "Your email is verified. Sign in to connect your device."
+                : "Your email is verified. Sign in to open your dashboard."}
           </AlertDescription>
         </Alert>
       )}

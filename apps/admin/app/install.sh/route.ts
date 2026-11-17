@@ -1,6 +1,7 @@
 import { readFile } from "fs/promises";
 import path from "path";
 import { NextResponse } from "next/server";
+import { installerControlPlaneUrl, stampControlPlaneUrl } from "@/lib/install-script";
 import { isLoopbackHostname } from "@/lib/security/env-guard";
 
 type InstallScript = {
@@ -36,7 +37,9 @@ export async function GET(request: Request) {
   const found = await readInstallScript();
   if (!found) return NextResponse.json({ error: "install.sh not found" }, { status: 404 });
 
-  let body = found.body;
+  // A one-line install passes no --url, so the script defaults to this deployment.
+  const controlPlaneUrl = installerControlPlaneUrl(request);
+  let body = controlPlaneUrl ? stampControlPlaneUrl(found.body, "sh", controlPlaneUrl) : found.body;
   // When developers curl the local admin install.sh, inject the monorepo root so
   // the customer-facing installer builds from this checkout instead of falling
   // back to an ancient GitHub agent-v0.1.0 release. Production hosts are untouched.
@@ -47,7 +50,7 @@ export async function GET(request: Request) {
       `export USEJUNCTION_ROOT=${shellSingleQuote(found.root)}`,
       "export USEJUNCTION_PROFILE=test",
       "",
-      found.body,
+      body,
     ].join("\n");
   }
 

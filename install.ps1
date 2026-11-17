@@ -4,7 +4,8 @@ param(
   [string]$Url = "",
   [string]$Profile = "",
   [switch]$Upgrade,
-  [switch]$Resume
+  [switch]$Resume,
+  [switch]$Local
 )
 
 $ErrorActionPreference = "Stop"
@@ -53,15 +54,23 @@ $RunnerPath = Join-Path $RootDir "run-agent.ps1"
 $LogPath = Join-Path $RootDir "agent.log"
 $ProfileArgs = if ($Profile -eq "test") { @("--profile", "test") } else { @() }
 
-function Show-Usage {
-  throw "Usage: install.ps1 [-Token <token> | -Upgrade | -Resume] [-Url <control-plane>]"
-}
-
 if ($Upgrade -and $Resume) {
   throw "-Upgrade and -Resume cannot be used together."
 }
-if (-not $Upgrade -and -not $Resume -and [string]::IsNullOrWhiteSpace($Token)) {
-  Show-Usage
+if ($Local -and ($Upgrade -or $Resume -or -not [string]::IsNullOrWhiteSpace($Token))) {
+  throw "-Local installs without signing in, so it cannot be combined with -Token, -Upgrade or -Resume."
+}
+# No token: sign in through the browser instead of copying one from the site.
+$SignIn = $false
+if (-not $Local -and -not $Upgrade -and -not $Resume -and [string]::IsNullOrWhiteSpace($Token)) {
+  if (Test-Path $ConfigPath) {
+    # Running the one-line install again on a connected machine repairs the
+    # install; it must not ask the person to sign in a second time.
+    Write-Host "UseJunction is already connected on this machine. Refreshing the install..."
+    $Resume = $true
+  } else {
+    $SignIn = $true
+  }
 }
 if ($Upgrade -and -not (Test-Path $ConfigPath)) {
   throw "No existing UseJunction enrollment found at $ConfigPath"
@@ -192,6 +201,14 @@ exit `$LASTEXITCODE
 
 $Version = "0.1.0"
 $Version = Get-LatestVersion
+# A connected machine already has the agent, kept current by its own updater.
+# -Local must not replace a running install: just show the table.
+if ($Local -and (Test-Path $ConfigPath)) {
+  Write-Host "UseJunction is already connected on this machine, so there is nothing to install."
+  if (Test-Path $Binary) { & $Binary @ProfileArgs }
+  exit 0
+}
+
 $Architecture = Get-AgentArchitecture
 $Artifact = "usejunction-windows-$Architecture.exe"
 
@@ -251,6 +268,30 @@ if ($repairInstall) {
   Add-AgentToPath
 }
 
+if ($Local) {
+  # View-only: the agent is on PATH and that is all. No sign-in, no scheduled
+  # task, and no change to any tool's settings.
+  $hasTable = $false
+  try {
+    & $Binary @($ProfileArgs + @("daily", "--help")) *> $null
+    $hasTable = ($LASTEXITCODE -eq 0)
+  } catch {
+    $hasTable = $false
+  }
+  if ($hasTable) {
+    # The closing lines below say how to connect, so the agent's own line is off.
+    $env:USEJUNCTION_NO_TIPS = "1"
+    & $Binary @ProfileArgs
+    Remove-Item Env:USEJUNCTION_NO_TIPS -ErrorAction SilentlyContinue
+  } else {
+    Write-Host "This UseJunction agent build has no terminal usage table yet; a newer release adds it."
+  }
+  Write-Host "UseJunction is installed. Nothing was connected and nothing runs in the background."
+  Write-Host "Run it any time: usejunction   (open a new terminal if the command is not found)"
+  Write-Host "To see charts and your team, run the installer without -Local: irm $Url/install.ps1 | iex"
+  exit 0
+}
+
 if ($Upgrade) {
   Register-AgentTask
   Start-ScheduledTask -TaskName $TaskName
@@ -281,11 +322,37 @@ if ($Resume) {
 }
 
 $onboardFailed = $false
-& $Binary @($ProfileArgs + @("onboard", "--token", $Token, "--url", $Url, "--accept-collection-notice"))
-if ($LASTEXITCODE -ne 0) {
-  if (-not (Test-Path $ConfigPath)) { throw "Device onboarding failed before enrollment completed." }
-  $onboardFailed = $true
-  Write-Warning "Device enrolled, but the first sync did not complete. The background agent will keep retrying."
+if ($SignIn) {
+  # An agent build from before terminal sign-in has no `login` command. Say so
+  # plainly instead of failing on a missing --token.
+  # try/catch: Windows PowerShell 5 turns a native command's stderr into a
+  # terminating error when it is redirected under ErrorActionPreference=Stop.
+  $canSignIn = $false
+  try {
+    & $Binary @($ProfileArgs + @("login", "--help")) *> $null
+    $canSignIn = ($LASTEXITCODE -eq 0)
+  } catch {
+    $canSignIn = $false
+  }
+  if (-not $canSignIn) {
+    throw "This UseJunction agent build cannot sign in from the terminal yet. Sign in at $Url, copy the install command with your token, and run that instead."
+  }
+  # The collection notice is shown and acknowledged in the browser.
+  & $Binary @($ProfileArgs + @("onboard", "--url", $Url))
+  if ($LASTEXITCODE -ne 0) {
+    if (-not (Test-Path $ConfigPath)) {
+      throw "Sign-in was not completed, so nothing was connected. Run the same command again when you are ready."
+    }
+    $onboardFailed = $true
+    Write-Warning "Device connected, but the first sync did not complete. The background agent will keep retrying."
+  }
+} else {
+  & $Binary @($ProfileArgs + @("onboard", "--token", $Token, "--url", $Url, "--accept-collection-notice"))
+  if ($LASTEXITCODE -ne 0) {
+    if (-not (Test-Path $ConfigPath)) { throw "Device onboarding failed before enrollment completed." }
+    $onboardFailed = $true
+    Write-Warning "Device enrolled, but the first sync did not complete. The background agent will keep retrying."
+  }
 }
 
 Register-AgentTask

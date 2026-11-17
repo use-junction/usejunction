@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   reportDelete: vi.fn(),
   providerDelete: vi.fn(),
   bucketDelete: vi.fn(),
+  deviceAuthDelete: vi.fn(),
   auditDelete: vi.fn(),
 }));
 
@@ -21,6 +22,7 @@ vi.mock("@usejunction/db", () => ({
     dailyReportUsageSnapshot: { deleteMany: mocks.reportDelete },
     providerSourceRecord: { deleteMany: mocks.providerDelete },
     rateLimitBucket: { deleteMany: mocks.bucketDelete },
+    deviceAuthRequest: { deleteMany: mocks.deviceAuthDelete },
     auditLog: { deleteMany: mocks.auditDelete },
   },
 }));
@@ -72,4 +74,14 @@ test("global TTLs keep privacy audit rows", async () => {
   const auditWhere = mocks.auditDelete.mock.calls[0][0].where;
   assert.deepEqual(auditWhere.NOT, { action: { startsWith: "privacy." } });
   assert.ok(auditWhere.createdAt.lt instanceof Date);
+});
+
+test("global TTLs drop device sign-in requests a day after they expire", async () => {
+  const { enforceGlobalTtls } = await import("@/lib/privacy/retention");
+  const now = new Date("2026-11-12T12:00:00.000Z");
+  const result = await enforceGlobalTtls(now);
+  assert.equal(result.deviceAuthRequests, 2);
+  assert.deepEqual(mocks.deviceAuthDelete.mock.calls[0][0].where, {
+    expiresAt: { lt: new Date("2026-11-11T12:00:00.000Z") },
+  });
 });
