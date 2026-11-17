@@ -58,6 +58,11 @@ func (p *CursorProvider) ProbeQuota(ctx context.Context) ([]types.QuotaSnapshot,
 
 func (p *CursorProvider) ScanLocalUsage(ctx context.Context, refresh bool) ([]types.DailyUsage, error) {
 	local, _ := scan.ScanCursorLocal(refresh)
+	if scan.IsLocalOnly(ctx) {
+		// Cursor keeps billed usage on cursor.com. A local-only scan uses what
+		// the background service already saved, and never asks for more.
+		return scan.MergeCursorUsage(local, probe.CachedCursorUsageEvents()), nil
+	}
 	events, _ := probe.ScanCursorUsageEvents(ctx, refresh)
 	merged := scan.MergeCursorUsage(local, events)
 	if len(merged) > 0 {

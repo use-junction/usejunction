@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/usejunction/agent/internal/types"
 )
@@ -206,13 +207,16 @@ func TestScanCodexForcesRequestOnTokenOnlyUsageRow(t *testing.T) {
 		buf.Write(b)
 		buf.WriteByte('\n')
 	}
+	// A fixed date drifts out of the 60 days the scanner reads and the test
+	// starts failing; yesterday never does.
+	day := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
 	write(map[string]any{
-		"type": "session_meta", "timestamp": "2026-09-01T10:00:00Z",
+		"type": "session_meta", "timestamp": day + "T10:00:00Z",
 		"payload": map[string]any{"originator": "codex_cli"},
 	})
 	// Single cumulative total — one request after parse; then we zero Requests
 	write(map[string]any{
-		"type": "event_msg", "timestamp": "2026-09-01T10:00:01Z",
+		"type": "event_msg", "timestamp": day + "T10:00:01Z",
 		"payload": map[string]any{
 			"type": "token_count", "model": "gpt-5.2-codex",
 			"info": map[string]any{"total_token_usage": map[string]any{
