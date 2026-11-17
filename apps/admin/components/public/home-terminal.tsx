@@ -1,25 +1,68 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowRight, Check, Clipboard } from "lucide-react";
-import { HOME_TERMINAL_COMMAND, HOME_TERMINAL_COMPARE_HREF } from "@/lib/public/home-cta";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ArrowRight, Check, Clipboard, SquareTerminal } from "lucide-react";
+import { DecorativeToolIcon } from "@/components/public/tool-logos-strip";
+import { HOME_TERMINAL_COMMAND } from "@/lib/public/home-cta";
+import { cn } from "@/lib/utils";
+
+/** How long each readout stays up. */
+const READOUT_MS = 3200;
+
+const VALUE = "text-[1.25rem] font-bold leading-none tracking-[-0.03em] tabular-nums";
+
+/** One example developer: what the command would tell them. Made-up numbers; the strip says so. */
+const READOUTS: { label: string; value: ReactNode }[] = [
+  { label: "Total spent", value: <span className={VALUE}>$412.60</span> },
+  { label: "Estimated next month", value: <span className={VALUE}>$430</span> },
+  {
+    label: "We recommend",
+    value: (
+      <span className="flex items-center gap-1.5 font-medium">
+        <DecorativeToolIcon name="Claude Code" size={18} />
+        <span>
+          <span className="sr-only">Claude </span>Max $100
+        </span>
+        <span className="text-muted-foreground">+</span>
+        <DecorativeToolIcon name="Codex" size={18} />
+        <span>
+          <span className="sr-only">ChatGPT </span>Plus $20
+        </span>
+      </span>
+    ),
+  },
+];
 
 /**
- * What the command prints, for an example developer. The layout is the
- * agent's own table (agent/cmd/usage_report.go); the numbers are made up and
- * the block is labelled as an example.
+ * A one-line strip, the weight of the "Works with" strip: the free terminal
+ * command, and beside it one short readout of what the command tells you.
+ * The command stays still; the readout changes every few seconds once the
+ * strip is on screen, and holds while somebody points at it.
  */
-const EXAMPLE_ROWS = [
-  ["2026-11-12", "Claude Code", "opus, sonnet", "$46.59"],
-  ["2026-11-13", "Claude Code", "opus", "$11.59"],
-  ["", "Codex", "gpt-5", "$9.75"],
-  ["2026-11-14", "Claude Code", "sonnet", "$3.20"],
-] as const;
-const EXAMPLE_TOTAL = "$71.13";
-
 export function HomeTerminal() {
+  const section = useRef<HTMLElement>(null);
+  const [readout, setReadout] = useState(0);
+  const [onScreen, setOnScreen] = useState(false);
+  const [held, setHeld] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const node = section.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      setOnScreen(true);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!onScreen || held) return;
+    const timer = window.setInterval(() => setReadout((current) => (current + 1) % READOUTS.length), READOUT_MS);
+    return () => window.clearInterval(timer);
+  }, [onScreen, held]);
 
   useEffect(() => {
     if (!copied) return;
@@ -37,84 +80,63 @@ export function HomeTerminal() {
   }
 
   return (
-    <section aria-labelledby="home-terminal-heading" className="bg-white pt-16 sm:pt-20 lg:pt-24">
-      <div className="mx-auto grid w-full max-w-[75rem] items-center gap-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14">
+    <section
+      ref={section}
+      aria-labelledby="home-terminal-heading"
+      onMouseEnter={() => setHeld(true)}
+      onMouseLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)}
+      onBlur={() => setHeld(false)}
+      className="mt-16 border-y border-border bg-white sm:mt-20 lg:mt-28"
+    >
+      <div className="mx-auto flex w-full max-w-[75rem] flex-wrap items-center gap-x-8 gap-y-4 px-4 py-5 text-[0.9375rem] sm:px-6">
         <div>
-          <h2
-            id="home-terminal-heading"
-            className="max-w-md text-[1.6rem] font-medium leading-tight tracking-[-0.02em] text-[#3a3b37] sm:text-[1.95rem]"
-          >
-            Or see your own number first, in the terminal.
+          <h2 id="home-terminal-heading" className="flex items-center gap-2.5 text-[0.9375rem] font-medium">
+            <SquareTerminal className="size-[22px] shrink-0 text-primary" aria-hidden />
+            See your own number in the terminal
           </h2>
-          <p className="mt-4 max-w-md text-[1.0625rem] leading-relaxed text-[#3a3b37]">
-            One command reads the logs already on your laptop. No account. Nothing leaves your machine.
-          </p>
-
-          <div className="mt-6 flex max-w-md items-stretch border-2 !border-foreground">
-            <code className="flex min-w-0 flex-1 items-center gap-2.5 overflow-x-auto bg-white px-4 py-3 font-mono text-[0.9375rem]">
-              <span aria-hidden className="select-none text-muted-foreground">
-                $
-              </span>
-              <span className="whitespace-nowrap">{HOME_TERMINAL_COMMAND}</span>
-            </code>
-            <button
-              type="button"
-              onClick={copy}
-              className="flex shrink-0 items-center gap-2 border-l-2 !border-foreground bg-brand-yellow px-4 text-[0.9375rem] font-semibold transition-colors hover:bg-brand-yellow-hover"
-            >
-              {copied ? <Check className="size-4" aria-hidden /> : <Clipboard className="size-4" aria-hidden />}
-              <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
-            </button>
-          </div>
-
-          <Link
-            href={HOME_TERMINAL_COMPARE_HREF}
-            className="mt-5 inline-flex items-center gap-1.5 border-b !border-current pb-px text-[0.9375rem] font-semibold transition-colors hover:text-primary"
-          >
-            How it compares with ccusage
-            <ArrowRight className="size-4" aria-hidden />
-          </Link>
+          <p className="mt-0.5 pl-8 text-[0.8125rem] text-muted-foreground">No account. Nothing leaves your machine.</p>
         </div>
 
-        <figure className="min-w-0">
-          <div className="overflow-x-auto bg-foreground px-4 py-5 font-mono text-[0.8125rem] leading-relaxed text-[#e6e8df] sm:px-6 sm:text-[0.875rem]">
-            <p className="whitespace-nowrap text-[#9aa18c]">
-              <span aria-hidden className="select-none">$ </span>
-              {HOME_TERMINAL_COMMAND}
-            </p>
-            <p className="mt-3 font-semibold text-white">AI coding usage · last 30 days · this machine</p>
-            <table className="mt-3 w-full border-separate border-spacing-x-0 border-spacing-y-0.5 whitespace-nowrap">
-              <thead>
-                <tr className="text-left text-[#9aa18c]">
-                  <th scope="col" className="pr-5 font-normal">Date</th>
-                  <th scope="col" className="pr-5 font-normal">Tool</th>
-                  {/* On a phone the models column goes, so the cost stays on screen. */}
-                  <th scope="col" className="hidden pr-5 font-normal sm:table-cell">Models</th>
-                  <th scope="col" className="text-right font-normal">Cost</th>
-                </tr>
-              </thead>
-              <tbody>
-                {EXAMPLE_ROWS.map(([date, tool, models, cost], index) => (
-                  <tr key={index}>
-                    <td className="pr-5">{date}</td>
-                    <td className="pr-5">{tool}</td>
-                    <td className="hidden pr-5 sm:table-cell">{models}</td>
-                    <td className="text-right">{cost}</td>
-                  </tr>
-                ))}
-                <tr className="font-semibold text-white">
-                  <td className="pr-5 pt-1">Total</td>
-                  <td className="pr-5" />
-                  <td className="hidden pr-5 sm:table-cell" />
-                  <td className="pt-1 text-right">{EXAMPLE_TOTAL}</td>
-                </tr>
-              </tbody>
-            </table>
-            <p className="mt-4 text-[#9aa18c]">Estimated at API list prices from local logs, not your bill.</p>
-            <p className="text-[#9aa18c]">Nothing left this machine.</p>
+        <div className="flex w-full items-stretch bg-foreground font-mono text-[0.875rem] text-[#e6e8df] sm:w-auto">
+          <code className="flex min-w-0 flex-1 items-center gap-2.5 whitespace-nowrap py-2.5 pl-4 pr-5">
+            <span aria-hidden className="select-none text-[#9aa18c]">
+              $
+            </span>
+            {HOME_TERMINAL_COMMAND}
+          </code>
+          <button
+            type="button"
+            onClick={copy}
+            className="flex shrink-0 items-center gap-2 border-l border-white/20 px-3.5 font-sans text-[0.875rem] font-semibold text-white transition-colors hover:bg-white/10"
+          >
+            {copied ? <Check className="size-4 text-brand-yellow" aria-hidden /> : <Clipboard className="size-4" aria-hidden />}
+            <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
+          </button>
+        </div>
+
+        {/* Beside the command where there is room for one line; under it, lined up with the heading, where there is not. */}
+        <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-1.5 sm:pl-8 xl:w-auto xl:flex-1 xl:pl-0">
+          <ArrowRight className="hidden size-4 shrink-0 text-muted-foreground xl:block" aria-hidden />
+          {/* The readouts share one cell, so the strip keeps its size while they take turns. */}
+          <div className="grid">
+            {READOUTS.map((item, index) => (
+              <p
+                key={item.label}
+                data-readout={index === readout ? "shown" : "waiting"}
+                aria-hidden={index !== readout}
+                className={cn(
+                  "col-start-1 row-start-1 flex items-center gap-2.5 whitespace-nowrap",
+                  index === readout ? "home-term-rise" : "invisible",
+                )}
+              >
+                <span className="text-muted-foreground">{item.label}</span>
+                {item.value}
+              </p>
+            ))}
           </div>
-          <figcaption className="mt-2.5 text-[0.8125rem] text-muted-foreground">Example output. Your own tools and numbers appear in their place.</figcaption>
-        </figure>
+          <p className="w-full text-[0.8125rem] text-muted-foreground sm:ml-auto sm:w-auto">Example</p>
+        </div>
       </div>
     </section>
   );

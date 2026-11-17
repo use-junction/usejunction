@@ -29,4 +29,3 @@ export const HERO_VIDEO = {
 
 /** The free terminal table: no account, nothing uploaded. Published as the `usejunction` npm package. */
 export const HOME_TERMINAL_COMMAND = "npx usejunction";
-export const HOME_TERMINAL_COMPARE_HREF = "/compare/ccusage";

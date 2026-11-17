@@ -31,11 +31,10 @@ export function UseJunctionHomeContent() {
       <HeroSection />
       <ToolLogosStrip />
 
-      {/* The free way in: a terminal table from local logs, with no account. */}
-      <HomeTerminal />
-
       {/* Three problems for an example team, one picture each: limits, duplicate seats, where the spend landed. */}
       <HomeWeeksChapter />
+      {/* The free way in, as a one-line strip: a terminal table from local logs, with no account. */}
+      <HomeTerminal />
       <HomePaidTwiceBand />
       <HomeWork />
 
