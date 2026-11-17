@@ -18,6 +18,7 @@ test("seo registry includes priority guides and compare pages", () => {
   assert.ok(paths.has("/guides/open-source-wakatime-alternative-for-ai-coding"));
   assert.ok(paths.has("/compare/wakatime"));
   assert.ok(paths.has("/compare/codexbar"));
+  assert.ok(paths.has("/compare/ccusage"));
   assert.ok(paths.has("/compare/junction-panel"));
   assert.ok(paths.has("/compare/engineering-intelligence"));
   assert.ok(paths.has("/solutions/ai-coding-observability-for-teams"));

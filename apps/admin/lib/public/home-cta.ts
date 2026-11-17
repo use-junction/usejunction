@@ -26,3 +26,6 @@ export const HERO_VIDEO = {
     { src: "/video/hero-loop.webm", type: 'video/webm; codecs="vp9"' },
   ],
 } as const;
+
+/** The free terminal table: no account, nothing uploaded. Published as the `usejunction` npm package. */
+export const HOME_TERMINAL_COMMAND = "npx usejunction";

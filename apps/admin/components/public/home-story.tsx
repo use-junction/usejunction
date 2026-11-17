@@ -219,9 +219,10 @@ function SeatUnused({ children }: { children: ReactNode }) {
 const SEAT_GRID =
   "grid grid-cols-[minmax(0,1fr)_5.5rem_6.75rem] items-stretch sm:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,1.25fr)]";
 
+/** Sits directly under the one-line terminal strip (home-terminal), which carries the gap above the pair. */
 export function HomePaidTwiceBand() {
   return (
-    <section aria-labelledby="home-paid-twice-heading" className="mt-24 overflow-x-clip bg-brand-yellow sm:mt-32 lg:mt-44">
+    <section aria-labelledby="home-paid-twice-heading" className="overflow-x-clip bg-brand-yellow">
       <div className="mx-auto w-full max-w-[75rem] px-4 pb-[4.5rem] pt-16 sm:px-6 lg:pb-32 lg:pt-[7.5rem]">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:items-end lg:gap-20">
           <h2
