@@ -96,6 +96,28 @@ type usageReport struct {
 	Totals        usageTokens
 	// AllEstimated is true when every dollar is an API list-price estimate.
 	AllEstimated bool
+	// Cost split by tool and by model across the whole window, biggest first.
+	ByTool  []usageShare
+	ByModel []usageShare
+	// Tools with usage in the logs read, but none in this window.
+	Idle []usageIdleTool
+	// Models priced at the default rate because the price table has no entry.
+	Unpriced []string
+}
+
+// usageShare is one tool's or one model's part of the window's cost.
+type usageShare struct {
+	Name string `json:"name"`
+	// Tool is set on a model's share: the tool it was used through.
+	Tool          string  `json:"tool,omitempty"`
+	TotalTokens   int     `json:"totalTokens"`
+	EstimatedCost float64 `json:"estimatedCost"`
+	Share         float64 `json:"share"`
+}
+
+type usageIdleTool struct {
+	Name     string `json:"name"`
+	LastUsed string `json:"lastUsed"`
 }
 
 var compactDatePattern = regexp.MustCompile(`^\d{8}$`)
@@ -314,11 +336,12 @@ func buildUsageReport(rows []types.DailyUsage, now time.Time, opts usageReportOp
 		models map[string]*usageModelLine
 	}
 	buckets := map[string]*bucket{}
+	byTool := map[string]*usageShare{}
+	byModel := map[string]*usageShare{}
+	lastUsed := map[string]string{}
+	unpriced := map[string]bool{}
 	for _, row := range rows {
 		if row.MetricKind == types.MetricKindProductivity {
-			continue
-		}
-		if row.Date < report.Since || row.Date > report.Until {
 			continue
 		}
 		if !toolMatches(filter, row.ToolName) {
@@ -326,6 +349,12 @@ func buildUsageReport(rows []types.DailyUsage, now time.Time, opts usageReportOp
 		}
 		input := uncachedInput(row)
 		if input+row.OutputTokens+row.CacheReadTokens+row.CacheWriteTokens == 0 && row.EstimatedCost <= 0 {
+			continue
+		}
+		if name := toolDisplayName(row.ToolName); row.Date > lastUsed[name] {
+			lastUsed[name] = row.Date
+		}
+		if row.Date < report.Since || row.Date > report.Until {
 			continue
 		}
 		period := periodKey(report.Period, row.Date)
@@ -352,10 +381,49 @@ func buildUsageReport(rows []types.DailyUsage, now time.Time, opts usageReportOp
 		line.add(input, row.OutputTokens, row.CacheReadTokens, row.CacheWriteTokens, cost)
 		b.row.add(input, row.OutputTokens, row.CacheReadTokens, row.CacheWriteTokens, cost)
 		report.Totals.add(input, row.OutputTokens, row.CacheReadTokens, row.CacheWriteTokens, cost)
-		if cost > 0 && row.CostKind != "" && row.CostKind != types.CostKindEstimatedAPI {
+		vendorCost := cost > 0 && row.CostKind != "" && row.CostKind != types.CostKindEstimatedAPI
+		if vendorCost {
 			report.AllEstimated = false
 		}
+		tokens := input + row.OutputTokens + row.CacheReadTokens + row.CacheWriteTokens
+		toolShare := byTool[b.row.ToolName]
+		if toolShare == nil {
+			toolShare = &usageShare{Name: b.row.ToolName}
+			byTool[b.row.ToolName] = toolShare
+		}
+		toolShare.TotalTokens += tokens
+		toolShare.EstimatedCost += cost
+		modelKey := model + "|" + b.row.ToolName
+		modelShare := byModel[modelKey]
+		if modelShare == nil {
+			modelShare = &usageShare{Name: model, Tool: b.row.ToolName}
+			byModel[modelKey] = modelShare
+		}
+		modelShare.TotalTokens += tokens
+		modelShare.EstimatedCost += cost
+		// A vendor-reported cost is real; an estimate for a model missing from the price table is a guess.
+		if cost > 0 && !vendorCost && !scan.HasListPrice(row.Model) {
+			unpriced[model] = true
+		}
 	}
+
+	report.ByTool = sortedShares(byTool, report.Totals.EstimatedCost)
+	report.ByModel = sortedShares(byModel, report.Totals.EstimatedCost)
+	for name, last := range lastUsed {
+		if byTool[name] == nil {
+			report.Idle = append(report.Idle, usageIdleTool{Name: name, LastUsed: last})
+		}
+	}
+	sort.Slice(report.Idle, func(i, j int) bool {
+		if report.Idle[i].LastUsed != report.Idle[j].LastUsed {
+			return report.Idle[i].LastUsed > report.Idle[j].LastUsed
+		}
+		return report.Idle[i].Name < report.Idle[j].Name
+	})
+	for model := range unpriced {
+		report.Unpriced = append(report.Unpriced, model)
+	}
+	sort.Strings(report.Unpriced)
 
 	// A week or month row is only as complete as the days the scanner reads.
 	coveredFrom, coveredTo := report.Since, report.Until
@@ -405,6 +473,37 @@ func buildUsageReport(rows []types.DailyUsage, now time.Time, opts usageReportOp
 		return left.ToolName < right.ToolName
 	})
 	return report, nil
+}
+
+// sortedShares turns per-tool or per-model sums into shares of total, biggest first.
+func sortedShares(sums map[string]*usageShare, total float64) []usageShare {
+	shares := make([]usageShare, 0, len(sums))
+	for _, sum := range sums {
+		share := *sum
+		if total > 0 {
+			share.Share = share.EstimatedCost / total
+		}
+		shares = append(shares, share)
+	}
+	sort.Slice(shares, func(i, j int) bool {
+		if shares[i].EstimatedCost != shares[j].EstimatedCost {
+			return shares[i].EstimatedCost > shares[j].EstimatedCost
+		}
+		if shares[i].TotalTokens != shares[j].TotalTokens {
+			return shares[i].TotalTokens > shares[j].TotalTokens
+		}
+		return shares[i].Name+shares[i].Tool < shares[j].Name+shares[j].Tool
+	})
+	return shares
+}
+
+// toolNames lists the tools in the window, most expensive first.
+func (r usageReport) toolNames() []string {
+	names := make([]string, 0, len(r.ByTool))
+	for _, share := range r.ByTool {
+		names = append(names, share.Name)
+	}
+	return names
 }
 
 // formatTokens shortens a token count to at most five characters.
@@ -497,6 +596,22 @@ func (r usageReport) method(connected bool) []string {
 		first = "From local logs; part is estimated at API list prices. Days are UTC."
 	}
 	lines := []string{first}
+	if len(r.Unpriced) > 0 {
+		names := r.Unpriced
+		more := ""
+		if len(names) > 4 {
+			more = fmt.Sprintf(" and %d more", len(names)-4)
+			names = names[:4]
+		}
+		lines = append(lines, fmt.Sprintf("No list price for %s%s, so %s estimated at a default rate.", strings.Join(names, ", "), more, plural(len(r.Unpriced), "it is", "they are")))
+	}
+	if len(r.Idle) > 0 {
+		var idle []string
+		for _, tool := range r.Idle {
+			idle = append(idle, fmt.Sprintf("%s (last used %s)", tool.Name, tool.LastUsed))
+		}
+		lines = append(lines, "Also found, not used in this period: "+strings.Join(idle, ", ")+".")
+	}
 	if r.BeforeHistory {
 		lines = append(lines, fmt.Sprintf("Only the last %d days are read, so nothing before %s is shown.", scan.UsageLookbackDays, r.HistoryStart))
 	}
@@ -506,15 +621,16 @@ func (r usageReport) method(connected bool) []string {
 	return lines
 }
 
-// renderUsageReport prints the table. Numbers are right-aligned and a period
-// is named once, on its first row.
+// renderUsageReport prints the table, then where the money went. Numbers are
+// right-aligned, a period is named once on its first row, and a period that
+// used more than one tool ends with its own total.
 func renderUsageReport(w io.Writer, report usageReport, connected bool) {
 	fmt.Fprintf(w, "\n %s\n\n", ui.Strong(report.title()))
 
 	if len(report.Rows) == 0 {
 		fmt.Fprintf(w, " No AI coding usage found on this machine between %s and %s.\n", report.Since, report.Until)
 		for _, line := range report.method(connected) {
-			if strings.HasPrefix(line, "Only the last") {
+			if strings.HasPrefix(line, "Only the last") || strings.HasPrefix(line, "Also found") {
 				fmt.Fprintf(w, " %s\n", ui.Muted(line))
 			}
 		}
@@ -523,73 +639,100 @@ func renderUsageReport(w io.Writer, report usageReport, connected bool) {
 	}
 
 	periodHeader := map[string]string{usagePeriodDaily: "Date", usagePeriodWeekly: "Week of", usagePeriodMonthly: "Month"}[report.Period]
-	// Left-aligned text columns first, then right-aligned numbers.
-	const textColumns = 3
-	table := [][]string{{periodHeader, "Tool", "Models", "Input", "Output", "Cache", "Cost"}}
-	lastPeriod := ""
-	for _, row := range report.Rows {
-		period := ""
-		if row.Period != lastPeriod {
-			period = row.Period
-			if row.Covers != "" {
-				period += " (" + row.Covers + ")"
+	table := usageTable{
+		Header:      []string{periodHeader, "Tool", "Models", "Input", "Output", "Cache", "Cost"},
+		TextColumns: 3,
+		FlexColumn:  2,
+	}
+	numbers := func(t usageTokens) []string {
+		return []string{
+			formatTokens(t.InputTokens), formatTokens(t.OutputTokens),
+			formatTokens(t.CacheReadTokens + t.CacheWriteTokens), formatCost(t.EstimatedCost),
+		}
+	}
+	for start := 0; start < len(report.Rows); {
+		end := start
+		for end < len(report.Rows) && report.Rows[end].Period == report.Rows[start].Period {
+			end++
+		}
+		var periodTotal usageTokens
+		for i, row := range report.Rows[start:end] {
+			period := ""
+			if i == 0 {
+				period = row.Period
+				if row.Covers != "" {
+					period += " (" + row.Covers + ")"
+				}
 			}
-			lastPeriod = row.Period
+			cells := append([]string{period, row.ToolName, cutToWidth(strings.Join(row.Models, ", "), usageModelsColumnMax)}, numbers(row.usageTokens)...)
+			table.Rows = append(table.Rows, usageTableRow{Cells: cells, GroupStart: i == 0})
+			for _, line := range row.ModelBreakdown {
+				detail := append([]string{"", "", cutToWidth("└ "+line.Model, usageModelsColumnMax)}, numbers(line.usageTokens)...)
+				table.Rows = append(table.Rows, usageTableRow{Cells: detail, Kind: usageRowDetail})
+			}
+			periodTotal.add(row.InputTokens, row.OutputTokens, row.CacheReadTokens, row.CacheWriteTokens, row.EstimatedCost)
 		}
-		table = append(table, []string{
-			period, row.ToolName, cutToWidth(strings.Join(row.Models, ", "), usageModelsColumnMax),
-			formatTokens(row.InputTokens), formatTokens(row.OutputTokens),
-			formatTokens(row.CacheReadTokens + row.CacheWriteTokens), formatCost(row.EstimatedCost),
-		})
-		for _, line := range row.ModelBreakdown {
-			table = append(table, []string{
-				"", "", cutToWidth("└ "+line.Model, usageModelsColumnMax),
-				formatTokens(line.InputTokens), formatTokens(line.OutputTokens),
-				formatTokens(line.CacheReadTokens + line.CacheWriteTokens), formatCost(line.EstimatedCost),
-			})
+		if end-start > 1 {
+			subtotal := append([]string{"", "All tools", ""}, numbers(periodTotal)...)
+			table.Rows = append(table.Rows, usageTableRow{Cells: subtotal, Kind: usageRowSubtotal})
 		}
+		start = end
 	}
-	total := []string{
-		"Total", "", "",
-		formatTokens(report.Totals.InputTokens), formatTokens(report.Totals.OutputTokens),
-		formatTokens(report.Totals.CacheReadTokens + report.Totals.CacheWriteTokens), formatCost(report.Totals.EstimatedCost),
-	}
-	writeUsageTable(w, table, total, textColumns)
+	table.Total = append([]string{"Total", "", ""}, numbers(report.Totals)...)
+	width := usageTerminalWidth()
+	table.render(w, width)
+	renderCostShares(w, report, width)
+
 	fmt.Fprintln(w)
 	for _, line := range report.method(connected) {
 		fmt.Fprintf(w, " %s\n", ui.Muted(line))
 	}
 }
 
-// writeUsageTable prints a header line, the rows and a total line. The first
-// textColumns columns are left-aligned text; the rest are right-aligned numbers.
-func writeUsageTable(w io.Writer, table [][]string, total []string, textColumns int) {
-	widths := make([]int, len(table[0]))
-	for _, line := range append(append([][]string{}, table...), total) {
-		for i, cell := range line {
-			if n := utf8.RuneCountInString(cell); n > widths[i] {
-				widths[i] = n
-			}
-		}
-	}
-	format := func(line []string) string {
-		cells := make([]string, len(line))
-		for i, cell := range line {
-			pad := strings.Repeat(" ", widths[i]-utf8.RuneCountInString(cell))
-			if i < textColumns {
-				cells[i] = cell + pad
-			} else {
-				cells[i] = pad + cell
-			}
-		}
-		return strings.TrimRight(strings.Join(cells, "  "), " ")
-	}
+// usageSummaryModels is how many models the summary lists before grouping the rest.
+const usageSummaryModels = 6
 
-	fmt.Fprintf(w, " %s\n", ui.Muted(format(table[0])))
-	for _, line := range table[1:] {
-		fmt.Fprintf(w, " %s\n", format(line))
+// renderCostShares prints where the window's cost went: by tool when there is
+// more than one, and by model when there is more than one.
+func renderCostShares(w io.Writer, report usageReport, width int) {
+	if report.Totals.EstimatedCost <= 0 {
+		return
 	}
-	fmt.Fprintf(w, " %s\n", ui.Strong(format(total)))
+	const barWidth = 20
+	if len(report.ByTool) > 1 {
+		t := usageTable{Header: []string{"Tool", "Cost", "Share", ""}, TextColumns: 1, FlexColumn: -1}
+		for _, share := range report.ByTool {
+			t.Rows = append(t.Rows, usageTableRow{Cells: []string{share.Name, formatCost(share.EstimatedCost), formatShare(share.Share), padBar(shareBar(share.Share, barWidth), barWidth)}})
+		}
+		fmt.Fprintf(w, "\n %s\n", ui.Strong("Cost by tool"))
+		t.render(w, width)
+	}
+	if len(report.ByModel) > 1 {
+		t := usageTable{Header: []string{"Model", "Tool", "Cost", "Share", ""}, TextColumns: 2, FlexColumn: -1}
+		shown := report.ByModel
+		var rest usageShare
+		if len(shown) > usageSummaryModels {
+			for _, share := range shown[usageSummaryModels:] {
+				rest.EstimatedCost += share.EstimatedCost
+				rest.Share += share.Share
+			}
+			rest.Name = fmt.Sprintf("%d more", len(shown)-usageSummaryModels)
+			shown = shown[:usageSummaryModels]
+		}
+		for _, share := range shown {
+			t.Rows = append(t.Rows, usageTableRow{Cells: []string{share.Name, share.Tool, formatCost(share.EstimatedCost), formatShare(share.Share), padBar(shareBar(share.Share, barWidth), barWidth)}})
+		}
+		if rest.Name != "" {
+			t.Rows = append(t.Rows, usageTableRow{Kind: usageRowDetail, Cells: []string{rest.Name, "", formatCost(rest.EstimatedCost), formatShare(rest.Share), padBar(shareBar(rest.Share, barWidth), barWidth)}})
+		}
+		fmt.Fprintf(w, "\n %s\n", ui.Strong("Cost by model"))
+		t.render(w, width)
+	}
+}
+
+// padBar right-pads a bar so it reads left to right in a right-aligned column.
+func padBar(bar string, width int) string {
+	return bar + strings.Repeat(" ", width-runeWidth(bar))
 }
 
 // usageReportJSON is the --json form. The rows sit under the period's name
@@ -607,9 +750,18 @@ func usageReportJSON(report usageReport) map[string]any {
 	case !report.AllEstimated:
 		costBasis = "mixed"
 	}
+	byTool, byModel := report.ByTool, report.ByModel
+	if byTool == nil {
+		byTool = []usageShare{}
+	}
+	if byModel == nil {
+		byModel = []usageShare{}
+	}
 	return map[string]any{
 		report.Period: rows,
 		"totals":      report.Totals,
+		"byTool":      byTool,
+		"byModel":     byModel,
 		"since":       report.Since,
 		"until":       report.Until,
 		"timezone":    "UTC",
