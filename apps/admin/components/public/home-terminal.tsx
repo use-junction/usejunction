@@ -17,23 +17,29 @@ const DAYS = [
 const TOTAL_CENTS = DAYS.reduce((sum, cents) => sum + cents, 0);
 const NEXT_MONTH_CENTS = 43000;
 
-/**
- * The graph: spend so far as a rising line, then a dashed stretch for next month at the same pace.
- * Sizes are in CSS pixels; the line keeps 2px clear of the top and bottom.
- */
-const GRAPH = { past: 96, ahead: 36, height: 32 };
-const GRAPH_TOP = TOTAL_CENTS * ((GRAPH.past + GRAPH.ahead) / GRAPH.past);
-const graphY = (cents: number) => GRAPH.height - 2 - (cents / GRAPH_TOP) * (GRAPH.height - 4);
-const PAST_LINE = (() => {
+const PLANS_DOLLARS = 120;
+
+/** The line for "Total spent": spend adding up over the 30 days. Drawn in a 100 x 40 box that stretches to the space it gets. */
+const LINE_BOX = { width: 100, height: 40 };
+const lineY = (cents: number) => LINE_BOX.height - 2 - (cents / TOTAL_CENTS) * (LINE_BOX.height - 6);
+const TOTAL_LINE = (() => {
   let spent = 0;
   return DAYS.map((cents, index) => {
     spent += cents;
-    const x = (index / (DAYS.length - 1)) * GRAPH.past;
-    return `${index ? "L" : "M"}${x.toFixed(1)} ${graphY(spent).toFixed(1)}`;
+    const x = (index / (DAYS.length - 1)) * LINE_BOX.width;
+    return `${index ? "L" : "M"}${x.toFixed(1)} ${lineY(spent).toFixed(1)}`;
   }).join(" ");
 })();
-const PAST_END_Y = graphY(TOTAL_CENTS);
-const AHEAD_END_Y = graphY(GRAPH_TOP);
+
+/**
+ * The bars for "Estimated next month": the 30 days in two-day bars, then next month's in the same
+ * rhythm, scaled to the estimate and started a few days along so it is not a copy of the first half.
+ */
+const PAST_BARS = Array.from({ length: DAYS.length / 2 }, (_, index) => DAYS[index * 2] + DAYS[index * 2 + 1]);
+const AHEAD_BARS = PAST_BARS.map((_, index) =>
+  Math.round(PAST_BARS[(index + 4) % PAST_BARS.length] * (NEXT_MONTH_CENTS / TOTAL_CENTS)),
+);
+const TOP_BAR = Math.max(...PAST_BARS, ...AHEAD_BARS);
 
 /** A dollar amount that counts up to its value when `animate` is set. Without it the value is there from the start. */
 function Amount({ cents, animate, whole }: { cents: number; animate: boolean; whole?: boolean }) {
@@ -60,9 +66,11 @@ const NUMBER = "text-[1.25rem] font-bold leading-6 tracking-[-0.03em] tabular-nu
 /** Staggers an entrance: see `.home-term-rise` in globals.css. */
 const after = (index: number) => ({ "--i": index }) as CSSProperties;
 
-const READOUTS: { label: string; value: (animate: boolean) => ReactNode }[] = [
+const READOUTS: { label: string; graph: string; describes: string; value: (animate: boolean) => ReactNode }[] = [
   {
     label: "Total spent",
+    graph: "total",
+    describes: "A line of spend adding up over the last 30 days",
     value: (animate) => (
       <span className={NUMBER}>
         <Amount cents={TOTAL_CENTS} animate={animate} />
@@ -71,6 +79,8 @@ const READOUTS: { label: string; value: (animate: boolean) => ReactNode }[] = [
   },
   {
     label: "Estimated next month",
+    graph: "forecast",
+    describes: "Bars of spend over the last 30 days, then paler bars for next month",
     value: (animate) => (
       <span className={NUMBER}>
         <Amount cents={NEXT_MONTH_CENTS} animate={animate} whole />
@@ -79,6 +89,8 @@ const READOUTS: { label: string; value: (animate: boolean) => ReactNode }[] = [
   },
   {
     label: "We recommend",
+    graph: "plans",
+    describes: "Two bars: $430 at API prices, and $120 on the recommended plans",
     value: () => (
       <span className="flex h-6 items-center gap-1.5 font-medium">
         <span className="home-term-rise flex items-center gap-1.5" style={after(1)}>
@@ -101,12 +113,73 @@ const READOUTS: { label: string; value: (animate: boolean) => ReactNode }[] = [
   },
 ];
 
+/** Total spent: one line rising to the total, uncovered from the left, with a dot where it ends. */
+function TotalGraph() {
+  return (
+    <div className="absolute inset-y-0 left-0 right-1.5">
+      <svg
+        viewBox={`0 0 ${LINE_BOX.width} ${LINE_BOX.height}`}
+        preserveAspectRatio="none"
+        className="home-term-draw block size-full"
+        aria-hidden
+      >
+        <path d={`${TOTAL_LINE} L${LINE_BOX.width} ${LINE_BOX.height} L0 ${LINE_BOX.height} Z`} className="fill-primary/15" />
+        <path
+          d={TOTAL_LINE}
+          className="fill-none stroke-primary"
+          strokeWidth="2"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      <span
+        className="home-term-dot absolute left-full size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary"
+        style={{ top: `${(lineY(TOTAL_CENTS) / LINE_BOX.height) * 100}%` }}
+      >
+        <span className="absolute inset-0 animate-ping rounded-full bg-primary/60" />
+      </span>
+    </div>
+  );
+}
+
+/** Estimated next month: this month's bars, then next month's in a paler shade. */
+function ForecastGraph() {
+  return (
+    <div className="absolute inset-0 flex items-end gap-[2px]">
+      {[...PAST_BARS, ...AHEAD_BARS].map((cents, index) => (
+        <span
+          key={index}
+          data-bar={index < PAST_BARS.length ? "past" : "ahead"}
+          className={cn("home-term-bar flex-1", index < PAST_BARS.length ? "bg-primary" : "bg-primary/30")}
+          style={{ ...after(index), height: `${Math.max(6, (cents / TOP_BAR) * 100)}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** We recommend: the same work at API prices, and on the two plans. */
+function PlansGraph() {
+  const row = "home-term-grow flex h-[17px] items-center whitespace-nowrap px-1.5 text-[0.6875rem] font-semibold leading-none";
+  return (
+    <div className="absolute inset-0 flex flex-col justify-between">
+      <span className={cn(row, "bg-[#deded6]")}>${NEXT_MONTH_CENTS / 100} at API prices</span>
+      <span
+        className={cn(row, "bg-brand-yellow")}
+        style={{ ...after(3), width: `${(PLANS_DOLLARS / (NEXT_MONTH_CENTS / 100)) * 100}%` }}
+      >
+        ${PLANS_DOLLARS} on plans
+      </span>
+    </div>
+  );
+}
+
 /**
  * A one-line strip, the weight of the "Works with" strip: the free terminal
- * command, and beside it a small graph with one short readout of what the
- * command tells you. The command stays still. Once the strip is on screen the
- * graph draws itself and the readout takes turns, holding while somebody
- * points at it.
+ * command, and beside it one short readout of what the command tells you, with
+ * its own small graph. The command stays still. Once the strip is on screen the
+ * readouts take turns, each graph drawing itself, and hold while somebody
+ * points at the strip.
  */
 export function HomeTerminal() {
   const section = useRef<HTMLElement>(null);
@@ -151,9 +224,6 @@ export function HomeTerminal() {
   }
 
   const readout = turn % READOUTS.length;
-  const round = Math.floor(turn / READOUTS.length);
-  // The dashed stretch belongs to next month, so it comes in with that readout and stays for the plans.
-  const ahead = readout > 0;
 
   return (
     <section
@@ -201,41 +271,20 @@ export function HomeTerminal() {
           </span>
         </button>
 
-        <div className="flex items-center gap-x-4 sm:pl-8 xl:pl-0">
+        {/* The graph takes whatever room the row has left, so the strip runs the full width of the page column. */}
+        <div className="flex w-full min-w-0 items-center gap-x-6 lg:w-auto lg:flex-1 lg:gap-x-9">
           <div
             role="img"
-            aria-label="A graph of spend rising over the last 30 days"
-            data-ahead={ahead}
-            className="relative shrink-0"
-            style={{ width: GRAPH.past + GRAPH.ahead + 4, height: GRAPH.height }}
+            aria-label={READOUTS[readout].describes}
+            data-graph={READOUTS[readout].graph}
+            className="relative h-10 min-w-0 flex-1"
           >
-            {/* Each stretch is uncovered from the left, which draws its line. */}
-            <span key={`past-${onScreen}-${round}`} className="home-term-draw absolute left-0 top-0 block overflow-hidden" style={{ width: GRAPH.past }}>
-              <svg width={GRAPH.past} height={GRAPH.height} viewBox={`0 0 ${GRAPH.past} ${GRAPH.height}`} className="block" aria-hidden>
-                <path d={`${PAST_LINE} L${GRAPH.past} ${GRAPH.height} L0 ${GRAPH.height} Z`} className="fill-primary/15" />
-                <path d={PAST_LINE} className="fill-none stroke-primary" strokeWidth="2" strokeLinejoin="round" />
-              </svg>
-            </span>
-            {ahead ? (
-              <span className="home-term-draw absolute top-0 block overflow-hidden" style={{ left: GRAPH.past, width: GRAPH.ahead }}>
-                <svg width={GRAPH.ahead} height={GRAPH.height} viewBox={`0 0 ${GRAPH.ahead} ${GRAPH.height}`} className="block" aria-hidden>
-                  <path
-                    d={`M0 ${PAST_END_Y.toFixed(1)} L${GRAPH.ahead} ${AHEAD_END_Y.toFixed(1)}`}
-                    className="fill-none stroke-primary"
-                    strokeWidth="2"
-                    strokeDasharray="3 3"
-                  />
-                </svg>
-              </span>
-            ) : null}
-            {/* The dot sits on the end of the line and follows it out along the dashed stretch. */}
-            <span
-              key={`dot-${onScreen}-${round}`}
-              className="home-term-dot absolute size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary transition-[left,top] duration-700 ease-linear"
-              style={{ left: ahead ? GRAPH.past + GRAPH.ahead : GRAPH.past, top: ahead ? AHEAD_END_Y : PAST_END_Y }}
-            >
-              <span className="absolute inset-0 animate-ping rounded-full bg-primary/60" />
-            </span>
+            {/* Keyed so each graph draws itself again when its turn comes. */}
+            <div key={`${onScreen}-${turn}`} className="absolute inset-0">
+              {readout === 0 ? <TotalGraph /> : null}
+              {readout === 1 ? <ForecastGraph /> : null}
+              {readout === 2 ? <PlansGraph /> : null}
+            </div>
           </div>
 
           {/* The readouts share one cell, so the strip keeps its size while they take turns. */}

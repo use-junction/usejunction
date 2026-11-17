@@ -534,7 +534,7 @@ a {
   outline-offset: 3px;
 }
 
-/* Homepage terminal strip: the graph's line is uncovered from the left, its dot arrives when the line does, and each readout rises into place when its turn comes. */
+/* Homepage terminal strip: each readout rises into place when its turn comes, and its graph draws itself: a line uncovered from the left with a dot arriving at its end, bars rising one after another, or bars growing from the left. */
 @keyframes home-term-rise {
   from {
     opacity: 0;
@@ -544,7 +544,10 @@ a {
 
 @keyframes home-term-draw {
   from {
-    width: 0;
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
   }
 }
 
@@ -552,6 +555,21 @@ a {
   from {
     opacity: 0;
     scale: 0;
+  }
+}
+
+@keyframes home-term-bar {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes home-term-grow {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
   }
 }
 
@@ -566,6 +584,17 @@ a {
 
 .home-term-dot {
   animation: home-term-dot 300ms cubic-bezier(0.2, 0.7, 0.2, 1) 900ms both;
+}
+
+.home-term-bar {
+  transform-origin: bottom;
+  animation: home-term-bar 480ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 22ms);
+}
+
+.home-term-grow {
+  animation: home-term-grow 700ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
 }
 
 /* Homepage: a hand-placed note on a picture, in the violet of a reviewer's pen: a pale card with a hard violet shadow, and a violet arrow. */

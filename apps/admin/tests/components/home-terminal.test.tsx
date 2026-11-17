@@ -66,10 +66,10 @@ test("the strip stays one line: a small graph and one readout, with no table, ta
     expect(within(section).queryByRole(role)).toBeNull();
   }
   expect(section.textContent).not.toMatch(/ccusage|Example/i);
-  expect(within(section).getByRole("img", { name: /spend rising over the last 30 days/ })).toBeTruthy();
+  expect(within(section).getByRole("img", { name: "A line of spend adding up over the last 30 days" })).toBeTruthy();
 });
 
-test("once on screen the number counts up and the readout takes turns: total spent, next month, the plans we recommend", () => {
+test("once on screen the readouts take turns, each with its own graph: total spent, next month, the plans we recommend", () => {
   vi.useFakeTimers();
   const scrollIntoView = stubScrollIntoView();
 
@@ -88,24 +88,29 @@ test("once on screen the number counts up and the readout takes turns: total spe
   expect(counting).toBeLessThan(412.6);
   act(() => void vi.advanceTimersByTime(900));
   expect(shown(section)).toBe("Total spent$412.60");
-  // The dashed stretch of the graph is next month's, so it is not drawn yet.
-  expect(graph.getAttribute("data-ahead")).toBe("false");
+  expect(graph.getAttribute("data-graph")).toBe("total");
+  expect(graph.querySelector("svg path")).toBeTruthy();
 
   // 1.2s of the first turn are gone; each swap is followed by a second for the number to count up.
   act(() => void vi.advanceTimersByTime(3600 - 1200));
   expect(shown(section)).toMatch(/^Estimated next month/);
   act(() => void vi.advanceTimersByTime(1200));
   expect(shown(section)).toBe("Estimated next month$430");
-  expect(graph.getAttribute("data-ahead")).toBe("true");
+  // Next month gets bars: this month's, then as many paler ones for the month ahead.
+  expect(graph.getAttribute("data-graph")).toBe("forecast");
+  expect(graph.querySelectorAll("[data-bar=past]")).toHaveLength(15);
+  expect(graph.querySelectorAll("[data-bar=ahead]")).toHaveLength(15);
 
   act(() => void vi.advanceTimersByTime(3600 - 1200));
   expect(shown(section)).toBe("We recommendClaude Max $100+ChatGPT Plus $20");
-  expect(graph.getAttribute("data-ahead")).toBe("true");
+  // The plans get a comparison, and its two amounts match the readouts: the estimate, and the two plans added up.
+  expect(graph.getAttribute("data-graph")).toBe("plans");
+  expect(graph.textContent).toBe("$430 at API prices$120 on plans");
 
   act(() => void vi.advanceTimersByTime(3600));
   act(() => void vi.advanceTimersByTime(1200));
   expect(shown(section)).toBe("Total spent$412.60");
-  expect(graph.getAttribute("data-ahead")).toBe("false");
+  expect(graph.getAttribute("data-graph")).toBe("total");
 });
 
 test("pointing at the strip holds the readout, and it carries on afterwards", () => {
