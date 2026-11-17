@@ -6,7 +6,13 @@
 #   scripts/publish-npm-wrapper.sh 0.4.21             # publish (needs npm login or NODE_AUTH_TOKEN)
 #
 # The package holds no binary. It downloads the release's binary on first run,
-# so the release must be published before the package is.
+# so the release must be published before the package is. It does hold the
+# release's checksums.txt, so the binary is checked against what was published
+# here rather than against a file served next to it.
+#
+# Publishing a version that is already on npm is skipped, so the release
+# workflow can be run again safely. In GitHub Actions it publishes with npm
+# provenance, which ties the package to the workflow run that built it.
 set -euo pipefail
 
 VERSION="${1:-}"
@@ -31,16 +37,27 @@ for asset in usejunction-darwin-arm64 usejunction-darwin-amd64 usejunction-linux
   fi
 done
 
+if [[ "$MODE" != "--dry-run" ]] && [[ "$(npm view "usejunction@${VERSION}" version 2>/dev/null || true)" == "$VERSION" ]]; then
+  echo "usejunction@${VERSION} is already on npm; nothing to publish."
+  exit 0
+fi
+
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 cp -R "$ROOT/npm/usejunction/." "$STAGE/"
+rm -rf "$STAGE/docs"
 cp "$ROOT/LICENSE" "$STAGE/LICENSE"
+printf '%s\n' "$CHECKSUMS" > "$STAGE/checksums.txt"
+
+PUBLISH=(npm publish --access public)
+if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+  PUBLISH+=(--provenance)
+fi
+if [[ "$MODE" == "--dry-run" ]]; then
+  PUBLISH+=(--dry-run)
+fi
 (
   cd "$STAGE"
   npm version "$VERSION" --no-git-tag-version --allow-same-version >/dev/null
-  if [[ "$MODE" == "--dry-run" ]]; then
-    npm publish --access public --dry-run
-  else
-    npm publish --access public
-  fi
+  "${PUBLISH[@]}"
 )

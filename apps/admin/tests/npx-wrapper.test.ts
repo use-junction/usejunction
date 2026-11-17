@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -54,9 +54,9 @@ async function release(options: { checksum?: string } = {}) {
   return { requests, cache, base: `http://127.0.0.1:${(server.address() as AddressInfo).port}` };
 }
 
-function run(args: string[], env: Record<string, string>) {
+function run(args: string[], env: Record<string, string>, script = wrapper) {
   return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
-    execFile(process.execPath, [wrapper, ...args], { env: { PATH: process.env.PATH ?? "", HOME: tmpdir(), ...env } }, (error, stdout, stderr) => {
+    execFile(process.execPath, [script, ...args], { env: { PATH: process.env.PATH ?? "", HOME: tmpdir(), ...env } }, (error, stdout, stderr) => {
       resolve({ code: error ? Number((error as NodeJS.ErrnoException & { code?: number }).code ?? 1) : 0, stdout, stderr });
     });
   });
@@ -110,4 +110,55 @@ test("npx usejunction explains a missing release instead of crashing", async () 
   const missing = await run([], { USEJUNCTION_RELEASE_BASE: `${base}/nowhere`, USEJUNCTION_VERSION: "9.9.9", USEJUNCTION_NPX_CACHE: cache });
   assert.equal(missing.code, 1);
   assert.match(missing.stderr, /answered 404\. Check that release 9\.9\.9 exists\./);
+});
+
+/**
+ * A copy of the package as npm would install it: version 9.9.9, with the
+ * checksums.txt the publish script copies in from the release.
+ */
+function publishedCopy(checksum: string) {
+  const root = mkdtempSync(path.join(tmpdir(), "uj-npm-pkg-"));
+  cleanups.push(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(path.join(root, "bin"));
+  copyFileSync(wrapper, path.join(root, "bin", "usejunction.js"));
+  const pkg = JSON.parse(readFileSync(path.join(path.dirname(wrapper), "..", "package.json"), "utf8"));
+  writeFileSync(path.join(root, "package.json"), JSON.stringify({ ...pkg, version: "9.9.9" }));
+  writeFileSync(path.join(root, "checksums.txt"), `${checksum}  ${asset}\n`);
+  return path.join(root, "bin", "usejunction.js");
+}
+
+const realChecksum = createHash("sha256").update(fakeAgent).digest("hex");
+
+test.skipIf(!supported)("a published package checks the download against the checksums it carries, not the release's", async () => {
+  // The release serves a wrong checksum next to the binary; the package's own copy is right.
+  const tampered = await release({ checksum: "b".repeat(64) });
+  const trusted = await run(["daily"], { USEJUNCTION_RELEASE_BASE: tampered.base, USEJUNCTION_NPX_CACHE: tampered.cache }, publishedCopy(realChecksum));
+  assert.equal(trusted.code, 0, trusted.stderr);
+  assert.match(trusted.stdout, /args=daily/);
+  assert.deepEqual(tampered.requests, [`/${asset}`], "with checksums in the package, the release's are not even fetched");
+
+  // The other way round: a binary that matches the release's checksums but not the package's never runs.
+  const swapped = await release();
+  const refused = await run(["daily"], { USEJUNCTION_RELEASE_BASE: swapped.base, USEJUNCTION_NPX_CACHE: swapped.cache }, publishedCopy("c".repeat(64)));
+  assert.equal(refused.code, 1);
+  assert.match(refused.stderr, /does not match its checksum, so it was not run/);
+  assert.equal(refused.stdout, "");
+});
+
+test.skipIf(!supported)("a cached binary that changed is downloaded again before anything runs", async () => {
+  const { requests, cache, base } = await release();
+  const script = publishedCopy(realChecksum);
+  const env = { USEJUNCTION_RELEASE_BASE: base, USEJUNCTION_NPX_CACHE: cache };
+  assert.equal((await run([], env, script)).code, 0);
+
+  const cached = path.join(cache, "9.9.9", asset);
+  writeFileSync(cached, "#!/bin/sh\necho tampered\n", { mode: 0o755 });
+
+  const again = await run(["daily"], env, script);
+  assert.equal(again.code, 0, again.stderr);
+  assert.match(again.stderr, /The cached copy of usejunction 9\.9\.9 has changed; downloading it again\./);
+  assert.doesNotMatch(again.stdout, /tampered/);
+  assert.match(again.stdout, /args=daily/);
+  assert.equal(readFileSync(cached, "utf8"), fakeAgent);
+  assert.equal(requests.filter((url) => url === `/${asset}`).length, 2);
 });
