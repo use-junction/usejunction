@@ -63,3 +63,10 @@ test("release workflows never paste an input into a shell script", () => {
     }
   }
 });
+
+test("the release build runs on a macOS runner GitHub still offers", () => {
+  // macos-14 was retired: the agent-v0.5.0 build was cancelled before its first step.
+  const build = job(read(".github/workflows/agent-release-build.yml"), "build");
+  const runner = build.match(/runs-on: (\S+)/)?.[1];
+  assert.equal(runner, "macos-15");
+});
