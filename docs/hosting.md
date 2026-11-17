@@ -254,7 +254,11 @@ After install, `usejunction` is on `PATH` in new terminals.
 | `usejunction doctor`             | Detect installed tools                                  |
 | `usejunction status`             | Show enrollment state                                   |
 | `usejunction`                    | Daily usage table for the last 30 days; no account      |
+| `usejunction weekly`             | The same by week, Monday to Sunday                      |
 | `usejunction monthly`            | The same by month; add `--breakdown` for model lines    |
+| `usejunction today`              | Today only (`daily --last 1`)                           |
+| `usejunction week`               | This week only (`weekly --last 1`)                      |
+| `usejunction month`              | This month only (`monthly --last 1`)                    |
 | `usejunction session`            | Claude Code cost per session, with its project          |
 | `usejunction blocks`             | Claude Code in 5-hour blocks; `--active` for the pace   |
 | `usejunction statusline`         | One line of cost for Claude Code's status line          |
@@ -265,7 +269,7 @@ After install, `usejunction` is on `PATH` in new terminals.
 | `usejunction update --force`     | Reinstall a version locally blocked after rollback      |
 | `usejunction uninstall`          | Remove agent                                            |
 
-`usejunction`, `usejunction daily` and `usejunction monthly` read local logs only and upload nothing, connected or not. They take `--since` and `--until` (`YYYYMMDD` or `YYYY-MM-DD`), `--tool`, `--order`, `--breakdown` and `--json`. Days are UTC and only the last 60 days are read. In a terminal the table ends with one line pointing to sign-in; `USEJUNCTION_NO_TIPS=1` removes it.
+`usejunction`, `daily`, `weekly`, `monthly`, `today`, `week` and `month` read local logs only and upload nothing, connected or not. The reports take `--since` and `--until` (`YYYYMMDD` or `YYYY-MM-DD`) or `--last N` (the most recent N days, weeks or months, the current one included), plus `--tool`, `--order`, `--breakdown` and `--json`; `today`, `week` and `month` take `--tool`, `--breakdown` and `--json`. Days are UTC and only the last 60 days are read. In a terminal the table ends with one line pointing to sign-in; `USEJUNCTION_NO_TIPS=1` removes it.
 
 To try the tables without installing anything, run `npx usejunction` (it downloads and verifies the release binary, then runs it), or `brew install use-junction/tap/usejunction` once the tap is published. Neither signs in or starts a background service.
 

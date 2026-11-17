@@ -1,6 +1,6 @@
 # How the terminal usage numbers are measured
 
-`usejunction`, `daily`, `monthly`, `session`, `blocks` and `statusline` read the usage numbers AI coding tools write to this machine. This page says what those numbers are, and how they compare with ccusage on the same logs.
+`usejunction`, `daily`, `weekly`, `monthly`, `today`, `week`, `month`, `session`, `blocks` and `statusline` read the usage numbers AI coding tools write to this machine. This page says what those numbers are, and how they compare with ccusage on the same logs.
 
 ## What is counted
 
@@ -8,7 +8,7 @@
 - **One response is counted once.** Claude Code can write one response over several lines, the early ones with a partial output count. Only the most complete line counts.
 - **Input is uncached input.** Tools that report cached tokens inside their input count (Codex) are not counted twice.
 - **Cost is an estimate at API list prices**, from the price table in `agent/internal/scan/pricing.go`. It is not your bill. A subscription costs what the plan costs, whatever the table says.
-- **Days are UTC** in `daily` and `monthly`, the same days the dashboard uses. `session` and `blocks` show local time.
+- **Days are UTC** in `daily`, `weekly` and `monthly` (and `today`, `week` and `month`), the same days the dashboard uses. `session` and `blocks` show local time.
 - **Only the last 60 days are read.**
 
 ## Nothing leaves the machine
