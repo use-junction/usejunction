@@ -1,7 +1,7 @@
 {
   "name": "usejunction",
   "version": "0.0.0",
-  "description": "See what your AI coding tools cost, from the logs on this machine. No account needed.",
+  "description": "See what Claude Code, Codex, Cursor and other AI coding tools cost, from your local logs: today, week, month, daily, weekly, monthly, session and 5-hour block reports. No account, nothing uploaded.",
   "license": "LicenseRef-UseJunction-Community-1.0",
   "homepage": "https://usejunction.dev",
   "repository": {
@@ -21,11 +21,20 @@
   },
   "keywords": [
     "claude-code",
+    "claude",
     "codex",
     "cursor",
+    "copilot",
+    "gemini",
+    "opencode",
+    "ai",
+    "llm",
     "usage",
     "cost",
     "tokens",
-    "ccusage"
+    "token-usage",
+    "cli",
+    "ccusage",
+    "ccusage-alternative"
   ]
 }

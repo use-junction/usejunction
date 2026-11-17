@@ -28,6 +28,7 @@ var (
 	usageJSON       bool
 	usageBreakdown  bool
 	usageActiveOnly bool
+	usageLast       int
 
 	// Swapped out in tests so a command can run without reading real logs.
 	scanUsageForReport = func(ctx context.Context) ([]types.DailyUsage, bool) {
@@ -40,12 +41,20 @@ var (
 	}
 )
 
-func addUsageReportFlags(cmd *cobra.Command) {
+func addUsageReportFlags(cmd *cobra.Command, unit string) {
+	addUsageViewFlags(cmd)
 	flags := cmd.Flags()
 	flags.StringVar(&usageSince, "since", "", "First day to show (YYYYMMDD or YYYY-MM-DD)")
 	flags.StringVar(&usageUntil, "until", "", "Last day to show (YYYYMMDD or YYYY-MM-DD)")
-	flags.StringVar(&usageTool, "tool", "all", "Show one tool only: claude|codex|cursor|copilot|opencode|…")
+	flags.IntVar(&usageLast, "last", 0, fmt.Sprintf("Show only the most recent N %s (1 is the current one)", unit))
 	flags.StringVar(&usageOrder, "order", "asc", "Oldest first (asc) or newest first (desc)")
+}
+
+// addUsageViewFlags are the flags every table takes, including today, week
+// and month, which fix their own dates.
+func addUsageViewFlags(cmd *cobra.Command) {
+	flags := cmd.Flags()
+	flags.StringVar(&usageTool, "tool", "all", "Show one tool only: claude|codex|cursor|copilot|opencode|…")
 	flags.BoolVar(&usageBreakdown, "breakdown", false, "Add a line per model under each row")
 	flags.BoolVar(&usageJSON, "json", false, "Print JSON instead of a table")
 }
@@ -53,10 +62,16 @@ func addUsageReportFlags(cmd *cobra.Command) {
 // runUsageReport reads local usage and prints one table. It never uploads:
 // a connected device syncs from its background service, not from here.
 func runUsageReport(cmd *cobra.Command, period string) error {
+	return runUsageReportFor(cmd, period, usageLast)
+}
+
+// runUsageReportFor prints one table of the most recent `last` periods, or of
+// the --since/--until window when last is 0.
+func runUsageReportFor(cmd *cobra.Command, period string, last int) error {
 	jsonOut := usageJSON || format == "json"
 	opts := usageReportOptions{
 		Period: period, Since: usageSince, Until: usageUntil,
-		Tool: usageTool, Breakdown: usageBreakdown, Order: usageOrder,
+		Tool: usageTool, Breakdown: usageBreakdown, Order: usageOrder, Last: last,
 	}
 	now := usageReportNow()
 	// Check the flags before spending time on a scan.
@@ -226,6 +241,48 @@ No account is needed and nothing is uploaded. Prompt text is never read.`,
 	},
 }
 
+var weeklyCmd = &cobra.Command{
+	Use:   "weekly",
+	Short: "Show usage and estimated cost per week, from this machine's logs",
+	Long: `weekly prints one row per week and tool. Weeks run Monday to Sunday, UTC,
+and are named by the Monday they start on.
+
+Only the last 60 days of logs are read, so the oldest week can be partial;
+the table says which days a partial week covers.`,
+	Args: cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runUsageReport(cmd, usagePeriodWeekly)
+	},
+}
+
+// One-word views of the current day, week and month.
+var todayCmd = &cobra.Command{
+	Use:   "today",
+	Short: "Show today's usage and estimated cost (same as daily --last 1)",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runUsageReportFor(cmd, usagePeriodDaily, 1)
+	},
+}
+
+var weekCmd = &cobra.Command{
+	Use:   "week",
+	Short: "Show this week's usage and estimated cost (same as weekly --last 1)",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runUsageReportFor(cmd, usagePeriodWeekly, 1)
+	},
+}
+
+var monthCmd = &cobra.Command{
+	Use:   "month",
+	Short: "Show this month's usage and estimated cost (same as monthly --last 1)",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runUsageReportFor(cmd, usagePeriodMonthly, 1)
+	},
+}
+
 var monthlyCmd = &cobra.Command{
 	Use:   "monthly",
 	Short: "Show usage and estimated cost per month, from this machine's logs",
@@ -299,9 +356,12 @@ func init() {
 	rootCmd.RunE = func(cmd *cobra.Command, args []string) error {
 		return runUsageReport(cmd, usagePeriodDaily)
 	}
-	addUsageReportFlags(rootCmd)
-	addUsageReportFlags(dailyCmd)
-	addUsageReportFlags(monthlyCmd)
-	rootCmd.AddCommand(dailyCmd)
-	rootCmd.AddCommand(monthlyCmd)
+	addUsageReportFlags(rootCmd, "days")
+	addUsageReportFlags(dailyCmd, "days")
+	addUsageReportFlags(weeklyCmd, "weeks")
+	addUsageReportFlags(monthlyCmd, "months")
+	for _, view := range []*cobra.Command{todayCmd, weekCmd, monthCmd} {
+		addUsageViewFlags(view)
+	}
+	rootCmd.AddCommand(dailyCmd, weeklyCmd, monthlyCmd, todayCmd, weekCmd, monthCmd)
 }

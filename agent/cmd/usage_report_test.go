@@ -261,6 +261,7 @@ func TestUsageSignInCommandFitsHowTheAgentWasRun(t *testing.T) {
 func resetUsageFlags() {
 	usageSince, usageUntil, usageTool, usageOrder = "", "", "all", "asc"
 	usageJSON, usageBreakdown, usageActiveOnly = false, false, false
+	usageLast = 0
 }
 
 func runUsageCommand(t *testing.T, args ...string) string {
