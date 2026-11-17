@@ -230,24 +230,24 @@ Subsequent OTAs then verify signed manifests normally.
 
 Two more ways to get the agent point at the same release binaries. Neither installs a background service or signs anyone in; they exist so people can run the usage tables (`usejunction`, see `docs/usage-numbers.md`) without an account.
 
-- **npm**: `npx usejunction` runs `npm/usejunction/bin/usejunction.js`. It downloads the release binary for the platform, checks it against the release's `checksums.txt`, keeps it in the user's cache folder and runs it. The package version is the agent version.
+- **npm**: `npx usejunction` runs `npm/usejunction/bin/usejunction.js`. It downloads the release binary for the platform, checks it against the `checksums.txt` that was copied into the package when it was published (not one fetched next to the binary), keeps it in the user's cache folder, and checks the cached copy again on every run. The package version is the agent version, and it is published with npm provenance.
 - **Homebrew**: `brew install use-junction/tap/usejunction` installs the release binary from a formula in the `use-junction/homebrew-tap` repository.
 
-After promoting a release, run the **Agent release to npm and Homebrew** workflow with the version. It runs `scripts/publish-npm-wrapper.sh` and `scripts/build-homebrew-formula.sh`. Both scripts stop if the release is missing a platform. To do it by hand:
+Both are part of the release cycle. When **Agent release control** promotes a release, its `distribute` job calls **Agent release to npm and Homebrew** (`agent-release-distribute.yml`) with the same version, after the promotion has succeeded. Pre-releases (`1.2.3-beta.1`) are not published. The npm half skips a version npm already has, so the workflow can be run again by hand to retry. It runs `scripts/publish-npm-wrapper.sh` and `scripts/build-homebrew-formula.sh`; both stop if the release is missing a platform. To do it by hand:
 
 ```bash
-scripts/publish-npm-wrapper.sh 0.4.21 --dry-run   # then without --dry-run
-scripts/build-homebrew-formula.sh 0.4.21 > Formula/usejunction.rb   # in a checkout of the tap
+scripts/publish-npm-wrapper.sh 0.5.0 --dry-run   # then without --dry-run
+scripts/build-homebrew-formula.sh 0.5.0 > Formula/usejunction.rb   # in a checkout of the tap
 ```
 
-One-time setup, not done yet:
+Secrets:
 
-1. Create the npm package owner and add an automation token as the `NPM_TOKEN` repository secret. The name `usejunction` was free on npm on 2026-11-16.
-2. Create the public repository `use-junction/homebrew-tap` and add a token that can push to it as `HOMEBREW_TAP_TOKEN`.
+1. `NPM_TOKEN`: an npm token that can publish `usejunction`. Set on 2026-11-17.
+2. `HOMEBREW_TAP_TOKEN`: not set yet. Create the public repository `use-junction/homebrew-tap` and add a token that can push to it.
 
 The workflow skips whichever half has no secret.
 
-Publish to npm only after the release is public: the package holds no binary, so a version that points at an unpublished release fails for everyone who runs it.
+Workflow inputs reach scripts through `env`, never pasted into a `run:` block, so a crafted version string cannot run as shell.
 
 ## Control plane API surface
 

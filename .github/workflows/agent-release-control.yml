@@ -22,14 +22,19 @@ on:
 permissions:
   contents: write
 
+# Inputs reach scripts through env, never pasted into a `run:` block, so a
+# crafted version string cannot run as shell.
 jobs:
   control:
     runs-on: ubuntu-latest
     environment: agent-production
+    env:
+      VERSION: ${{ inputs.version }}
+      URGENCY: ${{ inputs.urgency }}
     steps:
       - name: Validate input
         shell: bash
-        run: '[[ "${{ inputs.version }}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]'
+        run: '[[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]'
       - uses: actions/checkout@v4
         if: inputs.action == 'promote'
       - name: Download immutable candidate
@@ -37,7 +42,7 @@ jobs:
         shell: bash
         run: |
           mkdir release
-          gh release download "agent-v${{ inputs.version }}" --dir release
+          gh release download "agent-v${VERSION}" --dir release
           test -f release/manifest.json
           test -f release/checksums.txt
         env:
@@ -46,10 +51,10 @@ jobs:
         if: inputs.action == 'promote'
         shell: bash
         run: |
-          node scripts/sign-agent-release-manifest.js release/manifest.json "${{ inputs.urgency }}"
-          gh release edit "agent-v${{ inputs.version }}" --draft=false --latest
+          node scripts/sign-agent-release-manifest.js release/manifest.json "$URGENCY"
+          gh release edit "agent-v${VERSION}" --draft=false --latest
           # Keep GitHub Release manifest in sync with the promoted, re-signed copy.
-          gh release upload "agent-v${{ inputs.version }}" release/manifest.json --clobber
+          gh release upload "agent-v${VERSION}" release/manifest.json --clobber
         env:
           GH_TOKEN: ${{ github.token }}
           AGENT_UPDATE_SIGNING_KEY_ID: ${{ secrets.AGENT_UPDATE_SIGNING_KEY_ID }}
@@ -71,8 +76,23 @@ jobs:
           curl --fail-with-body --silent --show-error \
             -H "Authorization: Bearer $AGENT_RELEASE_OPERATIONS_TOKEN" \
             -H "Content-Type: application/json" \
-            --data '{"version":"${{ inputs.version }}"}' \
+            --data "{\"version\":\"${VERSION}\"}" \
             "$CONTROL_PLANE_URL/api/internal/agent-releases/pause"
         env:
           CONTROL_PLANE_URL: ${{ secrets.CONTROL_PLANE_URL }}
           AGENT_RELEASE_OPERATIONS_TOKEN: ${{ secrets.AGENT_RELEASE_OPERATIONS_TOKEN }}
+
+  # A promoted release goes to npm and Homebrew at the same version, so
+  # `npx usejunction` and `brew install` run what the fleet is moving to.
+  # Pre-releases (1.2.3-beta.1) stay off npm.
+  distribute:
+    name: Publish to npm and Homebrew
+    needs: control
+    if: inputs.action == 'promote' && !contains(inputs.version, '-')
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/agent-release-distribute.yml
+    with:
+      version: ${{ inputs.version }}
+    secrets: inherit

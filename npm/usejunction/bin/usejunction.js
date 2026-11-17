@@ -5,6 +5,10 @@
 // it against the release's checksums, and runs it with the arguments given.
 // The binary is kept in the user's cache folder, so later runs start at once.
 // Nothing is installed: no background service, no PATH change, no settings.
+//
+// A published package carries the release's checksums.txt, copied in when it
+// was published. Downloads are checked against that copy, not one fetched from
+// the same place as the binary, and the cached binary is checked on every run.
 
 const { spawnSync } = require("node:child_process");
 const { createHash } = require("node:crypto");
@@ -56,6 +60,21 @@ async function download(url) {
   return Buffer.from(await response.arrayBuffer());
 }
 
+function sha256(buffer) {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+// The checksums published with this package, for the version it was published
+// for. A different USEJUNCTION_VERSION has none, and fetches the release's.
+function bundledChecksums(version) {
+  if (version !== require("../package.json").version) return null;
+  try {
+    return fs.readFileSync(path.join(__dirname, "..", "checksums.txt"), "utf8");
+  } catch {
+    return null;
+  }
+}
+
 function expectedChecksum(checksums, name) {
   for (const line of checksums.split(/\r?\n/)) {
     const [sum, file] = line.trim().split(/\s+/);
@@ -69,16 +88,31 @@ async function ensureBinary() {
   const name = assetName();
   const directory = path.join(cacheRoot(), version);
   const target = path.join(directory, name);
-  if (fs.existsSync(target)) return target;
+
+  const bundled = bundledChecksums(version);
+  const pinned = bundled === null ? "" : expectedChecksum(bundled, name);
+  if (bundled !== null && !pinned) fail(`this package lists no checksum for ${name}.`);
+
+  if (fs.existsSync(target)) {
+    if (!pinned || sha256(fs.readFileSync(target)) === pinned) return target;
+    // A cached copy that changed since it was checked is replaced, never run.
+    process.stderr.write(`The cached copy of usejunction ${version} has changed; downloading it again.\n`);
+    fs.rmSync(target, { force: true });
+  }
 
   const base = (process.env.USEJUNCTION_RELEASE_BASE || `https://github.com/use-junction/usejunction/releases/download/agent-v${version}`).replace(/\/+$/, "");
   process.stderr.write(`Downloading usejunction ${version}…\n`);
-  const [checksums, binary] = await Promise.all([download(`${base}/checksums.txt`), download(`${base}/${name}`)]);
-
-  const expected = expectedChecksum(checksums.toString("utf8"), name);
-  if (!expected) fail(`release ${version} lists no checksum for ${name}.`);
-  const actual = createHash("sha256").update(binary).digest("hex");
-  if (actual !== expected) {
+  let expected = pinned;
+  let binary;
+  if (expected) {
+    binary = await download(`${base}/${name}`);
+  } else {
+    const [checksums, file] = await Promise.all([download(`${base}/checksums.txt`), download(`${base}/${name}`)]);
+    expected = expectedChecksum(checksums.toString("utf8"), name);
+    if (!expected) fail(`release ${version} lists no checksum for ${name}.`);
+    binary = file;
+  }
+  if (sha256(binary) !== expected) {
     fail(`the download of ${name} does not match its checksum, so it was not run. Try again.`);
   }
 
