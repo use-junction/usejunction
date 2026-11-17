@@ -1,0 +1,31 @@
+{
+  "name": "usejunction",
+  "version": "0.0.0",
+  "description": "See what your AI coding tools cost, from the logs on this machine. No account needed.",
+  "license": "LicenseRef-UseJunction-Community-1.0",
+  "homepage": "https://usejunction.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/use-junction/usejunction.git",
+    "directory": "npm/usejunction"
+  },
+  "bin": {
+    "usejunction": "bin/usejunction.js"
+  },
+  "files": [
+    "bin/usejunction.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "claude-code",
+    "codex",
+    "cursor",
+    "usage",
+    "cost",
+    "tokens",
+    "ccusage"
+  ]
+}

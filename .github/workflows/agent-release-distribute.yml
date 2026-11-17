@@ -1,0 +1,63 @@
+name: Agent release to npm and Homebrew
+
+# Run by hand after an agent release is promoted. It publishes the
+# `usejunction` npm package (so `npx usejunction` runs that release) and
+# updates the Homebrew formula. Each half is skipped when its secret is absent.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Published agent version, for example 0.4.21"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    name: Publish the npm package
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - name: Publish usejunction to npm
+        if: env.NODE_AUTH_TOKEN != ''
+        run: ./scripts/publish-npm-wrapper.sh "${{ inputs.version }}"
+      - name: Skipped
+        if: env.NODE_AUTH_TOKEN == ''
+        run: echo "NPM_TOKEN is not set, so nothing was published to npm."
+
+  homebrew:
+    name: Update the Homebrew formula
+    runs-on: ubuntu-latest
+    env:
+      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write the formula
+        run: ./scripts/build-homebrew-formula.sh "${{ inputs.version }}" > "$RUNNER_TEMP/usejunction.rb"
+      - name: Push it to use-junction/homebrew-tap
+        if: env.TAP_TOKEN != ''
+        run: |
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/use-junction/homebrew-tap.git" "$RUNNER_TEMP/tap"
+          mkdir -p "$RUNNER_TEMP/tap/Formula"
+          cp "$RUNNER_TEMP/usejunction.rb" "$RUNNER_TEMP/tap/Formula/usejunction.rb"
+          cd "$RUNNER_TEMP/tap"
+          git config user.name "usejunction-release"
+          git config user.email "release@usejunction.dev"
+          git add Formula/usejunction.rb
+          if git diff --cached --quiet; then
+            echo "The formula is already at ${{ inputs.version }}."
+          else
+            git commit -m "usejunction ${{ inputs.version }}"
+            git push
+          fi
+      - name: Skipped
+        if: env.TAP_TOKEN == ''
+        run: echo "HOMEBREW_TAP_TOKEN is not set, so the tap was not updated."
