@@ -75,3 +75,38 @@ test("the package description names the periods people look for", () => {
   assert.match(pkg.description, /No account/);
   assert.ok(pkg.keywords.includes("ccusage"));
 });
+
+/**
+ * The tools that put rows in a usage table: every provider whose ScanLocalUsage
+ * does more than `return nil, nil`. Detected-only tools (Ollama, LM Studio)
+ * and tools with no provider at all (Gemini CLI) are left out.
+ */
+function toolsWithUsage(): string[] {
+  const dir = path.join(repoRoot, "agent", "internal", "providers");
+  const registry = readFileSync(path.join(dir, "provider.go"), "utf8");
+  const ids: string[] = [];
+  for (const file of readdirSync(dir).filter((name) => name.endsWith(".go") && !name.endsWith("_test.go"))) {
+    const source = readFileSync(path.join(dir, file), "utf8");
+    const scan = source.match(/func \(p \*(\w+)\) ScanLocalUsage\([^)]*\) \([^)]*\) \{\s*([^\n]*)/);
+    if (!scan || scan[2]!.trim() === "return nil, nil") continue;
+    const type = scan[1]!;
+    // One provider type can stand for several tools: &ClineProvider{Tool: "roo"}.
+    const variants = [...registry.matchAll(new RegExp(`&${type}\\{Tool: "([a-z-]+)"\\}`, "g"))].map((match) => match[1]!);
+    const fixed = source.match(new RegExp(`func \\(p \\*${type}\\) ID\\(\\) string \\{\\s*return "([a-z-]+)"`))?.[1];
+    ids.push(...(variants.length > 0 ? variants : fixed ? [fixed] : []));
+  }
+  return ids.sort();
+}
+
+test("the npm README lists exactly the sources that put rows in a usage table", () => {
+  const usage = toolsWithUsage();
+  assert.deepEqual(usage, ["antigravity", "claude", "cline", "codex", "continue", "copilot", "cursor", "opencode", "roo"]);
+
+  const table = readme.slice(readme.indexOf("## Supported Sources"), readme.indexOf("## Installation"));
+  const listed = [...table.matchAll(/`usejunction daily --tool ([a-z-]+)`/g)].map((match) => match[1]!).sort();
+  assert.deepEqual(listed, usage, "Supported Sources must match the providers that report usage");
+  assert.match(readme, new RegExp(`\\*\\*${usage.length} Sources, Cursor Included\\*\\*`));
+  for (const missing of ["Gemini CLI", "Ollama", "LM Studio"]) {
+    assert.ok(!readme.includes(missing), `README claims ${missing}, which reports no usage`);
+  }
+});

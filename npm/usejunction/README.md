@@ -25,20 +25,17 @@ npx usejunction@latest
 
 usejunction reads the usage that AI coding tools already write to your machine and turns it into daily, weekly, monthly, session and 5-hour reports.
 
-| Source         | Focused command example                |
-| -------------- | -------------------------------------- |
-| Claude Code    | `usejunction daily --tool claude`      |
-| Codex          | `usejunction daily --tool codex`       |
-| Cursor         | `usejunction daily --tool cursor`      |
-| GitHub Copilot | `usejunction daily --tool copilot`     |
-| OpenCode       | `usejunction daily --tool opencode`    |
-| Gemini CLI     | `usejunction daily --tool gemini`      |
-| Antigravity    | `usejunction daily --tool antigravity` |
-| Cline          | `usejunction daily --tool cline`       |
-| Roo Code       | `usejunction daily --tool roo`         |
-| Continue       | `usejunction daily --tool continue`    |
-| Ollama         | `usejunction daily --tool ollama`      |
-| LM Studio      | `usejunction daily --tool lmstudio`    |
+| Source              | Focused command example                |
+| ------------------- | -------------------------------------- |
+| Claude Code         | `usejunction daily --tool claude`      |
+| Codex               | `usejunction daily --tool codex`       |
+| Cursor              | `usejunction daily --tool cursor`      |
+| GitHub Copilot Chat | `usejunction daily --tool copilot`     |
+| OpenCode            | `usejunction daily --tool opencode`    |
+| Antigravity         | `usejunction daily --tool antigravity` |
+| Cline               | `usejunction daily --tool cline`       |
+| Roo Code            | `usejunction daily --tool roo`         |
+| Continue            | `usejunction daily --tool continue`    |
 
 Use `usejunction daily`, `usejunction weekly` or `usejunction monthly` to include every detected source in one report.
 
@@ -111,7 +108,7 @@ Dates are `YYYYMMDD` or `YYYY-MM-DD`. Add `--help` to any command for the rest.
 - 💬 **Session Report**: Claude Code cost per session, with the project it ran in
 - ⏰ **5-Hour Blocks Report**: Track Claude's 5-hour usage windows, with the time left, the spend per hour and where the active block is heading
 - 🚀 **Statusline Integration**: Session, today and block cost on one line in Claude Code's status bar
-- 🧰 **12 Sources, Cursor Included**: Claude Code, Codex, Cursor, GitHub Copilot, OpenCode, Gemini CLI, Antigravity, Cline, Roo Code, Continue, Ollama and LM Studio in one table
+- 🧰 **9 Sources, Cursor Included**: Claude Code, Codex, Cursor, GitHub Copilot Chat, OpenCode, Antigravity, Cline, Roo Code and Continue in one table
 - 🤖 **Model Tracking**: See which models each tool used, most expensive first
 - 📋 **Model Breakdown**: A line per model with `--breakdown`
 - 📅 **Date Filtering**: `--since` and `--until`
