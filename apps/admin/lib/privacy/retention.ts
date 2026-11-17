@@ -33,9 +33,13 @@ export async function enforceUsageRetention(orgId: string, retentionDays: number
 }
 
 export async function enforceGlobalTtls(now = new Date()) {
-  const [provider, buckets, auditLogs] = await Promise.all([
+  const [provider, buckets, deviceAuthRequests, auditLogs] = await Promise.all([
     prisma.providerSourceRecord.deleteMany({ where: { expiresAt: { lt: now } } }),
     prisma.rateLimitBucket.deleteMany({ where: { expiresAt: { lt: now } } }),
+    // Device sign-in requests live for minutes; keep a day for support, then drop.
+    prisma.deviceAuthRequest.deleteMany({
+      where: { expiresAt: { lt: new Date(now.getTime() - 24 * 60 * 60 * 1000) } },
+    }),
     prisma.auditLog.deleteMany({
       where: {
         createdAt: { lt: cutoffDate(AUDIT_RETENTION_DAYS, now) },
@@ -43,7 +47,12 @@ export async function enforceGlobalTtls(now = new Date()) {
       },
     }),
   ]);
-  return { provider: provider.count, rateLimits: buckets.count, auditLogs: auditLogs.count };
+  return {
+    provider: provider.count,
+    rateLimits: buckets.count,
+    deviceAuthRequests: deviceAuthRequests.count,
+    auditLogs: auditLogs.count,
+  };
 }
 
 export async function processDueErasureRequests(now = new Date()) {
