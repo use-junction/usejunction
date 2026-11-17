@@ -110,6 +110,23 @@ test("repository filters retain workspace coverage including unlinked usage", as
   assert.equal(mocks.allocationGroups.mock.calls[0]?.[0].where.repositoryId, undefined);
 });
 
+test("repository spend counts only attributed allocations so its share of spend on work stays within 100%", async () => {
+  mocks.access.mockResolvedValue([repository("r1", "api"), repository("r2", "web")]);
+  mocks.allocationGroups.mockResolvedValue([
+    { repositoryId: "r1", costKind: "estimated_api", method: "commit_split", _sum: { costMicros: 800_000n } },
+    { repositoryId: "r2", costKind: "estimated_api", method: "unattributed", _sum: { costMicros: 3_000_000n } },
+    { repositoryId: "r2", costKind: "verified_usage", method: "commit_split", _sum: { costMicros: 200_000n } },
+  ]);
+  mocks.raw.mockResolvedValueOnce([]).mockResolvedValueOnce([{ hasTickets: false }]);
+  const { loadWorkSpendPage } = await import("@/lib/app-pages/work-spend");
+  const page = await loadWorkSpendPage(principal, { days: "30" });
+  assert.equal(page.coverage.attributedMicros, "1000000");
+  assert.equal(page.repositories[1]?.estimatedMicros, "0");
+  assert.equal(page.repositories[1]?.verifiedMicros, "200000");
+  const repoTotal = page.repositories.reduce((sum, row) => sum + BigInt(row.verifiedMicros) + BigInt(row.estimatedMicros), 0n);
+  assert.ok(repoTotal <= BigInt(page.coverage.attributedMicros));
+});
+
 test("owners can view people allocation and managers cannot", async () => {
   mocks.access.mockResolvedValue([repository("r1", "api")]);
   const { loadWorkSpendPage } = await import("@/lib/app-pages/work-spend");

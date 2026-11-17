@@ -13,7 +13,7 @@ import {
   githubAuthorScopeFromConnection,
   githubMemberLoginsFromConfig,
   githubUserIdFromMetadata,
-  isInScopeGitHubLogin,
+  isInAnyGitHubAuthorScope,
   matchDeveloperForGitHubAuthor,
   mergeGithubIdentityMetadata,
   nextGitHubAuthorResolution,
@@ -246,9 +246,10 @@ export async function resolveAuthors(
   orgId: string,
   connectionId: string,
   hints: AuthorHint[],
-  scope: GitHubAuthorScope,
+  scope: GitHubAuthorScope | GitHubAuthorScope[],
   context?: AuthorResolutionContext,
 ) {
+  const scopes = Array.isArray(scope) ? scope : [scope];
   const ctx = context ?? await loadAuthorResolutionContext(orgId);
   return ctx.gate(async () => {
     const resolved = new Map<string, string | null>();
@@ -276,10 +277,11 @@ export async function resolveAuthors(
       const ranked = nextGitHubAuthorResolution({
         existingMatchedBy: existing?.matchedBy,
         existingDeveloperId: existing?.developerId,
-        inScope: isInScopeGitHubLogin(login, scope),
+        inScope: isInAnyGitHubAuthorScope(login, scopes),
         matched: matched.developerId
           ? matched
-          : soleDeveloperMatch(ctx.developers, scope, login),
+          : scopes.map((item) => soleDeveloperMatch(ctx.developers, item, login)).find((item) => item.developerId)
+            ?? { developerId: null, matchedBy: null },
       });
       if (!ranked.persist) {
         resolved.set(login, ranked.developerId);
@@ -727,35 +729,26 @@ export async function runCommitUsageMapping(
     context?: AuthorResolutionContext;
   } = {},
 ) {
-  let connectionId = options.connectionId ?? null;
-  let scope = options.scope ?? null;
-  // The sync hands over everything it already knows; other callers look the connection up.
-  if (!(connectionId && scope && options.context)) {
-    const connection = await prisma.providerConnection.findFirst({
-      where: {
-        orgId,
-        provider: "github",
-        status: { not: "disconnected" },
-        ...(options.connectionId ? { id: options.connectionId } : {}),
-      },
-      select: { id: true, config: true },
-    });
-    if (!connection) return runFeatureCostAllocation(orgId, window, options.developerIds, { context: options.context });
-    connectionId = connection.id;
-    if (!scope) {
-      const config = (connection.config ?? {}) as IntegrationConfig;
-      const developers = options.context?.developers ?? await prisma.developer.findMany({
-        where: { orgId, removedAt: null },
-        select: { email: true },
-      });
-      scope = githubAuthorScopeFromConnection({
-        accountType: normalizeGitHubAccountType(config.accountType) ?? "Organization",
-        memberLogins: githubMemberLoginsFromConfig(connection.config),
-        developers,
-      });
-    }
-  }
+  // Restamping is workspace-wide, so an author is judged against every connected
+  // account: one only in scope on a personal install must survive an org install's run.
+  const connections = await prisma.providerConnection.findMany({
+    where: { orgId, provider: "github", status: { not: "disconnected" } },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, config: true },
+  });
+  const connection = connections.find((row) => row.id === options.connectionId) ?? connections[0];
+  if (!connection) return runFeatureCostAllocation(orgId, window, options.developerIds, { context: options.context });
   const context = options.context ?? await loadAuthorResolutionContext(orgId);
+  // The sync hands over the scope it already built for its own connection.
+  const scopes = connections.map((row) => {
+    if (row.id === connection.id && options.scope) return options.scope;
+    const config = (row.config ?? {}) as IntegrationConfig;
+    return githubAuthorScopeFromConnection({
+      accountType: normalizeGitHubAccountType(config.accountType) ?? "Organization",
+      memberLogins: githubMemberLoginsFromConfig(row.config),
+      developers: context.developers,
+    });
+  });
   const authorLogins = await prisma.gitCommit.groupBy({
     by: ["authorLogin"],
     where: { orgId, isBot: false, authorLogin: { not: null } },
@@ -768,7 +761,7 @@ export async function runCommitUsageMapping(
       githubUserId: githubUserIdFromMetadata(identity.metadata),
     })),
   ];
-  const resolved = await resolveAuthors(orgId, connectionId, hints, scope, context);
+  const resolved = await resolveAuthors(orgId, connection.id, hints, scopes, context);
   // A full pass, as before: every resolved login is stamped (nulls included) so
   // identities changed outside this run stay consistent; unchanged rows are skipped in SQL.
   await restampGitAuthors(orgId, [...resolved].map(([login, developerId]) => ({ login, developerId })));
