@@ -75,8 +75,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className={`${dmSans.variable} ${figtree.variable} ${jetbrainsMono.variable}`}>
         <AppProviders><Suspense fallback={null}>{children}</Suspense></AppProviders>
-        {/* Vercel Web Analytics only exists on Vercel; self-hosted installs skip it. */}
-        {process.env.VERCEL === "1" ? <WebAnalytics /> : null}
+        {/* Loads only on the hosted site; the component checks the domain in the browser. */}
+        <WebAnalytics />
       </body>
     </html>
   );

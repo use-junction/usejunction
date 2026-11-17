@@ -17,6 +17,16 @@ const REDACTED_SEGMENTS: Array<{ match: RegExp; replace: string }> = [
   { match: /^\/signals\/journeys\/[^/]+/, replace: "/signals/journeys/[flowKey]" },
 ];
 
+/**
+ * The hosted service: usejunction.dev and its subdomains (eu.usejunction.dev),
+ * and Vercel preview deployments. Self-hosted installs run on their own
+ * domains, where Vercel's analytics endpoint does not exist.
+ */
+export function isHostedSite(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  return host === "usejunction.dev" || host.endsWith(".usejunction.dev") || host.endsWith(".vercel.app");
+}
+
 /** Keeps the origin and the page; drops the query string and fragment, and replaces tokens and ids in the path. */
 export function redactAnalyticsUrl(url: string): string {
   let parsed: URL;

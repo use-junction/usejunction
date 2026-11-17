@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "vitest";
 import { serializeAnalyticsConsent } from "../lib/consent/analytics-consent";
-import { prepareAnalyticsEvent, redactAnalyticsUrl } from "../lib/web-analytics";
+import { isHostedSite, prepareAnalyticsEvent, redactAnalyticsUrl } from "../lib/web-analytics";
 
 const site = "https://usejunction.dev";
 
@@ -43,14 +43,26 @@ test("turning analytics off in Settings → Privacy stops Vercel Web Analytics t
   assert.equal(prepareAnalyticsEvent({ type: "pageview", url: "garbage" }, null), null);
 });
 
-test("the root layout adds Web Analytics only on Vercel, and the cookies page lists it", () => {
+test("Web Analytics loads on the hosted site only, decided in the browser", () => {
+  for (const host of ["usejunction.dev", "eu.usejunction.dev", "admin-git-main-makers-ops.vercel.app", "USEJUNCTION.DEV."]) {
+    assert.equal(isHostedSite(host), true, host);
+  }
+  for (const host of ["localhost", "127.0.0.1", "junction.acme.internal", "usejunction.dev.evil.com", "notusejunction.dev"]) {
+    assert.equal(isHostedSite(host), false, host);
+  }
+});
+
+test("the root layout always mounts Web Analytics, and the cookies page lists it", () => {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const layout = readFileSync(path.join(here, "..", "app", "layout.tsx"), "utf8");
-  assert.match(layout, /\{process\.env\.VERCEL === "1" \? <WebAnalytics \/> : null\}/);
+  // process.env.VERCEL is not set at runtime on this project, so gating on it hid analytics everywhere.
+  assert.doesNotMatch(layout, /process\.env\.VERCEL/);
+  assert.match(layout, /<WebAnalytics \/>/);
 
   const component = readFileSync(path.join(here, "..", "components", "web-analytics.tsx"), "utf8");
   assert.match(component, /from "@vercel\/analytics\/next"/);
   assert.match(component, /beforeSend=\{\(event\) => prepareAnalyticsEvent\(event\)\}/);
+  assert.match(component, /isHostedSite\(window\.location\.hostname\)/);
 
   const cookies = readFileSync(path.join(here, "..", "content", "legal", "cookies.ts"), "utf8");
   assert.match(cookies, /Vercel Web Analytics counts page views on usejunction\.dev without cookies/);
