@@ -641,7 +641,7 @@ install_agent() {
     trap 'if [ -n "${tmp_dir:-}" ]; then rm -rf "$tmp_dir"; fi' EXIT
 
     local control_base="${CONTROL_PLANE_URL}/releases/download/v${VERSION}"
-    local github_base="https://github.com/Dinuda/usejunction/releases/download/agent-v${VERSION}"
+    local github_base="https://github.com/use-junction/usejunction/releases/download/agent-v${VERSION}"
     local bases=()
     if [[ -n "${USEJUNCTION_DOWNLOAD_BASE:-}" ]]; then
       bases+=("${USEJUNCTION_DOWNLOAD_BASE}")
@@ -669,7 +669,7 @@ install_agent() {
     trap 'if [ -n "${tmp_dir:-}" ]; then rm -rf "$tmp_dir"; fi' EXIT
 
     local control_base="${CONTROL_PLANE_URL}/releases/download/v${VERSION}"
-    local github_base="https://github.com/Dinuda/usejunction/releases/download/agent-v${VERSION}"
+    local github_base="https://github.com/use-junction/usejunction/releases/download/agent-v${VERSION}"
     local bases=()
     if [[ -n "${USEJUNCTION_DOWNLOAD_BASE:-}" ]]; then
       bases+=("${USEJUNCTION_DOWNLOAD_BASE}")

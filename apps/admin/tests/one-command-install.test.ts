@@ -285,3 +285,17 @@ test("install.ps1 has the same view-only switch", () => {
   assert.match(installPs1.slice(local, firstRegister), /exit 0/);
   assert.doesNotMatch(installPs1.slice(local, firstRegister), /onboard|"login"|Register-ScheduledTask/);
 });
+
+test("both installers download release files from the repo the releases are published in", () => {
+  // The repo moved to use-junction/usejunction. Dinuda/usejunction is now a
+  // separate private repo, so GitHub does not redirect and every download 404s.
+  const repo = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  for (const file of ["install.sh", "install.ps1", "scripts/build-agent-releases.sh"]) {
+    const body = readFileSync(path.join(repo, file), "utf8");
+    assert.doesNotMatch(body, /Dinuda\/usejunction/, `${file} still points at Dinuda/usejunction`);
+  }
+  for (const file of ["install.sh", "install.ps1"]) {
+    const body = readFileSync(path.join(repo, file), "utf8");
+    assert.match(body, /https:\/\/github\.com\/use-junction\/usejunction\/releases\/download\/agent-v/, `${file} has no GitHub release source`);
+  }
+});
